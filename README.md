@@ -7,7 +7,7 @@ A Python library for content-addressable data storage.
 MCard provides a standardized way to handle content-addressable data with the following key attributes:
 
 - `content`: The actual content data (can be any type)
-- `content_hash`: A SHA-256 hash of the content (64-character hexadecimal string)
+- `content_hash`: A SHA-256 hash of the content, automatically calculated (64-character hexadecimal string)
 - `time_claimed`: A timezone-aware timestamp indicating when the content was claimed
 
 ## Installation
@@ -21,16 +21,18 @@ pip install mcard-core
 ```python
 from mcard import MCard
 
-# Create an MCard with content and its hash
-card = MCard(
-    content="Hello World",
-    content_hash="6861c3fdb3c1866563d1d0fa31664c836d992e1dcbcf1a4d517bbfecd3e5f5ba"
-)
+# Create an MCard - only content is needed, hash is automatically calculated
+card = MCard(content="Hello World")
 
 # Access attributes
 print(card.content)  # "Hello World"
-print(card.content_hash)  # "6861c3..."
+print(card.content_hash)  # "6861c3..." (automatically calculated SHA-256 hash)
 print(card.time_claimed)  # Current time with timezone
+
+# Different content types are supported
+number_card = MCard(content=42)
+dict_card = MCard(content={"key": "value"})
+bytes_card = MCard(content=b"binary data")
 
 # Store MCards in SQLite database
 from mcard import MCardStorage

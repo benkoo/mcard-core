@@ -27,7 +27,7 @@ class MCard(BaseModel):
     )
 
     content: Any = Field(description="The actual content of the MCard.")
-    content_hash: str = Field(description="SHA-256 hash of the content.", default=None)
+    content_hash: str = Field(description="SHA-256 hash of the content. This is automatically calculated from the content.", default=None, frozen=True)
     time_claimed: datetime = Field(
         default_factory=get_now_with_located_zone,
         description="Timestamp when the content was claimed."
