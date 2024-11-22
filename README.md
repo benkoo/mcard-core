@@ -1,6 +1,6 @@
 # MCard Core
 
-A wrapper class for content-addressable data with implementations in Python and TypeScript.
+A Python library for content-addressable data storage.
 
 ## Features
 
@@ -12,19 +12,11 @@ MCard provides a standardized way to handle content-addressable data with the fo
 
 ## Installation
 
-### Python
 ```bash
 pip install mcard-core
 ```
 
-### TypeScript
-```bash
-npm install @mcard/core
-```
-
 ## Usage
-
-### Python
 
 ```python
 from mcard import MCard
@@ -39,38 +31,45 @@ card = MCard(
 print(card.content)  # "Hello World"
 print(card.content_hash)  # "6861c3..."
 print(card.time_claimed)  # Current time with timezone
-```
 
-### TypeScript
+# Store MCards in SQLite database
+from mcard import MCardStorage
 
-```typescript
-import { MCard } from '@mcard/core';
+# Initialize storage
+storage = MCardStorage("mcards.db")
 
-// Create an MCard with content and its hash
-const card = new MCard(
-    "Hello World",
-    "6861c3fdb3c1866563d1d0fa31664c836d992e1dcbcf1a4d517bbfecd3e5f5ba"
-);
+# Save MCard
+storage.save(card)
 
-// Access attributes
-console.log(card.content);  // "Hello World"
-console.log(card.contentHash);  // "6861c3..."
-console.log(card.timeclaimed);  // Current time
+# Retrieve by hash
+retrieved = storage.get(card.content_hash)
+
+# Get all stored MCards
+all_cards = storage.get_all()
 ```
 
 ## Development
 
-### Testing
-
-Python:
+1. Clone the repository:
 ```bash
-python -m pytest implementations/python/tests/test_mcard.py -v
+git clone https://github.com/yourusername/mcard-core.git
+cd mcard-core
 ```
 
-TypeScript:
+2. Create and activate a virtual environment:
 ```bash
-cd implementations/typescript
-npm test
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Run tests:
+```bash
+pytest
 ```
 
 ## License

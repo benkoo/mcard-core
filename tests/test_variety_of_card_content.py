@@ -15,7 +15,7 @@ class TestVarietyOfCardContent(unittest.TestCase):
     def setUpClass(cls):
         """Set up test fixtures that should be shared across all tests."""
         # Load environment variables from project root
-        cls.project_root = Path(__file__).resolve().parents[3]  # Go up 3 levels to reach project root
+        cls.project_root = Path(__file__).resolve().parents[1]  # Go up 1 level to reach project root
         dotenv.load_dotenv(cls.project_root / ".env")
         
         # Get the database paths from environment
