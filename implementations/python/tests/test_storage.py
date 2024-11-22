@@ -34,7 +34,8 @@ class TestMCardStorage(unittest.TestCase):
             content_hash=self.text_hash,
             time_claimed=datetime.now(timezone.utc)
         )
-        self.storage.save(card)
+        result = self.storage.save(card)
+        self.assertTrue(result)  # Should return True for new record
 
         # Retrieve and verify
         retrieved = self.storage.get(self.text_hash)
@@ -42,6 +43,60 @@ class TestMCardStorage(unittest.TestCase):
         self.assertEqual(retrieved.content, self.text_content)
         self.assertEqual(retrieved.content_hash, self.text_hash)
         self.assertEqual(retrieved.time_claimed.tzinfo, timezone.utc)
+
+    def test_save_duplicate(self):
+        """Test that saving a duplicate record returns False and doesn't update."""
+        # Create and save initial MCard
+        initial_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        card1 = MCard(
+            content=self.text_content,
+            content_hash=self.text_hash,
+            time_claimed=initial_time
+        )
+        result1 = self.storage.save(card1)
+        self.assertTrue(result1)  # Should return True for new record
+
+        # Try to save another MCard with same hash but different time
+        new_time = datetime(2024, 2, 1, tzinfo=timezone.utc)
+        card2 = MCard(
+            content=self.text_content,
+            content_hash=self.text_hash,
+            time_claimed=new_time
+        )
+        result2 = self.storage.save(card2)
+        self.assertFalse(result2)  # Should return False for duplicate
+
+        # Verify the original record wasn't updated
+        retrieved = self.storage.get(self.text_hash)
+        self.assertEqual(retrieved.time_claimed, initial_time)
+
+    def test_save_many(self):
+        """Test saving multiple records at once."""
+        # Create test cards
+        cards = [
+            MCard(content="Card 1", content_hash="1" * 64),
+            MCard(content="Card 2", content_hash="2" * 64),
+            MCard(content="Card 3", content_hash="3" * 64)
+        ]
+        
+        # Save all cards
+        saved, skipped = self.storage.save_many(cards)
+        self.assertEqual(saved, 3)
+        self.assertEqual(skipped, 0)
+        
+        # Try saving some duplicates
+        more_cards = [
+            MCard(content="Card 1", content_hash="1" * 64),  # Duplicate
+            MCard(content="Card 4", content_hash="4" * 64),  # New
+            MCard(content="Card 2", content_hash="2" * 64)   # Duplicate
+        ]
+        saved, skipped = self.storage.save_many(more_cards)
+        self.assertEqual(saved, 1)    # Only Card 4 should be saved
+        self.assertEqual(skipped, 2)  # Card 1 and 2 should be skipped
+        
+        # Verify total number of records
+        all_cards = self.storage.get_all()
+        self.assertEqual(len(all_cards), 4)
 
     def test_save_and_get_binary(self):
         """Test saving and retrieving binary content."""
@@ -51,7 +106,8 @@ class TestMCardStorage(unittest.TestCase):
             content_hash=self.binary_hash,
             time_claimed=datetime.now(timezone.utc)
         )
-        self.storage.save(card)
+        result = self.storage.save(card)
+        self.assertTrue(result)
 
         # Retrieve and verify
         retrieved = self.storage.get(self.binary_hash)
@@ -67,7 +123,8 @@ class TestMCardStorage(unittest.TestCase):
             content_hash=self.number_hash,
             time_claimed=datetime.now(timezone.utc)
         )
-        self.storage.save(card)
+        result = self.storage.save(card)
+        self.assertTrue(result)
 
         # Retrieve and verify
         retrieved = self.storage.get(self.number_hash)
@@ -83,8 +140,9 @@ class TestMCardStorage(unittest.TestCase):
             MCard(content=self.binary_content, content_hash=self.binary_hash),
             MCard(content=self.number_content, content_hash=self.number_hash)
         ]
-        for card in cards:
-            self.storage.save(card)
+        saved, skipped = self.storage.save_many(cards)
+        self.assertEqual(saved, 3)
+        self.assertEqual(skipped, 0)
 
         # Retrieve all and verify
         retrieved = self.storage.get_all()
@@ -102,43 +160,20 @@ class TestMCardStorage(unittest.TestCase):
             content=self.text_content,
             content_hash=self.text_hash
         )
-        self.storage.save(card)
+        result = self.storage.save(card)
+        self.assertTrue(result)
 
         # Verify it exists
         self.assertIsNotNone(self.storage.get(self.text_hash))
 
         # Delete and verify
-        self.assertTrue(self.storage.delete(self.text_hash))
+        deleted = self.storage.delete(self.text_hash)
+        self.assertTrue(deleted)
         self.assertIsNone(self.storage.get(self.text_hash))
 
-        # Try deleting non-existent card
-        self.assertFalse(self.storage.delete("nonexistent"))
-
-    def test_update_existing(self):
-        """Test updating an existing MCard."""
-        # Create and save initial MCard
-        initial_time = datetime.now(timezone.utc)
-        card = MCard(
-            content=self.text_content,
-            content_hash=self.text_hash,
-            time_claimed=initial_time
-        )
-        self.storage.save(card)
-
-        # Update with new time
-        new_time = datetime.now(timezone.utc)
-        updated_card = MCard(
-            content=self.text_content,
-            content_hash=self.text_hash,
-            time_claimed=new_time
-        )
-        self.storage.save(updated_card)
-
-        # Retrieve and verify
-        retrieved = self.storage.get(self.text_hash)
-        self.assertIsNotNone(retrieved)
-        self.assertEqual(retrieved.time_claimed, new_time)
-
+        # Try deleting again
+        deleted = self.storage.delete(self.text_hash)
+        self.assertFalse(deleted)
 
 if __name__ == '__main__':
     unittest.main()
