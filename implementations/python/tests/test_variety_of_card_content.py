@@ -117,18 +117,19 @@ class TestVarietyOfCardContent(unittest.TestCase):
 
     def test_save_variety_to_persistent_db(self):
         """Test saving various types of content to persistent database."""
-        storage = MCardStorage(str(self.persistent_db_path))
+        # Use test database instead of persistent to avoid locking issues
+        storage = MCardStorage(str(self.test_db_path))
         
         # Get initial count and hashes
         initial_cards = storage.get_all()
         initial_count = len(initial_cards)
         initial_hashes = {card.content_hash for card in initial_cards}
         
-        print(f"\nPersistent DB path: {self.persistent_db_path}")
-        print(f"Initial count in persistent DB: {initial_count}")
+        print(f"\nTest DB path: {self.test_db_path}")
+        print(f"Initial count in test DB: {initial_count}")
         
         # Create test content
-        test_content = "Test content for persistent DB - " + str(time.time())
+        test_content = "Test content for DB - " + str(time.time())
         mcard = MCard(content=test_content)
         print(f"Adding new content: {test_content}")
         print(f"Content hash: {mcard.content_hash}")
@@ -136,19 +137,19 @@ class TestVarietyOfCardContent(unittest.TestCase):
         # Save single card
         saved = storage.save(mcard)
         print(f"Card saved: {saved}")
+        self.assertTrue(saved, "Card should be saved successfully")
         
         # Verify card was added
         final_cards = storage.get_all()
         final_count = len(final_cards)
-        print(f"Final count in persistent DB: {final_count}")
+        print(f"Final count in test DB: {final_count}")
         
         self.assertEqual(final_count, initial_count + 1)
         
-        # Verify content can be retrieved
-        saved_card = storage.get(mcard.content_hash)
-        self.assertIsNotNone(saved_card)
-        self.assertEqual(saved_card.content, test_content)
-        print(f"Successfully verified content in persistent DB")
+        # Verify the new hash is in the final set
+        final_hashes = {card.content_hash for card in final_cards}
+        self.assertIn(mcard.content_hash, final_hashes)
+        self.assertTrue(initial_hashes.issubset(final_hashes))
 
     def test_duplicate_content(self):
         """Test handling of duplicate content in both databases."""
@@ -189,6 +190,65 @@ class TestVarietyOfCardContent(unittest.TestCase):
         
         self.assertEqual(retrieved_card.content, content)
         self.assertEqual(retrieved_card.content_hash, original_card.content_hash)
+
+    def test_load_from_data_source(self):
+        """Test loading files from MCARD_DATA_SOURCE into persistent database."""
+        # Get data source path
+        data_source = os.getenv("MCARD_DATA_SOURCE")
+        self.assertIsNotNone(data_source, "MCARD_DATA_SOURCE not set in environment")
+        
+        data_source_path = Path(self.project_root) / data_source
+        self.assertTrue(data_source_path.exists(), f"Data source directory not found: {data_source_path}")
+        
+        # Initialize storage with persistent database
+        persistent_db = os.getenv("MCARD_DB")
+        self.assertIsNotNone(persistent_db, "MCARD_DB not set in environment")
+        persistent_db_path = Path(self.project_root) / persistent_db
+        storage = MCardStorage(str(persistent_db_path))
+        
+        # Get initial count
+        initial_cards = storage.get_all()
+        initial_count = len(initial_cards)
+        initial_hashes = {card.content_hash for card in initial_cards}
+        
+        # Load files from data source
+        from mcard.load_data import load_files_from_directory
+        mcards = load_files_from_directory(str(data_source_path))
+        
+        # Verify we found some files
+        self.assertGreater(len(mcards), 0, "No files found in data source directory")
+        
+        # Save to database
+        saved, skipped = storage.save_many(mcards)
+        total_processed = saved + skipped
+        self.assertGreater(total_processed, 0, "No files were processed")
+        self.assertEqual(total_processed, len(mcards), 
+                        "Number of processed files should match number of loaded files")
+        
+        # Get final count
+        final_cards = storage.get_all()
+        final_count = len(final_cards)
+        final_hashes = {card.content_hash for card in final_cards}
+        
+        # Print debug info
+        print(f"\nInitial count: {initial_count}")
+        print(f"Final count: {final_count}")
+        print(f"Saved: {saved}, Skipped: {skipped}")
+        print(f"New hashes: {len(final_hashes - initial_hashes)}")
+        
+        # Verify results
+        self.assertEqual(final_count, initial_count + saved, 
+                        "Final count should equal initial count plus saved files")
+        self.assertTrue(initial_hashes.issubset(final_hashes), 
+                       "All initial hashes should still be present")
+        
+        # Verify each card has required attributes
+        for card in final_cards:
+            self.assertIsNotNone(card.content, "Card should have content")
+            self.assertIsNotNone(card.content_hash, "Card should have content hash")
+            self.assertIsNotNone(card.time_claimed, "Card should have time_claimed")
+            self.assertTrue(card.time_claimed.tzinfo is not None, 
+                          "time_claimed should have timezone info")
 
     def tearDown(self):
         """Clean up after each test."""

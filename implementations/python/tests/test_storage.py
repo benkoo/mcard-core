@@ -28,11 +28,12 @@ class TestMCardStorage(unittest.TestCase):
 
     def test_save_and_get_text(self):
         """Test saving and retrieving text content."""
-        # Create and save MCard
+        # Create and save MCard with local timezone
+        local_time = datetime.now().astimezone()
         card = MCard(
             content=self.text_content,
             content_hash=self.text_hash,
-            time_claimed=datetime.now(timezone.utc)
+            time_claimed=local_time
         )
         result = self.storage.save(card)
         self.assertTrue(result)  # Should return True for new record
@@ -42,7 +43,9 @@ class TestMCardStorage(unittest.TestCase):
         self.assertIsNotNone(retrieved)
         self.assertEqual(retrieved.content, self.text_content)
         self.assertEqual(retrieved.content_hash, self.text_hash)
-        self.assertEqual(retrieved.time_claimed.tzinfo, timezone.utc)
+        # Time should preserve original timezone
+        self.assertEqual(retrieved.time_claimed.tzinfo, local_time.tzinfo)
+        self.assertEqual(retrieved.time_claimed.timestamp(), local_time.timestamp())
 
     def test_save_duplicate(self):
         """Test that saving a duplicate record returns False and doesn't update."""

@@ -10,17 +10,10 @@ import time
 
 def get_now_with_located_zone() -> datetime:
     """
-    Get current time with the local timezone. Falls back to UTC if local timezone
-    cannot be determined.
+    Get current time with the local timezone. Always ensures timezone information is present.
+    Returns time with local timezone.
     """
-    current_time = datetime.now()
-    if current_time.tzinfo is None:
-        try:
-            current_time = current_time.astimezone()
-        except Exception:
-            # Fallback to UTC
-            current_time = current_time.replace(tzinfo=timezone.utc)
-    return current_time
+    return datetime.now().astimezone()
 
 
 class MCard(BaseModel):
