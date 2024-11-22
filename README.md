@@ -8,7 +8,7 @@ MCard provides a standardized way to handle content-addressable data with the fo
 
 - `content`: The actual content data (can be any type)
 - `content_hash`: A SHA-256 hash of the content, automatically calculated (64-character hexadecimal string)
-- `time_claimed`: A timezone-aware timestamp indicating when the content was claimed
+- `time_claimed`: A timezone-aware timestamp with microsecond precision, used for ordering cards. This timestamp indicates when the content was claimed, preserving the exact order of card creation down to the microsecond.
 
 ## Installation
 
@@ -27,7 +27,7 @@ card = MCard(content="Hello World")
 # Access attributes
 print(card.content)  # "Hello World"
 print(card.content_hash)  # "6861c3..." (automatically calculated SHA-256 hash)
-print(card.time_claimed)  # Current time with timezone
+print(card.time_claimed)  # Current time with timezone and microsecond precision
 
 # Different content types are supported
 number_card = MCard(content=42)
@@ -46,7 +46,7 @@ storage.save(card)
 # Retrieve by hash
 retrieved = storage.get(card.content_hash)
 
-# Get all stored MCards
+# Get all stored MCards (ordered by time_claimed)
 all_cards = storage.get_all()
 ```
 
