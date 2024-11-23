@@ -4,29 +4,19 @@ Script to safely clean up the MCard persistent database.
 This script requires manual confirmation to proceed with deletion.
 """
 
-import os
 import sys
 import argparse
 from pathlib import Path
 from datetime import datetime
 import shutil
 
-try:
-    import dotenv
-    dotenv.load_dotenv(PROJECT_ROOT / ".env")
-    HAS_DOTENV = True
-except ImportError:
-    HAS_DOTENV = False
-    print("Warning: python-dotenv not found. Using default database path.")
-    print("To install: pip install python-dotenv\n")
-
-# Add the implementations/python directory to the Python path
+# Add the project root to the Python path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-PYTHON_IMPL_DIR = PROJECT_ROOT / "implementations" / "python"
-sys.path.append(str(PYTHON_IMPL_DIR))
+sys.path.append(str(PROJECT_ROOT))
 
 from mcard.storage import MCardStorage
+from mcard import config
 
 def backup_database(db_path: Path) -> Path:
     """Create a backup of the database before deletion."""
@@ -73,47 +63,35 @@ def delete_all_records(storage: MCardStorage) -> int:
 
 def main():
     """Main function to handle database cleanup."""
-    parser = argparse.ArgumentParser(description="Clean up MCard persistent database.")
-    parser.add_argument('--no-backup', action='store_true', 
-                      help="Skip creating a backup before deletion")
-    parser.add_argument('--force', action='store_true',
-                      help="Skip confirmation prompt")
+    parser = argparse.ArgumentParser(description="Clean up the MCard database with backup option.")
+    parser.add_argument("--no-backup", action="store_true", help="Skip database backup")
+    parser.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+    parser.add_argument("--test", action="store_true", help="Use test database")
     args = parser.parse_args()
 
     # Load environment variables
-    if HAS_DOTENV and not dotenv.load_dotenv():
-        print("Error: .env file not found")
-        sys.exit(1)
+    config.load_config()
 
-    db_path = Path(os.getenv('MCARD_DB', 'data/db/MCardStore.db'))
-    if not db_path.exists():
-        print(f"Error: Database not found at {db_path}")
-        sys.exit(1)
+    # Initialize storage with appropriate database
+    storage = MCardStorage(test=args.test)
+    db_path = Path(storage.db_path)
 
-    print(f"Database path: {db_path}")
-    
+    print(f"\nUsing database at: {db_path}")
+
     # Create backup unless --no-backup is specified
     if not args.no_backup:
         backup_path = backup_database(db_path)
     
-    # Initialize storage
-    storage = MCardStorage(str(db_path))
-    
-    # Get current record count and sample hashes
+    # Get current record information
     count, hashes = get_record_info(storage)
     
     # Get confirmation unless --force is specified
-    if not args.force and not confirm_deletion(count, hashes):
-        print("\nOperation cancelled")
-        sys.exit(0)
-    
-    # Delete records
-    deleted_count = delete_all_records(storage)
-    
-    print(f"\nOperation completed:")
-    print(f"- Records deleted: {deleted_count}")
-    if not args.no_backup:
-        print(f"- Backup created: {backup_path}")
+    if args.force or confirm_deletion(count, hashes):
+        delete_all_records(storage)
+        print("\nDatabase cleanup complete.")
+    else:
+        print("\nOperation cancelled.")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

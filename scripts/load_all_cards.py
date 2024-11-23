@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
-import os
+"""Script to load all cards from the data source into the database."""
+
 import sys
 from pathlib import Path
-import dotenv
+import argparse
 
-# Add the implementations/python directory to Python path
-project_root = Path(__file__).resolve().parents[1]
-sys.path.append(str(project_root / "implementations" / "python"))
+# Add the project root to the Python path
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.append(str(PROJECT_ROOT))
 
-# Load environment variables from .env file
-dotenv.load_dotenv(project_root / ".env")
+from mcard import config
+from mcard.load_data import main as load_data_main
 
-# Set the data source environment variable if not already set
-if "MCARD_DATA_SOURCE" not in os.environ:
-    os.environ["MCARD_DATA_SOURCE"] = "data/cards"
+def main():
+    """Main function to load all cards."""
+    parser = argparse.ArgumentParser(description="Load all cards from data source into database.")
+    parser.add_argument("--test", action="store_true", help="Use test database")
+    args = parser.parse_args()
 
-from mcard.load_data import main
+    # Load environment variables
+    config.load_config()
+
+    # Run the load data main function
+    load_data_main(test=args.test)
 
 if __name__ == "__main__":
     main()

@@ -5,11 +5,18 @@ Script to load and display all cards from the MCard database.
 Attempts to decode binary content as UTF-8 text and shows original timezone information.
 """
 
-import os
+import sys
+from pathlib import Path
 from datetime import datetime
-from dotenv import load_dotenv
+import argparse
+
+# Add the project root to the Python path
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.append(str(PROJECT_ROOT))
+
 from mcard.storage import MCardStorage
-from mcard.collection import MCardCollection
+from mcard import config
 
 def format_content(content):
     """
@@ -59,35 +66,33 @@ def format_datetime(dt):
     return f"{time_str} {tz_str}"
 
 def main():
+    """Main function to list all cards in the database."""
+    parser = argparse.ArgumentParser(description="List all cards in the MCard database.")
+    parser.add_argument("--test", action="store_true", help="Use test database")
+    args = parser.parse_args()
+
     # Load environment variables
-    load_dotenv()
+    config.load_config()
+
+    # Initialize storage with appropriate database
+    storage = MCardStorage(test=args.test)
+    print(f"\nUsing database at: {storage.db_path}\n")
+
+    # Get all records
+    records = storage.get_all()
     
-    # Get database path from environment
-    db_path = os.getenv('MCARD_DB')
-    if not db_path:
-        print("Error: MCARD_DB environment variable not set")
+    if not records:
+        print("No cards found in database.")
         return
-    
-    # Initialize storage and collection
-    storage = MCardStorage(db_path)
-    collection = MCardCollection(storage)
-    
-    # Get all cards
-    cards = collection.get_all_cards()
-    
-    if not cards:
-        print("No cards found in the database.")
-        return
-        
-    # Print card information
-    print(f"\nFound {len(cards)} cards in the database:\n")
-    print("-" * 80)
-    
-    for i, card in enumerate(cards, 1):
-        print(f"Card {i}:")
-        print(f"Content Hash: {card.content_hash}")
-        print(f"Time Claimed: {format_datetime(card.time_claimed)}")
-        print(f"Content: {format_content(card.content)}")
+
+    # Print records
+    print(f"Found {len(records)} cards:\n")
+    for record in records:
+        content = format_content(record.content)
+        time_str = format_datetime(record.time_claimed)
+        print(f"Hash: {record.content_hash}")
+        print(f"Time: {time_str}")
+        print(f"Content: {content}")
         print("-" * 80)
 
 if __name__ == "__main__":

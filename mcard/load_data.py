@@ -3,9 +3,9 @@ import os
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List
-import dotenv
 from .storage import MCardStorage
 from .core import MCard
+from . import config
 
 def load_files_from_directory(directory: str) -> List[MCard]:
     """Load all files from the specified directory and convert them to MCards."""
@@ -37,42 +37,23 @@ def load_files_from_directory(directory: str) -> List[MCard]:
     
     return mcards
 
-def main():
+def main(test: bool = False):
     """Main function to load data into storage."""
-    # Load environment variables from project root
-    project_root = Path(__file__).resolve().parents[3]  # Go up 3 levels to reach project root
-    dotenv.load_dotenv(project_root / ".env")
+    # Load environment variables
+    config.load_config()
     
-    # Get data source directory and database path
-    data_source = os.getenv("MCARD_DATA_SOURCE")
-    db_path = os.getenv("MCARD_DB")
+    # Get data source directory
+    data_source = config.get_data_source()
     
-    if not data_source:
-        raise ValueError("MCARD_DATA_SOURCE not set in environment")
-    if not db_path:
-        raise ValueError("MCARD_DB not set in environment")
-    
-    # Convert relative paths to absolute paths from project root
-    data_source = str(project_root / data_source)
-    db_path = str(project_root / db_path)
-    
-    # Ensure database directory exists
-    db_dir = os.path.dirname(db_path)
-    os.makedirs(db_dir, exist_ok=True)
-    
-    # Initialize storage
-    storage = MCardStorage(db_path)
-    
-    # Load and store files
-    print(f"Loading files from {data_source}")
+    # Load all files from data source
     mcards = load_files_from_directory(data_source)
+    print(f"Loaded {len(mcards)} cards from {data_source}")
     
-    # Save to storage
+    # Store in database
+    storage = MCardStorage(test=test)
     for mcard in mcards:
         storage.save(mcard)
-        print(f"Saved MCard with hash: {mcard.content_hash}")
-    
-    print(f"Successfully loaded {len(mcards)} files")
+    print("All cards stored in database")
 
 if __name__ == "__main__":
     main()

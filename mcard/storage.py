@@ -5,6 +5,7 @@ import time
 from typing import List, Optional, Tuple
 import sqlite3
 from .core import MCard
+from . import config
 
 class MCardRecord:
     """SQLite model for storing MCard instances."""
@@ -35,8 +36,14 @@ class MCardRecord:
 class MCardStorage:
     """Storage manager for MCard instances."""
     
-    def __init__(self, db_path: str = "mcards.db"):
+    def __init__(self, db_path: Optional[str] = None, test: bool = False):
         """Initialize storage with database path."""
+        # Load environment variables if not already loaded
+        config.load_config()
+        
+        # Use provided db_path or get from environment
+        self.db_path = db_path if db_path is not None else config.get_db_path(test)
+
         def adapt_datetime(val):
             """Store datetime with its timezone information."""
             if val.tzinfo is None:
@@ -53,7 +60,7 @@ class MCardStorage:
         sqlite3.register_adapter(datetime, adapt_datetime)
         sqlite3.register_converter("DATETIME", convert_datetime)
         
-        self.conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+        self.conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
         self.cursor = self.conn.cursor()
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS mcards (
