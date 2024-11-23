@@ -50,6 +50,33 @@ retrieved = storage.get(card.content_hash)
 all_cards = storage.get_all()
 ```
 
+## Configuration
+
+MCard uses environment variables for configuration. Create a `.env` file in your project root with the following parameters:
+
+### Required Parameters
+
+- `MCARD_DATA_SOURCE`: Path to the directory containing card data (e.g., `"data/cards"`)
+- `MCARD_DB`: Path to the main database file (e.g., `"data/db/MCardStore.db"`)
+- `MCARD_TEST_DB`: Path to the test database file (e.g., `"data/db/test/TESTONLY.db"`)
+
+### Optional Parameters
+
+- `MCARD_PERF_TEST_CARDS`: Number of cards to use in performance tests (default: 100)
+  - Example: `MCARD_PERF_TEST_CARDS=500`
+  - Set to a higher number for stress testing (e.g., 10000)
+  - Set to a lower number for quick tests (e.g., 100)
+
+Example `.env` file:
+```ini
+MCARD_DATA_SOURCE="data/cards"
+MCARD_DB="data/db/MCardStore.db"
+MCARD_TEST_DB="data/db/test/TESTONLY.db"
+
+# Performance test configuration
+MCARD_PERF_TEST_CARDS=500  # Number of cards to use in performance test
+```
+
 ## Development
 
 1. Clone the repository:
@@ -69,9 +96,15 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Run tests:
+4. Set up environment:
+   - Copy `.env.example` to `.env` (if provided)
+   - Modify the paths in `.env` to match your setup
+   - Make sure the specified directories exist
+
+5. Run tests:
 ```bash
-pytest
+pytest  # Run all tests
+pytest tests/test_performance.py  # Run only performance tests
 ```
 
 ## License

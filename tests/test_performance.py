@@ -8,9 +8,12 @@ import string
 import numpy as np
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-import dotenv
+from mcard import config
 from mcard.core import MCard
 from mcard.storage import MCardStorage
+
+# Default number of cards for performance testing if not specified in environment
+DEFAULT_TEST_CARDS = 100
 
 class TestMCardPerformance(unittest.TestCase):
     """Test cases for MCard performance with large datasets."""
@@ -18,13 +21,19 @@ class TestMCardPerformance(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures that should be shared across all tests."""
-        # Load environment variables from project root
-        cls.project_root = Path(__file__).resolve().parents[1]
-        dotenv.load_dotenv(cls.project_root / ".env")
+        # Load environment variables using mcard.config
+        config.load_config()
         
-        # Get the database paths from environment
-        cls.test_db_path = Path(cls.project_root) / os.getenv("MCARD_TEST_DB")
-        cls.persistent_db_path = Path(cls.project_root) / os.getenv("MCARD_DB")
+        # Get the database paths using config functions
+        cls.test_db_path = Path(config.get_db_path(test=True))
+        cls.persistent_db_path = Path(config.get_db_path(test=False))
+        
+        # Get number of test cards from environment, default to DEFAULT_TEST_CARDS
+        try:
+            cls.num_test_cards = int(os.getenv("MCARD_PERF_TEST_CARDS", str(DEFAULT_TEST_CARDS)))
+        except (TypeError, ValueError):
+            print(f"Warning: Invalid MCARD_PERF_TEST_CARDS value, using default ({DEFAULT_TEST_CARDS})")
+            cls.num_test_cards = DEFAULT_TEST_CARDS
         
         # Create necessary parent directories
         cls.test_db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -158,17 +167,14 @@ class TestMCardPerformance(unittest.TestCase):
             if (i + 1) % (num_cards // 10) == 0:  # Show progress every 10%
                 print(f"Deleted {i + 1:,} cards ({((i + 1) / num_cards * 100):.1f}%)...")
 
-    def test_load_1000_random_cards(self):
-        """Test loading and retrieving 1,000 random MCards."""
-        self._run_performance_test(1000)
-
-    def test_load_10000_random_cards(self):
-        """Test loading and retrieving 10,000 random MCards."""
-        self._run_performance_test(10000)
-
-    def test_load_100000_random_cards(self):
-        """Test loading and retrieving 100,000 random MCards."""
-        self._run_performance_test(100000)
+    def test_load_random_cards(self):
+        """Test loading and retrieving random MCards.
+        
+        The number of cards is configured through MCARD_PERF_TEST_CARDS
+        environment variable (defaults to DEFAULT_TEST_CARDS if not set
+        or if the value is invalid).
+        """
+        self._run_performance_test(self.num_test_cards)
 
 if __name__ == '__main__':
     unittest.main()
