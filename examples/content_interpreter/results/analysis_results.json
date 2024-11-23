@@ -1,0 +1,106 @@
+[
+  {
+    "title": " Es la simulaci\u00f3n de procesos de inteligencia humana por parte de m\u00e1quinas, especialmente sistemas ",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "es",
+        "prob": 0.9999963557814928
+      }
+    ],
+    "summary": " La inteligencia artificial (IA) es una simulaci\u00f3n de procesos de inteligencia humana en los cuales intervienen sistemas inform\u00e1ticos que adquieren informaci\u00f3n, rationan o toman decisiones y se autocorrectan. ",
+    "mcard": {
+      "content_hash": "f3624140c59ad5d213d187feab33d3696c256c78955f4f37da261f8b50e887fb",
+      "time_claimed": "2024-11-23T19:29:04.050745+08:00"
+    },
+    "authors": {
+      "summary_analyzer": {
+        "host": "http://nvidia.zero:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": " L'apprentissage profond est une forme d'intelligence artificielle o\u00f9 la machine peut apprendre par",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "sl",
+        "prob": 0.8563214784920149
+      },
+      {
+        "lang": "sk",
+        "prob": 0.14367852150798519
+      }
+    ],
+    "summary": " L'apprentissage profond (deep learning) est un type d'intelligence artificielle d\u00e9riv\u00e9 du machine learning o\u00f9 la machine est capable d'apprendre par elle-m\u00eame, contrairement \u00e0 une programmation explicite bas\u00e9e sur un jeu de r\u00e8gles. ",
+    "mcard": {
+      "content_hash": "cf0c03b3eeea4a60618ccf17fbe5f5655d5f321577697a8f1c5f879952fe88ae",
+      "time_claimed": "2024-11-23T19:29:04.050764+08:00"
+    },
+    "authors": {
+      "summary_analyzer": {
+        "host": "http://nvidia.zero:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": " Sk\uba39\ubab8\uc774 \uc0dd\uc131\ud55c JSON \uc608\uc81c \uce74\ub4dc\uc785\ub2c8\ub2e4. \ubc84\uc804\uc740 1.0, \uc800\uc790\ub294 MCard Generator\uc774\uace0 \ud0dc\uadf8\ub294 \ud14c\uc2a4\ud2b8, \uc608\uc81c, JSON\uc758 3\uac00\uc9c0\uc785\ub2c8\ub2e4. ",
+    "mime_type": "application/json",
+    "languages": [
+      {
+        "lang": "sk",
+        "prob": 0.9999945463342217
+      }
+    ],
+    "summary": " This is a JSON example of a test card. It has the following properties: version, author, and tags. The version is 1.0, the author is MCard Generator, and the tags include \"test,\" \"example,\" and \"json.\" ",
+    "mcard": {
+      "content_hash": "75b22242d3791f43bb8b68e55a880324b1357dde64d447c41717b8dc0b6c4ec3",
+      "time_claimed": "2024-11-23T19:29:04.050770+08:00"
+    },
+    "authors": {
+      "summary_analyzer": {
+        "host": "http://nvidia.zero:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": " Hello, World! ",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "sl",
+        "prob": 0.9999940271578106
+      }
+    ],
+    "summary": " Sure, here's a summary of the content:\n\n\"Hello, World!\" is a simple computer program that displays the text \"Hello, World!\" on the screen. It is often used as an example when teaching programming concepts. The program can be written in many different programming languages, such as C, Java, Python, and others. In Standard ML (SL), the program would look something like this:\n```sl\nfun main () = print \"Hello, World!\";\n```\nThis code defines a function called `main` that prints the string \"Hello, World!\" to the console when it is executed. The `print` function is used to output the text to the screen. ",
+    "mcard": {
+      "content_hash": "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f",
+      "time_claimed": "2024-11-23T19:29:04.050774+08:00"
+    },
+    "authors": {
+      "summary_analyzer": {
+        "host": "http://nvidia.zero:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": " This appears to be a snippet of code or markup, possibly from an HTML file. However, the content i",
+    "mime_type": "application/octet-stream",
+    "languages": [],
+    "summary": " I'm sorry, but the text you provided appears to be empty or missing. Can you please provide more context or clarify your request? ",
+    "mcard": {
+      "content_hash": "054edec1d0211f624fed0cbca9d4f9400b0e491c43742af2c5b0abebf0c990d8",
+      "time_claimed": "2024-11-23T19:29:04.050779+08:00"
+    },
+    "authors": {
+      "summary_analyzer": {
+        "host": "http://nvidia.zero:11434",
+        "model": "llava"
+      }
+    }
+  }
+]

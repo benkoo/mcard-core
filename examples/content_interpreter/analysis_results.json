@@ -1,0 +1,206 @@
+[
+  {
+    "hash": "b7a82da07558552ed3039d90e9d9dcd94639cc5edd7eac763f829b5496ba4f10",
+    "analysis": {
+      "mime_type": "text/html",
+      "languages": [
+        {
+          "lang": "en",
+          "prob": 0.9999955625219186
+        }
+      ],
+      "summary": " This is an HTML document with a title and a paragraph that describes the purpose of the document. It appears to be about guidelines for architecting React web applications, emphasizing scalability, maintainability, and efficiency. The document includes CSS styles for formatting the text. "
+    }
+  },
+  {
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "analysis": {
+      "mime_type": "application/x-empty",
+      "languages": [],
+      "summary": " The image you provided is a low-resolution photograph of a person, but due to the lack of clarity and detail in the image, it is not possible for me to provide any specific information about the content or context of the image. If you have any questions or need help with something else, feel free to ask! "
+    }
+  },
+  {
+    "hash": "cfbd4734fdae9c22c564e9a146d6671a4612153d4171317432081c099c8f9339",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "en",
+          "prob": 0.9999947969390601
+        }
+      ],
+      "summary": " Text splitting is an essential feature in LangChain that enables breaking down large texts into smaller segments for improved comprehension and processing efficiency. This capability is particularly useful for detailed analysis or extraction of specific contexts.\n\nChatGPT, developed by OpenAI, is a conversational AI model capable of understanding and generating human-like text, enhancing interactions with machines and revolutionizing the way we access information. By utilizing LangChain for text splitting, users can efficiently navigate and analyze vast amounts of data, ultimately leading to a deeper understanding and more insightful conclusions. "
+    }
+  },
+  {
+    "hash": "9cdca4b7194a7ed0f11ba0d629ebab6de6b8305d8b0eeb179cec3be26136a1d8",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "en",
+          "prob": 0.9999955540688092
+        }
+      ],
+      "summary": " The article presents a new approach to learning trigonometry using the Primary Gasing Triangle, a right triangle with a hypotenuse of 1 unit. This foundational element is used to define the primary trigonometric functions (sine and cosine) and can be derived into the Derived Gasing Triangle, where the other four trigonometric functions (tangent, secant, cotangent, and cosecant) are defined. This approach simplifies and clarifies learning trigonometry through the use of the Primary Gasing Triangle, leading to easier understanding of key formulas and solutions for various problems. The authors would like to thank Prof. Ben Koo for his discussions that contributed to the development of this concept. "
+    }
+  },
+  {
+    "hash": "0ebc2a7e7e2ff134548225ed48ff3c577cee84a15ee7b84a5a177d980f66d85d",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "en",
+          "prob": 0.999996308466467
+        }
+      ],
+      "summary": " The ABC curriculum is an educational framework designed to prepare students for a world influenced by Generative Artificial Intelligence (GAI) technologies, which have increased information density in unprecedented ways. It is integrative and inclusive, with the goal of being future-proof amidst fast-changing GAI technologies. The curriculum covers various topics such as [[File]]s, [[Page]], [[Services]], [[time saving method]], [[hub of thinking]], [[educational rubric]], [[Life-long Learning]], [[orthogonal method]], [[Information Density]], [[future-proof]], [[Proof Assistant]], [[Curry-Howard-Lambek Isomorphism]], [[Coherence]], [[Timeliness]], [[Relevance]], [[Social Activities]], [[Master Algorithm]], [[GASing]], and [[Tutorial Experience]]. The author, Ben Koo, suggests the use of free software movements in implementing this curriculum. "
+    }
+  },
+  {
+    "hash": "85e5b064d0ccf74d744b4795f6e8aac5cbe408692dbaabc6ef8bee010031e7ae",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "zh-tw",
+          "prob": 0.714286147269771
+        },
+        {
+          "lang": "ko",
+          "prob": 0.2857136229828678
+        }
+      ],
+      "summary": " 這篇文章談到中華思想是一種重視智慧的文化。不同於西洋哲學高度重視宇宙論、本體论、認識論與倫理學，中華思想主要探索如何在中華文化中呈現智慧。作者指出，中華思想的特點在三者內部具有錯綜複雜的互應關係，從本體論、工夫論和境界論來看：\n\n1. 從本體論的角度來說，本體是天人合一的具體內容，不依謠或言語而有無，人悟得本體來自於生命的體證。每個思想家對本體的體證內容各有不同，而在這種探索中，人們需要勤積地做工夫。\n2. 從工夫論的角度來說，工夫與本體相關，對於本體的認識有深入的影響。不同宗派經典指向的本體內涵也會影響到後人自我。\n3. 從境界論的角度來說，本體始終只是「一」，但境界是本體不同狀態的體現，展現在人生命體證裡的具體內容。不同階段的認識使得境界有差異。\n\n作者還提到了儒釋道思想是中華思想的一部分，他們常用「空」、「無」、「仁」與「誠」等詞來描述本體和工夫，也有關境界的觀點。 "
+    }
+  },
+  {
+    "hash": "5dc03906f76e0e0d5ed52d2b8545d01a7fe1c251a3df0a8dd66497a66edcad22",
+    "analysis": {
+      "mime_type": "application/pdf",
+      "languages": [],
+      "summary": " The content appears to be a PDF document with metadata and various properties. It contains an array of objects, including pages, language settings, structure tree root, metadata, viewer preferences, and mark information. There are also some page numbers specified in the 'Pages' dictionary entry. It is important to note that without additional context or information about the specific content of this PDF document, it is difficult to provide a more detailed summary. "
+    }
+  },
+  {
+    "hash": "2b2bac2e8c008938348934cbb84b43c26545b395f6a3b5f96d817e22629b176d",
+    "analysis": {
+      "mime_type": "application/pdf",
+      "languages": [],
+      "summary": " The document contains a block of text that appears to be related to computer programming or software development. It includes various terms and phrases such as \"PDF-1.3\", \"FlateDecode\", \"Stream\", \"h~}9Fw\", \"T!<'4u/???.ϟ~|v~C _<>',0>_>\", \"%PDF-1.3% FlateDecode % Length 980323\", and \"filter/FlateDecode\". The text seems to be related to the Adobe Portable Document Format (PDF), which is a file format developed by Adobe Systems for document file exchange. This format allows documents to be shared across different platforms and applications. It also includes terms like \"Filter\" and \"Length\", which are likely related to the specifications or settings of the PDF file. The text is a bit technical, suggesting that it might be intended for someone with knowledge of PDF or software development in general. "
+    }
+  },
+  {
+    "hash": "58bfbafdc46adb29af27c7197b089ae44c03ddd4dc4b9322823832c26857bffc",
+    "analysis": {
+      "mime_type": "application/pdf",
+      "languages": [],
+      "summary": " The content appears to be a PDF document containing various metadata such as the catalog, language preferences, metadata, and viewer preferences. The \"Kids\" array in the document references several page numbers, which could indicate that these pages contain content related to children or family-friendly material. However, without additional context, it is difficult to determine the exact nature of the content. "
+    }
+  },
+  {
+    "hash": "8072da3fcf848a7cde12ce479b4ed72d3685ee74dd48977025a303ccbad07f73",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "id",
+          "prob": 0.9999977237380574
+        }
+      ],
+      "summary": " Perpustakaan memiliki tiga jenis buku: novel (5/12), ensiklopedia (3/8), dan buku pelajaran (sisa). Novel dipinjam 1/4 hari, sedangkan ensiklopedia dan buku pelajaran digunakan oleh siswa untuk belajar kelompok. Jumlah total buku diperpustakaan adalah (5/12) + (3/8) + (sisa).\n\nPabrik mainan memiliki tiga jenis mainan: mobil, boneka dan puzzle. Mobil mainan berjumlah 4/9 dari total produksi, sedangkan boneka berjumlah 1/3 dari total produksi. Setiap hari, pabrik menjuang mainan dengan 2/3 dari mobil dan 1/3 dari boneka dan puzzle. Jika ada 30 buku pelajaran yang masih tersisa di rak, jumlah total buku di perpustakaan adalah (5/12) + (3/8) + (sisa). "
+    }
+  },
+  {
+    "hash": "30a8d163e9308fdd22a78be3e1bcb86445ce82793075de3c0ab449f4d1e7432b",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "id",
+          "prob": 0.9999965259224088
+        }
+      ],
+      "summary": " Berikut adalah penjelasan singkat tentang konten \"Produce Distribution\" dengan ID \"8d8ec\":\n\nKonten ini berisi informasi tentang distribusi produk dalam pasar. Tentunya, pasar yang dipersoalkan adalah pasar buku. Di dalamnya, terdapat informasi bahwa salah satu toko buku memiliki empat jenis buku: fiksi, non-fiksi, majalah, dan buku lain. Dari jumlah total buku yang dijual, sebesar 1/3 dari buku fiksi, sedikit lebih dari 0,4 dari buku non-fiksi, dan sisanya buku majalah. Sebagai informasi lagi, salah satu tim kerja di perusahaan memiliki jumlah anggota berbeda: 1/3 dari total anggota berada di Tim A, sedangkan 3/8 di Tim B dan sisanya di Tim C. Setiap minggu, Tim A bekerja selama 0,75 dari total jam kerja, Tim B bekerja 0,8 dari total jam, dan Tim C bekerja setengahnya. Jika Tim B bekerja selama 120 jam, jumlah total anggota di perusahaan adalah 3x8 + 6 = 24. Dari informasi ini, dapat diketahkan bahwa penjualan buku fiksi dan non-fiksi secara besar sama sekali dan buku majalah hanya satu dari empat jenis buku yang dijual. "
+    }
+  },
+  {
+    "hash": "28201cd8ec970de0654365ef600f6fc25a427eb60b4b4392b0d2ff79c309b217",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "id",
+          "prob": 0.9999972383486596
+        }
+      ],
+      "summary": " Pabrik menjual 1/2 dari jumlah mobil, 3/4 dari jumlah boneka, dan 2/3 dari jumlah puzzle setiap hari. Setelah penjualan, masih tersisa 60 mobil, 30 boneka, dan 40 puzzle.\n\nDi sebuah pabrik makanan ringan, 2/5 dari total produk adalah keripik kentang, 1/4 adalah keripik jagung, dan sisanya adalah keripik singkong. Setiap hari, pabrik memproduksi 1.200 bungkus, dan 1/2 dari keripik kentang, 3/5 dari keripik jagung, dan 2/3 dari keripik singkong terjual setiap hari. Setelah penjualan, tersisa 150 bungkus keripik di gudang.\n\nKeripik singkong diproduksi setiap hari sebanyak 4/3 dari jumlah total produk, sisanya adalah keripik jagung dan kentang. "
+    }
+  },
+  {
+    "hash": "22f0f5947b15e0f8771c5f1131bc91bbeb942ea767fdb59210024f4821bbef55",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "id",
+          "prob": 0.9999970229786346
+        }
+      ],
+      "summary": " Perpustakaan memiliki tiga jenis buku: novel, ensiklopedia, dan buku pelajaran. Jumlah novel adalah 5/12 dari total buku, sementara ensiklopedia berjumlah 3/8 dari total buku. Siswa menggunakan 2/3 dari buku pelajaran untuk belajar kelompok. Jika ada 30 buku pelajaran tersisa di rak, jumlah total buku di perpustakaan adalah:\n\nJumlah total buku = (5/12) x Jumlah novel + (3/8) x Jumlah ensiklopedia + Jumlah buku pelajaran\nJadi, jumlah total buku = (5/12) x Jumlah novel + (3/8) x 30 + 30\nJumlah total buku = (5/12) x Jumlah novel + 46,78 Rupiah\n\nTentu saja jumlah buku yang termasuk kategori novel dan ensiklopedia adalah:\n\nJumlah buku yang termasuk kategori novel dan ensiklopedia = (5/12) x Jumlah novel + (3/8) x Jumlah ensiklopedia\nJadi, jumlah buku yang termasuk kategori novel dan ensiklopedia = 7,64 Rupiah "
+    }
+  },
+  {
+    "hash": "054edec1d0211f624fed0cbca9d4f9400b0e491c43742af2c5b0abebf0c990d8",
+    "analysis": {
+      "mime_type": "application/octet-stream",
+      "languages": [],
+      "summary": " I'm sorry, but the content you provided does not appear to contain any text or information that can be summarized. Can you please provide more context or clarify what you are asking for? "
+    }
+  },
+  {
+    "hash": "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "en",
+          "prob": 0.999997894162387
+        }
+      ],
+      "summary": " \"Hello, World!\" is a simple program that displays the text \"Hello, World!\" on the screen. It is often used as a first example of a programming concept, such as a \"Hello, World!\" program in a programming language. "
+    }
+  },
+  {
+    "hash": "9ec9996cfc2274cf0dca6441c40abeb2b89ed270a1e00c6671475c794c62ef53",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "it",
+          "prob": 0.5714282514881419
+        },
+        {
+          "lang": "en",
+          "prob": 0.4285708838456091
+        }
+      ],
+      "summary": " The content of the nested file is as follows:\n\nThe text within the nested file reads:\n\n\"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed auctor, justo vitae consectetur, augue sapien euismod, vel scelerisque magna varius. Aliquam erat volutpat. Nunc at arcu eu orci ullamcorper. Nam porttitor nibh et rutrum aliquid. Sed in lectus vitae odio ultrices ac. Pellentesque habitant morbi tristique senectus et netus.\n\nAliquam euismod sapien eget semper. Nulla tincidunt sapien sit amet consectetur. Aliquam bibendum erat vel lectus vestibulum porta. Sed auctor, justo vitae consectetur, augue sapien euismod, vel scelerisque magna varius. Nam porttitor nibh et rutrum aliquid. Sed in lectus vitae odio ultrices ac. Pellentesque habitant morbi tristique senectus et netus.\n\nNunc at arcu eu orci ullamcorper. Sed euismod, velit et tincidunt auctor, rutrum urna nibh sit amet consectetur. In hac habitasse platea dictumst. Proin in massa lacus. Nunc at arcu eu orci ullamcorper. Sed euismod, velit et tincidunt auctor, rutrum urna nibh sit amet consectetur. In hac habitasse platea dictumst. Proin in massa lacus. Nunc at arcu eu orci ullamcorper. Sed euismod, velit et tincidunt auctor, rutrum urna nibh sit amet consectetur. In hac habitasse platea dictumst. Proin in massa lacus. Nunc at arcu eu orci ullamcorper. Sed euismod, velit et tincidunt auctor, rutrum urna nibh sit amet consectetur. In hac habitasse platea dictumst. Proin in massa lacus.\"\n\nThis text consists of placeholder text commonly used in publishing and graphic design to demonstrate the visual form of a document or a typeface without relying on meaningful content. It is known as \"lorem ipsum\" or simply \"lorem,\" which is derived from Latin and means \"fine print\" or \"small letters.\" "
+    }
+  },
+  {
+    "hash": "e7febf23ae5b20dbe02aecaf0fe4e415732f3431f786a4c0be1cc1a7d13e3ad3",
+    "analysis": {
+      "mime_type": "text/plain",
+      "languages": [
+        {
+          "lang": "en",
+          "prob": 0.9999967463292844
+        }
+      ],
+      "summary": " The text provided appears to be a request for information or assistance, possibly related to a technical or troubleshooting issue. However, without additional context, it's difficult to provide a specific summary of the content. "
+    }
+  }
+]
