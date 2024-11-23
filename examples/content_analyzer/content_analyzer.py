@@ -5,7 +5,8 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import json
-import magic
+import mimetypes
+import filetype
 import requests
 from langdetect import detect_langs
 from mcard import MCard
@@ -72,13 +73,72 @@ class AnalyzerConfig:
         )
 
 class MimeTypeAnalyzer:
-    """Analyzer for detecting MIME types."""
+    """Analyzer for detecting MIME types without requiring external binaries."""
     
-    def analyze(self, content: Union[str, bytes]) -> str:
-        """Detect MIME type of content."""
+    def __init__(self):
+        """Initialize the MIME type analyzer."""
+        mimetypes.init()
+        # Add additional MIME types not in the default database
+        mimetypes.add_type('application/x-empty', '.empty')
+        mimetypes.add_type('text/markdown', '.md')
+        mimetypes.add_type('text/markdown', '.markdown')
+
+    def _guess_from_content(self, content: bytes) -> Optional[str]:
+        """Guess MIME type from content using filetype library."""
+        kind = filetype.guess(content)
+        return kind.mime if kind else None
+
+    def _guess_from_content_heuristics(self, content: bytes) -> str:
+        """Use simple heuristics to guess MIME type from content."""
+        # Try to decode as UTF-8 text
+        try:
+            content.decode('utf-8')
+            return 'text/plain'
+        except UnicodeDecodeError:
+            pass
+        
+        # Check for common file signatures
+        if content.startswith(b'%PDF'):
+            return 'application/pdf'
+        elif content.startswith(b'\x89PNG\r\n'):
+            return 'image/png'
+        elif content.startswith(b'\xFF\xD8\xFF'):
+            return 'image/jpeg'
+        
+        # Default to binary
+        return 'application/octet-stream'
+
+    def analyze(self, content: Union[str, bytes], filename: Optional[str] = None) -> str:
+        """Detect MIME type of content using multiple methods.
+        
+        Args:
+            content: The content to analyze
+            filename: Optional filename to help with MIME type detection
+            
+        Returns:
+            Detected MIME type as string
+        """
         if isinstance(content, str):
             content = content.encode('utf-8')
-        return magic.from_buffer(content, mime=True)
+            
+        # Empty content check
+        if not content:
+            return 'application/x-empty'
+            
+        # Try to detect from content first using filetype
+        if len(content) >= 8:  # filetype needs at least 8 bytes
+            mime_type = self._guess_from_content(content)
+            if mime_type:
+                return mime_type
+                
+        # If filename is provided, try to guess from extension
+        if filename:
+            mime_type, _ = mimetypes.guess_type(filename)
+            if mime_type:
+                return mime_type
+                
+        # Fall back to basic heuristics
+        return self._guess_from_content_heuristics(content)
 
 class LanguageAnalyzer:
     """Analyzer for detecting text languages."""
