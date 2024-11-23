@@ -332,14 +332,14 @@ class CardGenerator:
     """Utility class for generating test cards with various content types."""
     
     @staticmethod
-    def create_text_card(content: str, metadata: Optional[Dict[str, Any]] = None) -> MCard:
+    def create_text_card(content: str) -> MCard:
         """Create a card with text content."""
-        return MCard(content=content, metadata=metadata)
+        return MCard(content=content)
     
     @staticmethod
-    def create_binary_card(content: bytes, metadata: Optional[Dict[str, Any]] = None) -> MCard:
+    def create_binary_card(content: bytes) -> MCard:
         """Create a card with binary content."""
-        return MCard(content=content, metadata=metadata)
+        return MCard(content=content)
     
     @classmethod
     def create_spanish_card(cls) -> MCard:

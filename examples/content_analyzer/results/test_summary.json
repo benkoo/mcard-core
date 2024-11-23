@@ -1,11 +1,9 @@
 {
   "total_cards": 3,
   "mime_types": {
-    "text/plain": 2,
-    "application/json": 1
+    "text/plain": 3
   },
   "languages": {
-    "fr": 1
-  },
-  "timestamp": "2024-11-23T19:47:33.766302"
+    "es": 1
+  }
 }
