@@ -13,6 +13,7 @@ import shutil
 
 try:
     import dotenv
+    dotenv.load_dotenv(PROJECT_ROOT / ".env")
     HAS_DOTENV = True
 except ImportError:
     HAS_DOTENV = False
