@@ -18,6 +18,27 @@ This design provides several key guarantees:
 - **Algebraic Closure**: Any operation on MCards produces results that maintain these properties
 - **Type Safety**: Built on Pydantic with strict validation and type checking
 
+## Theoretical Foundation
+
+MCard's design is rooted in Category Theory, where:
+- Each MCard represents a morphism (a mapping between objects)
+- Compositions of MCards form functors (structure-preserving mappings)
+- Transformations between MCards are natural transformations
+
+This aligns with Lambda Calculus's three fundamental abstractions:
+1. **Alpha Abstraction**: Variable renaming/substitution
+   - In MCard: Content transformation with preserved semantics
+2. **Beta Abstraction**: Function application
+   - In MCard: Applying transformations to content
+3. **Eta Abstraction**: Function equivalence
+   - In MCard: Different paths yielding equivalent results
+
+Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose programming system. However, it does so with a stronger theoretical foundation that enables:
+- Formal verification of transformations
+- Guaranteed composition properties
+- Traceable data lineage
+- Pure functional transformations
+
 ## Features
 
 ### Core MCard Attributes
