@@ -1,0 +1,16 @@
+{
+  "total_cards": 13,
+  "mime_types": {
+    "text/html": 1,
+    "application/x-empty": 1,
+    "text/plain": 8,
+    "application/pdf": 3
+  },
+  "languages": {
+    "en": 2,
+    "sl": 2,
+    "zh-tw": 1,
+    "ko": 1,
+    "id": 4
+  }
+}
