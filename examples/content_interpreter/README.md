@@ -1,6 +1,6 @@
 # MCard Content Interpreter Example
 
-This example demonstrates how to build a content analysis tool using MCard. The tool takes an MCard as input and produces a JSON analysis of its content, including:
+This example demonstrates how to build a content analysis tool using MCard. The tool analyzes MCard content and produces detailed analysis results including:
 
 1. MIME type detection
 2. Language detection (for text content)
@@ -23,7 +23,7 @@ You'll also need:
 
 1. Install the required Python packages:
 ```bash
-pip install python-magic langdetect requests
+pip install -r requirements.txt
 ```
 
 2. Install Ollama from [ollama.ai](https://ollama.ai)
@@ -40,23 +40,28 @@ ollama pull llava
 ollama serve
 ```
 
-2. Run the interpreter with an MCard content hash:
+2. Run the interpreter:
 ```bash
-python app.py <content_hash>
+python main.py [--env-file PATH_TO_ENV] [--output-dir OUTPUT_DIR] [--mode {db,test}]
 ```
 
-The program will output a JSON object with the following structure:
-```json
-{
-  "mime_type": "text/plain",
-  "languages": [
-    {
-      "lang": "en",
-      "prob": 0.999
-    }
-  ],
-  "summary": "A brief summary of the content..."
-}
+Arguments:
+- `--env-file`: Path to .env file (optional)
+- `--output-dir`: Directory to save results (default: current directory)
+- `--mode`: Analysis mode (default: 'db')
+  - `db`: Analyze cards from the database
+  - `test`: Generate and analyze test cards
+
+## Project Structure
+
+```
+.
+├── README.md               # This file
+├── analysis_results.json   # Analysis results output
+├── interpreter/           # Core interpreter package
+├── main.py               # Main entry point
+├── requirements.txt      # Python dependencies
+└── results/             # Directory for analysis results
 ```
 
 ## Features
@@ -75,7 +80,8 @@ Uses Ollama's llava model to generate summaries:
 
 ## Example Output
 
-For a text document:
+Analysis results are saved in JSON format with the following structure:
+
 ```json
 {
   "mime_type": "text/plain",
@@ -83,36 +89,16 @@ For a text document:
     {
       "lang": "en",
       "prob": 0.999
-    },
-    {
-      "lang": "fr",
-      "prob": 0.001
     }
   ],
-  "summary": "This document discusses the implementation of a new feature..."
+  "summary": "A brief summary of the content..."
 }
 ```
 
-For an image:
+For images, the output will look like:
 ```json
 {
   "mime_type": "image/jpeg",
   "languages": [],
   "summary": "The image shows a sunset over a mountain range..."
 }
-```
-
-## Error Handling
-
-The interpreter handles various error cases:
-- Invalid content hashes
-- Network errors with Ollama
-- Unsupported content types
-- Language detection failures
-
-## Configuration
-
-The Ollama host can be configured by passing it to the ContentInterpreter constructor:
-```python
-interpreter = ContentInterpreter(ollama_host="http://custom-host:11434")
-```
