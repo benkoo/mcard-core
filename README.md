@@ -5,28 +5,40 @@ A Python library implementing an algebraically closed data structure for content
 ## Core Concepts
 
 MCard implements an algebraically closed system where:
-1. Every MCard is uniquely identified by its content hash
-2. Every MCard has an associated claim time
+1. Every MCard is uniquely identified by its content hash (SHA-256)
+2. Every MCard has an associated claim time (timezone-aware timestamp)
 3. The database maintains these invariants automatically
+4. Content integrity is guaranteed through immutable hashes
+5. Temporal ordering is preserved at microsecond precision
 
 This design provides several key guarantees:
 - **Content Integrity**: The content hash serves as both identifier and verification mechanism
 - **Temporal Ordering**: All cards have a precise temporal order based on `time_claimed`
 - **Precedence Verification**: The claim time enables determination of content presentation order
 - **Algebraic Closure**: Any operation on MCards produces results that maintain these properties
+- **Type Safety**: Built on Pydantic with strict validation and type checking
 
 ## Features
 
-Each MCard has three fundamental attributes that maintain the algebraic closure:
+### Core MCard Attributes
+- `content`: The actual content data (supports strings, bytes, and arbitrary types)
+- `content_hash`: An immutable SHA-256 hash, automatically calculated (64-character hex string)
+- `time_claimed`: A timezone-aware timestamp with microsecond precision
 
-- `content`: The actual content data (can be any type)
-- `content_hash`: A SHA-256 hash of the content, automatically calculated (64-character hexadecimal string)
-- `time_claimed`: A timezone-aware timestamp with microsecond precision, used for ordering cards
+### Storage Features
+- SQLite-based persistent storage
+- Binary content support
+- Batch operations for efficient bulk processing
+- Transaction management with automatic rollback
+- Timezone preservation across operations
+- Thread-safe connection management
 
-These attributes ensure that:
-1. Content can always be verified against its hash
-2. Cards can always be totally ordered by their claim time
-3. Content precedence can always be determined
+### Collection Management
+- Automatic temporal ordering
+- Time range queries
+- Copy-on-read pattern for thread safety
+- Efficient in-memory sorting
+- Real-time collection refresh capability
 
 ## Installation
 
@@ -51,7 +63,7 @@ card = MCard(content="Hello World")
 
 # Access card properties
 print(card.content)         # "Hello World"
-print(card.content_hash)    # SHA-256 hash
+print(card.content_hash)    # SHA-256 hash (64-character hex string)
 print(card.time_claimed)    # Timezone-aware timestamp
 
 # Content verification is automatic
@@ -76,14 +88,47 @@ card2 = MCard(content="Second card")
 collection.add_card(card1)
 collection.add_card(card2)
 
-# Retrieve cards
-all_cards = collection.get_all_cards()  # Returns cards in temporal order
+# Retrieve cards (always sorted by time_claimed)
+all_cards = collection.get_all_cards()
 card = collection.get_card_by_hash(card1.content_hash)
+```
+
+### Advanced Features
+
+#### Binary Content
+```python
+# Store binary data
+binary_card = MCard(content=b"Binary data")
+storage.save(binary_card)
+
+# Content type is preserved
+retrieved = storage.get(binary_card.content_hash)
+assert isinstance(retrieved.content, bytes)
+```
+
+#### Batch Operations
+```python
+# Create multiple cards
+cards = [MCard(content=f"Card {i}") for i in range(100)]
+
+# Efficient batch save
+saved, skipped = storage.save_many(cards)
+print(f"Saved: {saved}, Skipped: {skipped}")
+```
+
+#### Time Range Queries
+```python
+from datetime import datetime, timedelta
+
+# Get cards within a time range
+start_time = datetime.now() - timedelta(hours=1)
+end_time = datetime.now()
+recent_cards = collection.get_cards_in_timerange(start_time, end_time)
 ```
 
 ### Thread Safety
 
-When using MCard in a web application or multi-threaded environment, ensure proper connection management:
+When using MCard in a web application or multi-threaded environment:
 
 ```python
 from flask import Flask, g
@@ -150,26 +195,14 @@ pytest
 ```
 mcard-core/
 ├── mcard/              # Core library implementation
-│   ├── core.py        # MCard class definition
-│   ├── storage.py     # Storage implementation
-│   └── collection.py  # Collection management
+│   ├── core.py        # MCard class definition (Pydantic model)
+│   ├── storage.py     # SQLite storage implementation
+│   └── collection.py  # Collection management with temporal ordering
 ├── examples/          # Example applications
 │   └── todo_app/     # Complete Todo application example
 ├── tests/            # Test suite
 └── scripts/          # Utility scripts
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Best Practices
 
@@ -177,18 +210,33 @@ This project is licensed under the MIT License - see the LICENSE file for detail
    - Use thread-local storage in multi-threaded environments
    - Properly manage database connections
    - Use appropriate transaction management
+   - Take advantage of the copy-on-read pattern
 
 2. **Error Handling**
    - Always use try/except blocks for database operations
    - Implement proper transaction rollback on errors
    - Include comprehensive error logging
+   - Verify content hashes after retrieval
 
 3. **Data Integrity**
-   - Verify content hashes when retrieving cards
+   - Let MCard handle content hash generation
    - Maintain proper temporal ordering
-   - Use transaction-based updates for consistency
+   - Use transaction-based updates
+   - Preserve timezone information
 
 4. **Performance**
+   - Use batch operations for multiple cards
    - Close database connections when done
-   - Use appropriate indexing for large collections
-   - Implement proper connection pooling in web applications
+   - Use time range queries for large collections
+   - Implement proper connection pooling
+   - Take advantage of in-memory sorting
+
+5. **Content Management**
+   - Use appropriate content types (string, bytes, etc.)
+   - Verify content integrity after operations
+   - Handle binary content appropriately
+   - Maintain timezone awareness
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
