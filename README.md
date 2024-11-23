@@ -21,7 +21,7 @@ Each MCard has three fundamental attributes that maintain the algebraic closure:
 
 - `content`: The actual content data (can be any type)
 - `content_hash`: A SHA-256 hash of the content, automatically calculated (64-character hexadecimal string)
-- `time_claimed`: A timezone-aware timestamp with microsecond precision, used for ordering cards. This timestamp indicates when the content was claimed, preserving the exact order of card creation down to the microsecond.
+- `time_claimed`: A timezone-aware timestamp with microsecond precision, used for ordering cards
 
 These attributes ensure that:
 1. Content can always be verified against its hash
@@ -34,68 +34,92 @@ These attributes ensure that:
 pip install mcard-core
 ```
 
+## Requirements
+
+- Python 3.8+
+- pydantic >= 2.0.0
+
 ## Usage
+
+### Basic Usage
 
 ```python
 from mcard import MCard
 
 # Create an MCard - content_hash and time_claimed are automatically set
-# maintaining algebraic closure
 card = MCard(content="Hello World")
 
-# Verify content integrity using the hash
-print(card.content)  # "Hello World"
-print(card.content_hash)  # "6861c3..." (SHA-256 hash guarantees content integrity)
-print(card.time_claimed)  # Precise timestamp for ordering
+# Access card properties
+print(card.content)         # "Hello World"
+print(card.content_hash)    # SHA-256 hash
+print(card.time_claimed)    # Timezone-aware timestamp
 
-# Different content types maintain the same properties
-number_card = MCard(content=42)
-dict_card = MCard(content={"key": "value"})
-bytes_card = MCard(content=b"binary data")
-
-# Store MCards in SQLite database while maintaining closure properties
-from mcard import MCardStorage
-
-# Initialize storage
-storage = MCardStorage("mcards.db")
-
-# Save MCard - database ensures uniqueness and maintains temporal order
-storage.save(card)
-
-# Retrieve by hash - content integrity is guaranteed
-retrieved = storage.get(card.content_hash)
-
-# Get all stored MCards (ordered by time_claimed)
-# This ordering guarantees correct precedence relationships
-all_cards = storage.get_all()
+# Content verification is automatic
+card.content = "New content"  # Hash is automatically updated
 ```
 
-## Configuration
+### Storage and Collections
 
-MCard uses environment variables for configuration. Create a `.env` file in your project root with the following parameters:
+```python
+from mcard import MCardStorage, MCardCollection
 
-### Required Parameters
+# Initialize storage with SQLite backend
+storage = MCardStorage("cards.db")
 
-- `MCARD_DATA_SOURCE`: Path to the directory containing card data (e.g., `"data/cards"`)
-- `MCARD_DB`: Path to the main database file (e.g., `"data/db/MCardStore.db"`)
-- `MCARD_TEST_DB`: Path to the test database file (e.g., `"data/db/test/TESTONLY.db"`)
+# Create a collection
+collection = MCardCollection(storage)
 
-### Optional Parameters
+# Add cards to collection
+card1 = MCard(content="First card")
+card2 = MCard(content="Second card")
 
-- `MCARD_PERF_TEST_CARDS`: Number of cards to use in performance tests (default: 100)
-  - Example: `MCARD_PERF_TEST_CARDS=500`
-  - Set to a higher number for stress testing (e.g., 10000)
-  - Set to a lower number for quick tests (e.g., 100)
+collection.add_card(card1)
+collection.add_card(card2)
 
-Example `.env` file:
-```ini
-MCARD_DATA_SOURCE="data/cards"
-MCARD_DB="data/db/MCardStore.db"
-MCARD_TEST_DB="data/db/test/TESTONLY.db"
-
-# Performance test configuration
-MCARD_PERF_TEST_CARDS=500  # Number of cards to use in performance test
+# Retrieve cards
+all_cards = collection.get_all_cards()  # Returns cards in temporal order
+card = collection.get_card_by_hash(card1.content_hash)
 ```
+
+### Thread Safety
+
+When using MCard in a web application or multi-threaded environment, ensure proper connection management:
+
+```python
+from flask import Flask, g
+from mcard import MCardStorage, MCardCollection
+
+app = Flask(__name__)
+DB_PATH = "cards.db"
+
+def get_storage():
+    if 'storage' not in g:
+        g.storage = MCardStorage(DB_PATH)
+    return g.storage
+
+def get_collection():
+    if 'collection' not in g:
+        g.collection = MCardCollection(get_storage())
+    return g.collection
+
+@app.teardown_appcontext
+def teardown_db(exception):
+    storage = g.pop('storage', None)
+    if storage is not None:
+        storage.conn.close()
+```
+
+## Examples
+
+### Todo Application
+A complete example of using MCard in a web application can be found in the `examples/todo_app` directory. This example demonstrates:
+- Thread-safe database operations
+- Proper transaction management
+- Content-addressable storage for todo items
+- Integration with Flask's application context
+- Best practices for error handling and logging
+
+See the [Todo App README](examples/todo_app/README.md) for more details.
 
 ## Development
 
@@ -105,28 +129,66 @@ git clone https://github.com/yourusername/mcard-core.git
 cd mcard-core
 ```
 
-2. Create and activate a virtual environment:
+2. Create a virtual environment:
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-3. Install dependencies:
+3. Install development dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Set up environment:
-   - Copy `.env.example` to `.env` (if provided)
-   - Modify the paths in `.env` to match your setup
-   - Make sure the specified directories exist
-
-5. Run tests:
+4. Run tests:
 ```bash
-pytest  # Run all tests
-pytest tests/test_performance.py  # Run only performance tests
+pytest
 ```
+
+## Project Structure
+
+```
+mcard-core/
+├── mcard/              # Core library implementation
+│   ├── core.py        # MCard class definition
+│   ├── storage.py     # Storage implementation
+│   └── collection.py  # Collection management
+├── examples/          # Example applications
+│   └── todo_app/     # Complete Todo application example
+├── tests/            # Test suite
+└── scripts/          # Utility scripts
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Best Practices
+
+1. **Thread Safety**
+   - Use thread-local storage in multi-threaded environments
+   - Properly manage database connections
+   - Use appropriate transaction management
+
+2. **Error Handling**
+   - Always use try/except blocks for database operations
+   - Implement proper transaction rollback on errors
+   - Include comprehensive error logging
+
+3. **Data Integrity**
+   - Verify content hashes when retrieving cards
+   - Maintain proper temporal ordering
+   - Use transaction-based updates for consistency
+
+4. **Performance**
+   - Close database connections when done
+   - Use appropriate indexing for large collections
+   - Implement proper connection pooling in web applications
