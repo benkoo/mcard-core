@@ -15,12 +15,15 @@ A demonstration of the [[Cubical Logic Model]] ([[CLM]]) principles applied to a
 - Demonstrate MCard's content-addressable storage capabilities
 - Showcase proper integration with web frameworks
 - Provide a foundation for more complex workflow applications
+- Enable efficient search and filtering of todo items
 
 ### Success Criteria
 - Thread-safe database operations
 - Proper transaction management
 - Comprehensive error handling
 - Clean and responsive UI
+- Real-time search functionality
+- Efficient content display and navigation
 
 ## Concrete Implementation (Process Models)
 
@@ -28,7 +31,29 @@ A demonstration of the [[Cubical Logic Model]] ([[CLM]]) principles applied to a
 - **Web Framework**: Flask for HTTP request handling
 - **Storage System**: MCard for content-addressable storage
 - **Database**: SQLite (via MCard) for persistent storage
-- **Frontend**: Tailwind CSS for modern UI components
+- **Frontend**: 
+  - Tailwind CSS for modern UI components
+  - JSON Editor for structured data visualization
+  - AJAX for dynamic content updates
+
+### Features
+1. **Card Management**
+   - Create and edit todo cards
+   - View detailed card content with syntax highlighting
+   - Mark cards as complete/incomplete
+   - Track card history and modifications
+
+2. **Search & Navigation**
+   - Real-time search functionality
+   - Dynamic content filtering
+   - Pagination for large datasets
+   - Responsive layout for all screen sizes
+
+3. **Content Display**
+   - JSON syntax highlighting
+   - Collapsible content sections
+   - Copy-to-clipboard functionality
+   - Dark mode support
 
 ### Data Structure
 Each todo item is stored as an MCard with the following structure:
@@ -37,27 +62,29 @@ Each todo item is stored as an MCard with the following structure:
     "title": "Todo title",
     "description": "Optional description",
     "done": false,
-   "clm": {
-      "abstract_spec": {
-         "context": "The spatial-temporal context of the todo.",
-         "goals": ["A list of goal statements for the todo."],
-         "success_criteria": {
-            "verification": "Verification criteria for the todo.",
-            "validation": "Validation criteria for the todo.",
-            "performance": "Performance metrics for the todo."
+    "deprecated": false,
+    "original_id": "hash_of_original_card",
+    "clm": {
+        "abstract_spec": {
+            "context": "The spatial-temporal context of the todo.",
+            "goals": ["A list of goal statements for the todo."],
+            "success_criteria": {
+                "verification": "Verification criteria for the todo.",
+                "validation": "Validation criteria for the todo.",
+                "performance": "Performance metrics for the todo."
             }
-      },
-      "concrete_impl": {
-         "inputs": {},
-         "activities": {},
-         "outputs": {}
-      },
-      "realistic_expectations": {
-         "practical_boundaries": {},
-         "traces": ["A list of execution traces for the todo."],
-         "external_feedback": {}
-      }
-   },
+        },
+        "concrete_impl": {
+            "inputs": {},
+            "activities": {},
+            "outputs": {}
+        },
+        "realistic_expectations": {
+            "practical_boundaries": {},
+            "traces": ["A list of execution traces for the todo."],
+            "external_feedback": {}
+        }
+    },
     "created_at": "timestamp",
     "updated_at": "timestamp"
 }
@@ -71,77 +98,61 @@ Each todo item is stored as an MCard with the following structure:
    - Automatic initialization
 
 2. **API Endpoints**
-   - Create new todos
+   - Create/edit todos with CLM support
    - Mark todos as complete/incomplete
-   - Delete todos
-   - View timestamps and status
+   - Search and filter todos
+   - View card details and history
+   - Real-time content updates
 
 3. **Frontend Interface**
-   - Responsive design
-   - Real-time updates
+   - Responsive design with Tailwind CSS
+   - Dynamic search with AJAX
+   - Interactive JSON editor
    - Error feedback
    - Status indicators
+   - Dark mode optimization
 
-## Realistic Expectations (Test Cases & Validation)
+## Setup & Usage
 
-### Setup & Usage
 1. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
+
 2. Run the application:
    ```bash
    flask --app app run --port 5002 --debug
    ```
+
 3. Access the interface at `http://localhost:5002`
 
-### Test Scenarios
-1. **Basic Operations**
-   - Create, read, update, delete todos
-   - Mark todos as complete/incomplete
-   - View creation/update timestamps
-
-2. **Error Handling**
-   - Invalid input validation
-   - Database transaction failures
-   - Concurrent access handling
-
-3. **Performance Metrics**
-   - Response time monitoring
-   - Resource utilization
-   - Transaction throughput
-
-### Best Practices
-- Clean code organization
-- Comprehensive error handling
-- Proper logging implementation
-- Consistent coding style
-
-## Future Extensions
-
-### Enhanced Capabilities
-- Natural language processing for todo categorization
-- Workflow definitions using Petri Net formalism
-- Integration with Content Analyzer
-- Advanced task dependencies
-
-### Statistical Analysis
-- Task completion patterns
-- Time estimation
-- Priority optimization
-- Resource allocation
-
-### System Integration
-- External API connectivity
-- Notification systems
-- Calendar integration
-- Mobile applications
+### Key Pages
+- **Home** (`/`): Overview of all todo items
+- **List View** (`/list`): Searchable list of all cards
+- **View Card** (`/view/<hash>`): Detailed card view with JSON editor
+- **Edit CLM** (`/edit_clm/<hash>`): CLM editor for todo items
 
 ## Development
 
-To run in development mode with debug logging:
+### Running in Development Mode
 ```bash
 flask --app app run --port 5002 --debug
+```
+
+### Project Structure
+```
+todo_app/
+├── app.py              # Main Flask application
+├── clm.py             # CLM implementation
+├── requirements.txt    # Python dependencies
+├── static/            # Static assets
+├── templates/         # HTML templates
+│   ├── components/    # Reusable UI components
+│   ├── edit_clm.html  # CLM editor template
+│   ├── index.html     # Home page
+│   ├── list_all_cards.html  # Card list view
+│   └── view_card.html # Card detail view
+└── todo_app.db        # SQLite database
 ```
 
 ## Contributing
