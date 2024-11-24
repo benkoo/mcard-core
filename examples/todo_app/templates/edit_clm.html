@@ -3,106 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Todo - {{ todo.title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <title>Edit Todo CLM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .collapsible-content.active {
+            max-height: 1000px;
+        }
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+        }
+        .collapsible-header::after {
+            content: '▼';
+            float: right;
+            transform: rotate(0deg);
+            transition: transform 0.3s ease;
+        }
+        .collapsible-header.active::after {
+            transform: rotate(180deg);
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto p-6">
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold">Edit Todo</h1>
-            <a href="{{ url_for('index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                Back to Todo List
-            </a>
-        </div>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-6">Edit Todo CLM</h1>
+        <form action="{{ url_for('update_clm', content_hash=todo.id) }}" method="post" class="space-y-6">
+            <input type="hidden" name="content_hash" value="{{ todo.id }}">
+            
+            <!-- Basic Info -->
+            <div class="space-y-4 mb-8">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Title</label>
+                    <input type="text" name="title" value="{{ todo.title }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea name="description" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.description }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                    <select name="done" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="false" {% if not todo.done %}selected{% endif %}>In Progress</option>
+                        <option value="true" {% if todo.done %}selected{% endif %}>Done</option>
+                    </select>
+                </div>
+            </div>
 
-        <form action="{{ url_for('update_clm', card_id=todo.current_hash) }}" method="post" class="bg-white p-6 rounded-lg shadow-md space-y-6">
-            <!-- Basic Todo Info -->
-            <div>
-                <h2 class="text-xl font-semibold mb-4">Basic Information</h2>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="title">Title</label>
-                    <input type="text" name="title" id="title" value="{{ todo.title }}" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="description">Description</label>
-                    <textarea name="description" id="description" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.description }}</textarea>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">Status</label>
-                    <div class="flex items-center">
-                        <input type="checkbox" name="done" id="done" {% if todo.done %}checked{% endif %} class="mr-2">
-                        <label for="done">Done</label>
+            <!-- Abstract Specification Section -->
+            <div class="border rounded-lg p-4 mb-6">
+                <h2 class="text-xl font-semibold mb-4 collapsible-header">Abstract Specification</h2>
+                <div class="collapsible-content space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Context</label>
+                        <textarea name="abstract_spec.context" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.abstract_spec.context }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Goals</label>
+                        <textarea name="abstract_spec.goals" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.abstract_spec.goals | join('\n') }}</textarea>
+                        <p class="mt-1 text-sm text-gray-500">Enter each goal on a new line</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Success Criteria - Verification</label>
+                        <textarea name="abstract_spec.success_criteria.verification" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.abstract_spec.success_criteria.verification }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Success Criteria - Validation</label>
+                        <textarea name="abstract_spec.success_criteria.validation" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.abstract_spec.success_criteria.validation }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Success Criteria - Performance</label>
+                        <textarea name="abstract_spec.success_criteria.performance" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.abstract_spec.success_criteria.performance }}</textarea>
                     </div>
                 </div>
             </div>
 
-            <!-- CLM Section -->
-            <div>
-                <h2 class="text-xl font-semibold mb-4">Cubical Logic Model</h2>
-                
-                <!-- Context -->
-                <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="context">Context</label>
-                    <textarea name="context" id="context" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.clm.abstract_spec.context }}</textarea>
+            <!-- Concrete Implementation Section -->
+            <div class="border rounded-lg p-4 mb-6">
+                <h2 class="text-xl font-semibold mb-4 collapsible-header">Concrete Implementation</h2>
+                <div class="collapsible-content space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Inputs</label>
+                        <textarea name="concrete_impl.inputs" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.concrete_impl.inputs | tojson }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Activities</label>
+                        <textarea name="concrete_impl.activities" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.concrete_impl.activities | tojson }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Outputs</label>
+                        <textarea name="concrete_impl.outputs" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.concrete_impl.outputs | tojson }}</textarea>
+                    </div>
                 </div>
+            </div>
 
-                <!-- Goals -->
-                <div class="mb-6" id="goals-container">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">Goals</label>
-                    <div class="goals-list space-y-2">
-                        {% for goal in todo.clm.abstract_spec.goals %}
-                        <div class="flex">
-                            <input type="text" name="goals[]" value="{{ goal }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                            <button type="button" onclick="this.parentElement.remove()" class="ml-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline">Remove</button>
-                        </div>
-                        {% endfor %}
+            <!-- Realistic Expectations Section -->
+            <div class="border rounded-lg p-4 mb-6">
+                <h2 class="text-xl font-semibold mb-4 collapsible-header">Realistic Expectations</h2>
+                <div class="collapsible-content space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Practical Boundaries</label>
+                        <textarea name="realistic_expectations.practical_boundaries" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.realistic_expectations.practical_boundaries | tojson }}</textarea>
                     </div>
-                    <button type="button" onclick="addGoalField()" class="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline">Add Goal</button>
-                </div>
-
-                <!-- Success Criteria -->
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold mb-4">Success Criteria</h3>
-                    
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="verification">Verification</label>
-                        <textarea name="verification" id="verification" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.clm.abstract_spec.success_criteria.verification }}</textarea>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Traces</label>
+                        <textarea name="realistic_expectations.traces" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.realistic_expectations.traces | join('\n') }}</textarea>
+                        <p class="mt-1 text-sm text-gray-500">Enter each trace on a new line</p>
                     </div>
-
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="validation">Validation</label>
-                        <textarea name="validation" id="validation" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.clm.abstract_spec.success_criteria.validation }}</textarea>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="performance">Performance</label>
-                        <textarea name="performance" id="performance" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.clm.abstract_spec.success_criteria.performance }}</textarea>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">External Feedback</label>
+                        <textarea name="realistic_expectations.external_feedback" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ todo.clm.realistic_expectations.external_feedback | tojson }}</textarea>
                     </div>
                 </div>
             </div>
 
             <div class="flex justify-between">
-                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                    Save Changes
-                </button>
-                <a href="{{ url_for('index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                    Cancel
-                </a>
+                <a href="{{ url_for('index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</a>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Save Changes</button>
             </div>
         </form>
     </div>
 
     <script>
-    function addGoalField() {
-        const container = document.querySelector('.goals-list');
-        const newGoal = document.createElement('div');
-        newGoal.className = 'flex';
-        newGoal.innerHTML = `
-            <input type="text" name="goals[]" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter a goal">
-            <button type="button" onclick="this.parentElement.remove()" class="ml-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline">Remove</button>
-        `;
-        container.appendChild(newGoal);
-    }
+        document.addEventListener('DOMContentLoaded', function() {
+            const headers = document.querySelectorAll('.collapsible-header');
+            headers.forEach(header => {
+                header.addEventListener('click', function() {
+                    // Toggle active class on header
+                    this.classList.toggle('active');
+                    
+                    // Toggle active class on the next sibling (content)
+                    const content = this.nextElementSibling;
+                    content.classList.toggle('active');
+                });
+                
+                // Start with all sections collapsed by default
+                header.classList.remove('active');
+                header.nextElementSibling.classList.remove('active');
+            });
+        });
     </script>
 </body>
 </html>

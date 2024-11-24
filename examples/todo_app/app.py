@@ -112,15 +112,15 @@ def add():
         app.logger.error(f"Error adding todo: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/toggle/<card_id>', methods=['POST'])
-def toggle(card_id):
+@app.route('/toggle/<content_hash>', methods=['POST'])
+def toggle(content_hash):
     try:
-        print(f"\n=== Toggling todo {card_id} ===")  # Debug log
+        print(f"\n=== Toggling todo {content_hash} ===")  # Debug log
         storage = get_storage()
-        card = storage.get(card_id)
+        card = storage.get(content_hash)
         print(f"Retrieved card: {card}")  # Debug log
         if not card:
-            print(f"Card not found with ID: {card_id}")  # Debug log
+            print(f"Card not found with ID: {content_hash}")  # Debug log
             return "Todo not found", 404
         
         old_todo = json.loads(card.content)
@@ -130,8 +130,8 @@ def toggle(card_id):
         updated_todo = old_todo.copy()
         updated_todo['done'] = not old_todo.get('done', False)
         updated_todo['updated_at'] = datetime.utcnow().isoformat()
-        updated_todo['original_id'] = old_todo.get('original_id', card_id)  # Track the original todo ID
-        updated_todo['previous_hash'] = card_id  # Track the previous version
+        updated_todo['original_id'] = old_todo.get('original_id', content_hash)  # Track the original todo ID
+        updated_todo['previous_hash'] = content_hash  # Track the previous version
         updated_todo['deprecated'] = False  # Mark this as the current version
         print(f"Updated todo data: {updated_todo}")  # Debug log
         
@@ -155,28 +155,28 @@ def toggle(card_id):
         app.logger.error(f"Error toggling todo: {str(e)}")
         return str(e), 500
 
-@app.route('/delete/<card_id>', methods=['POST'])
-def delete(card_id):
+@app.route('/delete/<content_hash>', methods=['POST'])
+def delete(content_hash):
     try:
-        print(f"\n=== Deleting todo {card_id} ===")  # Debug log
+        print(f"\n=== Deleting todo {content_hash} ===")  # Debug log
         storage = get_storage()
-        print(f"Attempting to delete card with ID: {card_id}")  # Debug log
-        if storage.delete(card_id):
-            print(f"Successfully deleted card with ID: {card_id}")  # Debug log
+        print(f"Attempting to delete card with ID: {content_hash}")  # Debug log
+        if storage.delete(content_hash):
+            print(f"Successfully deleted card with ID: {content_hash}")  # Debug log
             storage.conn.commit()
             return redirect(url_for('index'))
         else:
-            print(f"Card not found with ID: {card_id}")  # Debug log
+            print(f"Card not found with ID: {content_hash}")  # Debug log
             return "Todo not found", 404
     except Exception as e:
         storage.conn.rollback()
         app.logger.error(f"Error deleting todo: {str(e)}")
         return str(e), 500
 
-@app.route('/edit_clm/<card_id>')
-def edit_clm(card_id):
+@app.route('/edit_clm/<content_hash>')
+def edit_clm(content_hash):
     try:
-        print(f"\n=== Editing CLM for card {card_id} ===")  # Debug log
+        print(f"\n=== Editing CLM for card {content_hash} ===")  # Debug log
         storage = get_storage()
         
         # Find the latest version of this todo
@@ -189,18 +189,18 @@ def edit_clm(card_id):
             original_id = todo_data.get('original_id', card.content_hash)
             
             # Check if this is the todo we're looking for
-            if original_id == card_id:
+            if original_id == content_hash:
                 updated_at = datetime.fromisoformat(todo_data['updated_at'])
                 if latest_time is None or updated_at > latest_time:
                     latest_card = card
                     latest_time = updated_at
         
         if not latest_card:
-            print(f"Card not found with ID: {card_id}")  # Debug log
+            print(f"Card not found with ID: {content_hash}")  # Debug log
             return "Todo not found", 404
         
         todo = json.loads(latest_card.content)
-        todo['id'] = card_id  # Use original ID for display
+        todo['id'] = content_hash  # Use original ID for display
         todo['current_hash'] = latest_card.content_hash  # Add current hash for form submission
         print(f"Todo data: {todo}")  # Debug log
         
@@ -214,31 +214,49 @@ def edit_clm(card_id):
         app.logger.error(f"Error editing CLM: {str(e)}")
         return str(e), 500
 
-@app.route('/update_clm/<card_id>', methods=['POST'])
-def update_clm(card_id):
+@app.route('/update_clm/<content_hash>', methods=['POST'])
+def update_clm(content_hash):
     try:
-        print(f"\n=== Updating CLM for card {card_id} ===")  # Debug log
+        print(f"\n=== Updating CLM for card {content_hash} ===")  # Debug log
         storage = get_storage()
-        card = storage.get(card_id)
+        card = storage.get(content_hash)
         print(f"Retrieved card: {card}")  # Debug log
         if not card:
-            print(f"Card not found with ID: {card_id}")  # Debug log
+            print(f"Card not found with ID: {content_hash}")  # Debug log
             return "Todo not found", 404
 
         old_todo = json.loads(card.content)
         print(f"Original todo data: {old_todo}")  # Debug log
         
-        # Get all form data
+        # Get basic form data
         title = request.form.get('title', '').strip()
         description = request.form.get('description', '').strip()
-        done = request.form.get('done') == 'on'
-        context = request.form.get('context', '').strip()
-        goals = request.form.getlist('goals[]')
-        verification = request.form.get('verification', '').strip()
-        validation = request.form.get('validation', '').strip()
-        performance = request.form.get('performance', '').strip()
+        done = request.form.get('done') == 'true'
 
-        # Create new CLM instance
+        # Get Abstract Specification data
+        context = request.form.get('abstract_spec.context', '').strip()
+        goals = [g.strip() for g in request.form.get('abstract_spec.goals', '').split('\n') if g.strip()]
+        verification = request.form.get('abstract_spec.success_criteria.verification', '').strip()
+        validation = request.form.get('abstract_spec.success_criteria.validation', '').strip()
+        performance = request.form.get('abstract_spec.success_criteria.performance', '').strip()
+
+        # Get Concrete Implementation data
+        try:
+            inputs = json.loads(request.form.get('concrete_impl.inputs', '[]'))
+            activities = json.loads(request.form.get('concrete_impl.activities', '[]'))
+            outputs = json.loads(request.form.get('concrete_impl.outputs', '[]'))
+        except json.JSONDecodeError:
+            inputs, activities, outputs = [], [], []
+
+        # Get Realistic Expectations data
+        try:
+            practical_boundaries = json.loads(request.form.get('realistic_expectations.practical_boundaries', '[]'))
+            traces = [t.strip() for t in request.form.get('realistic_expectations.traces', '').split('\n') if t.strip()]
+            external_feedback = json.loads(request.form.get('realistic_expectations.external_feedback', '[]'))
+        except json.JSONDecodeError:
+            practical_boundaries, external_feedback = [], []
+
+        # Create new CLM instance with all fields
         clm = CubicalLogicModel(
             abstract_spec=AbstractSpecification(
                 context=context,
@@ -249,8 +267,16 @@ def update_clm(card_id):
                     performance=performance
                 )
             ),
-            concrete_impl=ConcreteImplementation.create(),
-            realistic_expectations=RealisticExpectations.create()
+            concrete_impl=ConcreteImplementation(
+                inputs=inputs,
+                activities=activities,
+                outputs=outputs
+            ),
+            realistic_expectations=RealisticExpectations(
+                practical_boundaries=practical_boundaries,
+                traces=traces,
+                external_feedback=external_feedback
+            )
         )
 
         # Create updated todo data
@@ -261,9 +287,9 @@ def update_clm(card_id):
             'clm': clm.to_dict(),
             'updated_at': datetime.utcnow().isoformat(),
             'created_at': old_todo.get('created_at'),
-            'original_id': old_todo.get('original_id', card_id),  # Track the original todo ID
-            'previous_hash': card_id,  # Track the previous version
-            'deprecated': False  # Mark this as the current version
+            'original_id': old_todo.get('original_id', content_hash),
+            'previous_hash': content_hash,
+            'deprecated': False
         }
         print(f"Updated todo data: {updated_todo}")  # Debug log
 
@@ -287,6 +313,23 @@ def update_clm(card_id):
         print(f"Error in update_clm: {str(e)}")  # Debug log
         app.logger.error(f"Error updating CLM: {str(e)}")
         return str(e), 500
+
+@app.route('/view/<content_hash>')
+def view_card(content_hash):
+    try:
+        storage = get_storage()
+        card = storage.get(content_hash)
+        if not card:
+            return "Card not found", 404
+            
+        content = json.loads(card.content)
+        return render_template('view_card.html', 
+                             content=content, 
+                             content_hash=content_hash,
+                             time_claimed=card.time_claimed)
+    except Exception as e:
+        print(f"Error in view_card: {str(e)}")  # Debug log
+        raise
 
 if __name__ == '__main__':
     app.run(debug=True)

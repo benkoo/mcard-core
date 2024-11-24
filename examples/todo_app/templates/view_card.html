@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Card Content</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSON Editor -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.10.0/jsoneditor.min.css" rel="stylesheet" type="text/css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.10.0/jsoneditor.min.js"></script>
+    <style>
+        /* Custom styling for JSON Editor */
+        .jsoneditor {
+            border: none !important;
+            border-radius: 0 0 0.5rem 0.5rem !important;
+        }
+        .jsoneditor-navigation-bar {
+            display: none;
+        }
+        .jsoneditor-tree {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+            padding: 0.75rem !important;
+            line-height: 1.2 !important;
+        }
+        /* Style the expand/collapse buttons */
+        .jsoneditor-tree button {
+            color: #64748b !important; /* subtle blue-gray */
+            width: 16px !important;
+            height: 16px !important;
+            padding: 0 !important;
+            opacity: 0.6 !important;
+            border: none !important;
+            background: none !important;
+            position: relative;
+        }
+        .jsoneditor-tree button:before {
+            content: '○';
+            font-size: 12px;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.15s ease-in-out;
+        }
+        .jsoneditor-tree button.jsoneditor-expanded:before {
+            content: '•';
+        }
+        .jsoneditor-tree button:hover {
+            opacity: 1 !important;
+            background: none !important;
+        }
+        /* Hide the default button styles */
+        .jsoneditor-button {
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        /* Adjust spacing between items */
+        table.jsoneditor-tree td {
+            padding: 1px !important;
+        }
+        .jsoneditor-tree td:first-child {
+            width: 16px !important;
+        }
+        .jsoneditor-readonly {
+            min-height: 20px !important;
+        }
+        .jsoneditor-field {
+            color: #93c5fd !important; /* light blue */
+            padding: 1px 4px !important;
+        }
+        .jsoneditor-value {
+            color: #86efac !important; /* light green */
+            padding: 1px 4px !important;
+        }
+        .jsoneditor-value.jsoneditor-number {
+            color: #f472b6 !important; /* pink */
+        }
+        .jsoneditor-value.jsoneditor-boolean {
+            color: #c084fc !important; /* purple */
+        }
+        .jsoneditor-value.jsoneditor-null {
+            color: #94a3b8 !important; /* gray */
+        }
+        #jsoneditor {
+            height: 100%;
+            background-color: #1e293b;
+            border-radius: 0.5rem;
+        }
+        .content-columns {
+            display: grid;
+            grid-template-columns: minmax(400px, 1fr) minmax(400px, 1fr);
+            gap: 1rem;
+            height: 100%;
+            overflow: hidden;
+            padding: 1rem;
+        }
+        .json-container {
+            position: relative;
+            height: 100%;
+            overflow: auto;
+            border-radius: 0.5rem;
+            background-color: #1e293b;
+        }
+        .raw-content {
+            background-color: #1e293b;
+            border-radius: 0.5rem;
+            overflow: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.875rem;
+            line-height: 1.2;
+            height: 100%;
+            padding: 1rem;
+        }
+        .raw-content pre {
+            margin: 0;
+            color: #f8fafc; /* Very light gray for maximum contrast */
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .raw-content .empty-message {
+            color: #cbd5e1; /* Light gray for placeholder text */
+            font-style: italic;
+        }
+        /* Add syntax highlighting for the raw JSON */
+        .raw-content .json-string { color: #86efac; } /* Light green */
+        .raw-content .json-number { color: #93c5fd; } /* Light blue */
+        .raw-content .json-boolean { color: #f472b6; } /* Light pink */
+        .raw-content .json-null { color: #cbd5e1; } /* Light gray */
+        .raw-content .json-key { color: #64748b; } /* Subtle blue-gray */
+        .content-wrapper {
+            min-height: 400px;
+            height: calc(100vh - 250px);
+            max-height: 1000px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            background-color: #0f172a;
+        }
+        /* Copy button styling */
+        .copy-button {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            padding: 0.5rem 1rem;
+            background-color: #3730a3;
+            color: white;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: background-color 0.2s;
+            opacity: 0;
+            z-index: 10;
+        }
+        .copy-button:hover {
+            background-color: #312e81;
+            opacity: 1;
+        }
+        .json-container:hover .copy-button {
+            opacity: 1;
+        }
+        .text-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="mb-6 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-gray-900">Card Content: <span class="font-mono text-indigo-600">{{ content_hash[:8] }}...</span></h1>
+            <a href="{{ url_for('index') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                Back to Todo List
+            </a>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Card Details</h2>
+                <div class="grid grid-cols-1 gap-4 text-sm bg-gray-50 p-4 rounded-lg">
+                    <div>
+                        <span class="font-medium text-gray-600 inline-block w-32">Content Hash:</span>
+                        <span class="ml-2 font-mono text-indigo-600">{{ content_hash }}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-600 inline-block w-32">Time Claimed:</span>
+                        <span class="ml-2 text-gray-900">{{ time_claimed | datetime }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Content
+                </h2>
+                <div class="content-wrapper">
+                    {% if is_json %}
+                        <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200">
+                            <div class="text-sm font-medium text-gray-600">Structured Data</div>
+                            <div class="text-sm text-gray-500" id="charCount"></div>
+                        </div>
+                        <div class="content-columns">
+                            <div class="json-container">
+                                <button class="copy-button" onclick="copyToClipboard()">
+                                    Copy
+                                </button>
+                                <div id="jsoneditor"></div>
+                            </div>
+                            <div class="raw-content">
+                                <div class="empty-message">Select a node to view its raw content</div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="flex items-center justify-between px-4 py-2 bg-gray-200 border-b border-gray-300">
+                            <div class="text-sm font-medium text-gray-700">Plain Text</div>
+                            <div class="text-sm text-gray-600">
+                                {{ content|length }} characters
+                            </div>
+                        </div>
+                        <div class="p-4 text-content text-sm text-gray-900 leading-relaxed bg-white">
+                            {{ content }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if previous_card %}
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Previous Version</h2>
+                <a href="{{ url_for('view_card', card_hash=previous_card) }}" 
+                   class="inline-flex items-center space-x-2 text-indigo-600 hover:text-indigo-700 font-mono transition-colors duration-200">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                    <span>{{ previous_card }}</span>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if is_json %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('jsoneditor');
+            const rawContent = document.querySelector('.raw-content');
+            const options = {
+                mode: 'tree',
+                modes: ['tree'],
+                mainMenuBar: false,
+                navigationBar: false,
+                statusBar: false,
+                search: false,
+                enableSort: false,
+                enableTransform: false,
+                indentation: 2,
+                onEditable: function() {
+                    return false;
+                },
+                onEvent: function(node, event) {
+                    if (event.type === 'click' || event.type === 'focus') {
+                        console.log('Selected node:', node);
+                        
+                        // Get the actual value at this path
+                        let value = editor.get();
+                        for (const key of node.path) {
+                            value = value[key];
+                        }
+                        
+                        // Create a clean object for display
+                        const displayNode = {
+                            value: value,
+                            path: node.path
+                        };
+                        
+                        displayRawContent(displayNode);
+                    }
+                }
+            };
+            
+            try {
+                // Parse the JSON content from the template
+                const content = JSON.parse({{ content | tojson | safe }});
+                const editor = new JSONEditor(container, options, content);
+                window.editor = editor;  // Store for global access
+                
+                // Expand only first two levels by default
+                setTimeout(() => {
+                    editor.collapseAll();
+                    editor.expandToLevel(2);
+                }, 100);
+                
+                // Update character count
+                document.getElementById('charCount').textContent = 
+                    `${JSON.stringify(content).length} characters`;
+            } catch (err) {
+                console.error('Error parsing JSON:', err);
+                container.innerHTML = `<div class="p-4 text-red-600">Error parsing JSON: ${err.message}</div>`;
+            }
+        });
+
+        function displayRawContent(node) {
+            const rawContentDiv = document.querySelector('.raw-content');
+            if (!node) {
+                rawContentDiv.innerHTML = '<div class="empty-message">Select a node to view its raw content</div>';
+                return;
+            }
+
+            try {
+                // Get the actual value from the node
+                const value = node.value;
+                
+                // Convert the value to a formatted string
+                let content;
+                if (typeof value === 'undefined') {
+                    content = 'undefined';
+                } else if (value === null) {
+                    content = '<span class="json-null">null</span>';
+                } else if (typeof value === 'boolean') {
+                    content = `<span class="json-boolean">${value}</span>`;
+                } else if (typeof value === 'number') {
+                    content = `<span class="json-number">${value}</span>`;
+                } else if (typeof value === 'string') {
+                    content = `"<span class="json-string">${value
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')}</span>"`;
+                } else if (typeof value === 'object') {
+                    content = JSON.stringify(value, null, 2)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        // Format keys without adding extra quotes
+                        .replace(/"([^"]+)":/g, function(match, key) {
+                            return `"<span class="json-key">${key}</span>":`;
+                        })
+                        // Format string values
+                        .replace(/: "([^"]+)"/g, function(match, value) {
+                            return `: "<span class="json-string">${value}</span>"`;
+                        })
+                        .replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>')
+                        .replace(/\b(null)\b/g, '<span class="json-null">$1</span>')
+                        .replace(/\b(-?\d+\.?\d*(?:e[+-]?\d+)?)\b/g, '<span class="json-number">$1</span>');
+                } else {
+                    content = String(value)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+                }
+
+                rawContentDiv.innerHTML = `<pre>${content}</pre>`;
+            } catch (err) {
+                console.error('Error displaying raw content:', err, node);
+                rawContentDiv.innerHTML = `<div class="empty-message">Error displaying content: ${err.message}</div>`;
+            }
+        }
+
+        function copyToClipboard() {
+            const json = window.editor.get();
+            const formatted = JSON.stringify(json, null, 4);
+            navigator.clipboard.writeText(formatted).then(() => {
+                const button = document.querySelector('.copy-button');
+                button.textContent = 'Copied!';
+                button.style.backgroundColor = '#059669'; // green
+                setTimeout(() => {
+                    button.textContent = 'Copy';
+                    button.style.backgroundColor = '#3730a3'; // original color
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                const button = document.querySelector('.copy-button');
+                button.textContent = 'Failed';
+                button.style.backgroundColor = '#dc2626'; // red
+                setTimeout(() => {
+                    button.textContent = 'Copy';
+                    button.style.backgroundColor = '#3730a3'; // original color
+                }, 2000);
+            });
+        }
+    </script>
+    {% endif %}
+</body>
+</html>
