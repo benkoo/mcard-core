@@ -73,17 +73,12 @@ class MCardStorage:
 
     def save(self, mcard: MCard) -> bool:
         """
-        Save MCard instance to database if it doesn't already exist.
+        Save MCard instance to database, updating if it already exists.
         
         Returns:
-            bool: True if the record was saved, False if it already existed
+            bool: True if the operation was successful
         """
         try:
-            # Check if record already exists
-            self.cursor.execute('SELECT 1 FROM mcards WHERE content_hash = ?', (mcard.content_hash,))
-            if self.cursor.fetchone():
-                return False
-
             # Convert content to bytes if it's not already
             content = mcard.content
             is_binary = isinstance(content, bytes)
@@ -92,8 +87,9 @@ class MCardStorage:
             elif not isinstance(content, bytes):
                 content = str(content).encode('utf-8')
 
+            # Use UPSERT (INSERT OR REPLACE) to handle both new and existing records
             self.cursor.execute('''
-                INSERT INTO mcards (content_hash, content, time_claimed, is_binary)
+                INSERT OR REPLACE INTO mcards (content_hash, content, time_claimed, is_binary)
                 VALUES (?, ?, ?, ?)
             ''', (mcard.content_hash, content, mcard.time_claimed, int(is_binary)))
             self.conn.commit()

@@ -7,75 +7,76 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-8 text-center text-gray-800">MCard Todo App</h1>
+    <div class="container mx-auto p-6">
+        <h1 class="text-3xl font-bold mb-8">Todo App with CLM</h1>
         
         <!-- Add Todo Form -->
-        <form action="{{ url_for('add') }}" method="POST" class="mb-8 bg-white p-6 rounded-lg shadow-md">
+        <form action="{{ url_for('add') }}" method="post" class="mb-8 bg-white p-6 rounded-lg shadow-md">
             <div class="mb-4">
-                <input type="text" name="title" placeholder="Todo title" required
-                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="title">Title</label>
+                <input type="text" name="title" id="title" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
+            
             <div class="mb-4">
-                <textarea name="description" placeholder="Description (optional)"
-                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="description">Description</label>
+                <textarea name="description" id="description" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
             </div>
-            <button type="submit"
-                class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors">
-                Add Todo
-            </button>
+
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Add Todo</button>
         </form>
 
         <!-- Todo List -->
         <div class="space-y-4">
             {% for todo in todos %}
-            <div class="bg-white p-4 rounded-lg shadow-md flex items-start justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center">
-                        <form action="{{ url_for('toggle', card_id=todo.id) }}" method="POST" class="mr-3">
-                            <button type="submit" class="focus:outline-none">
-                                {% if todo.done %}
-                                <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path>
-                                </svg>
-                                {% else %}
-                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10" stroke-width="2"></circle>
-                                </svg>
-                                {% endif %}
-                            </button>
-                        </form>
-                        <div>
-                            <h3 class="text-lg font-semibold {% if todo.done %}line-through text-gray-500{% endif %}">
-                                {{ todo.title }}
-                            </h3>
-                            {% if todo.description %}
-                            <p class="text-gray-600 mt-1 {% if todo.done %}line-through{% endif %}">
-                                {{ todo.description }}
-                            </p>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="todo-item {% if todo.done %}done{% endif %}">
+                        <div class="todo-header">
+                            <h2 class="text-xl font-semibold {% if todo.done %}line-through text-gray-500{% endif %}">{{ todo.title }}</h2>
+                            {% if todo.previous_hash %}
+                            <small class="text-gray-500">Previous version: {{ todo.previous_hash }}</small>
                             {% endif %}
-                            <p class="text-sm text-gray-500 mt-1">
-                                Created: {{ todo.created_at.split('T')[0] }}
-                                {% if todo.updated_at != todo.created_at %}
-                                | Updated: {{ todo.updated_at.split('T')[0] }}
-                                {% endif %}
-                            </p>
                         </div>
                     </div>
+                    <div class="flex space-x-2">
+                        <a href="{{ url_for('edit_clm', card_id=todo.id) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded">Edit CLM</a>
+                        <form action="{{ url_for('toggle', card_id=todo.id) }}" method="post" class="inline">
+                            <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded">
+                                {% if todo.done %}Undo{% else %}Done{% endif %}
+                            </button>
+                        </form>
+                        <form action="{{ url_for('delete', card_id=todo.id) }}" method="post" class="inline">
+                            <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded">Delete</button>
+                        </form>
+                    </div>
                 </div>
-                <form action="{{ url_for('delete', card_id=todo.id) }}" method="POST">
-                    <button type="submit"
-                        class="text-red-500 hover:text-red-700 focus:outline-none">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
-                </form>
+
+                {% if todo.description %}
+                <p class="text-gray-600 mb-4">{{ todo.description }}</p>
+                {% endif %}
+
+                <div class="text-sm text-gray-500 mt-4">
+                    Created: {{ todo.created_at | datetime }}
+                    {% if todo.updated_at != todo.created_at %}
+                    <br>Updated: {{ todo.updated_at | datetime }}
+                    {% endif %}
+                </div>
             </div>
             {% endfor %}
         </div>
     </div>
+
+    <script>
+    function addGoalField() {
+        const container = document.querySelector('.goals-list');
+        const newGoal = document.createElement('div');
+        newGoal.className = 'flex mb-2';
+        newGoal.innerHTML = `
+            <input type="text" name="goals[]" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter a goal">
+            <button type="button" onclick="this.parentElement.remove()" class="ml-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline">Remove</button>
+        `;
+        container.appendChild(newGoal);
+    }
+    </script>
 </body>
 </html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Todo - {{ todo.title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-6">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold">Edit Todo</h1>
+            <a href="{{ url_for('index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Back to Todo List
+            </a>
+        </div>
+
+        <form action="{{ url_for('update_clm', card_id=todo.current_hash) }}" method="post" class="bg-white p-6 rounded-lg shadow-md space-y-6">
+            <!-- Basic Todo Info -->
+            <div>
+                <h2 class="text-xl font-semibold mb-4">Basic Information</h2>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="title">Title</label>
+                    <input type="text" name="title" id="title" value="{{ todo.title }}" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="description">Description</label>
+                    <textarea name="description" id="description" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.description }}</textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Status</label>
+                    <div class="flex items-center">
+                        <input type="checkbox" name="done" id="done" {% if todo.done %}checked{% endif %} class="mr-2">
+                        <label for="done">Done</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CLM Section -->
+            <div>
+                <h2 class="text-xl font-semibold mb-4">Cubical Logic Model</h2>
+                
+                <!-- Context -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="context">Context</label>
+                    <textarea name="context" id="context" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.clm.abstract_spec.context }}</textarea>
+                </div>
+
+                <!-- Goals -->
+                <div class="mb-6" id="goals-container">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Goals</label>
+                    <div class="goals-list space-y-2">
+                        {% for goal in todo.clm.abstract_spec.goals %}
+                        <div class="flex">
+                            <input type="text" name="goals[]" value="{{ goal }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                            <button type="button" onclick="this.parentElement.remove()" class="ml-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline">Remove</button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" onclick="addGoalField()" class="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline">Add Goal</button>
+                </div>
+
+                <!-- Success Criteria -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Success Criteria</h3>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="verification">Verification</label>
+                        <textarea name="verification" id="verification" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.clm.abstract_spec.success_criteria.verification }}</textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="validation">Validation</label>
+                        <textarea name="validation" id="validation" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.clm.abstract_spec.success_criteria.validation }}</textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="performance">Performance</label>
+                        <textarea name="performance" id="performance" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ todo.clm.abstract_spec.success_criteria.performance }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between">
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Save Changes
+                </button>
+                <a href="{{ url_for('index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+    function addGoalField() {
+        const container = document.querySelector('.goals-list');
+        const newGoal = document.createElement('div');
+        newGoal.className = 'flex';
+        newGoal.innerHTML = `
+            <input type="text" name="goals[]" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter a goal">
+            <button type="button" onclick="this.parentElement.remove()" class="ml-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline">Remove</button>
+        `;
+        container.appendChild(newGoal);
+    }
+    </script>
+</body>
+</html>
