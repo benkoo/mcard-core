@@ -1,3 +1,4 @@
+{% from "components/nav.html" import nav %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,7 +32,10 @@
 </head>
 <body class="bg-gray-100 min-h-screen p-8">
     <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 class="text-2xl font-bold mb-6">Edit Todo CLM</h1>
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold mb-2">Edit Todo CLM</h1>
+            {{ nav('todo_cards') }}
+        </div>
         <form action="{{ url_for('update_clm', content_hash=todo.id) }}" method="post" class="space-y-6">
             <input type="hidden" name="content_hash" value="{{ todo.id }}">
             

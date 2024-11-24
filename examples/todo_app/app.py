@@ -314,6 +314,93 @@ def update_clm(content_hash):
         app.logger.error(f"Error updating CLM: {str(e)}")
         return str(e), 500
 
+@app.route("/api/search_cards")
+def search_cards():
+    search_query = request.args.get('search', '').strip()
+    per_page = request.args.get('per_page', 7, type=int)
+    page = request.args.get('page', 1, type=int)
+
+    storage = get_storage()
+    all_cards = storage.get_all()
+    todos = []
+    
+    # Convert cards to todo format
+    for card in all_cards:
+        todo_data = {
+            'id': card.content_hash,
+            'time_claimed': card.time_claimed
+        }
+        todos.append(todo_data)
+    
+    # Sort by time_claimed timestamp, most recent first
+    todos.sort(key=lambda x: x.get('time_claimed', ''), reverse=True)
+    
+    # Apply search filter if query exists and is not empty
+    if search_query and len(search_query) >= 2:
+        todos = [todo for todo in todos if 
+                search_query.lower() in str(todo['id']).lower() or 
+                search_query.lower() in str(todo['time_claimed']).lower()]
+    
+    # Calculate pagination
+    total_items = len(todos)
+    total_pages = (total_items + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    
+    # Get current page items
+    current_items = todos[start_idx:end_idx]
+    
+    return jsonify({
+        'todos': current_items,
+        'total_pages': total_pages,
+        'current_page': page
+    })
+
+@app.route("/list_all_cards")
+def list_all_cards():
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 7, type=int)
+    search_query = request.args.get('search', '').strip()
+
+    storage = get_storage()
+    all_cards = storage.get_all()
+    todos = []
+    
+    # Convert cards to todo format
+    for card in all_cards:
+        todo_data = {
+            'id': card.content_hash,
+            'time_claimed': card.time_claimed
+        }
+        todos.append(todo_data)
+    
+    # Sort by time_claimed timestamp, most recent first
+    todos.sort(key=lambda x: x.get('time_claimed', ''), reverse=True)
+    
+    # Apply search filter if query exists
+    if search_query:
+        todos = [todo for todo in todos if 
+                search_query.lower() in str(todo['id']).lower() or 
+                search_query.lower() in str(todo['time_claimed']).lower()]
+    
+    # Calculate pagination
+    total_items = len(todos)
+    total_pages = (total_items + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    
+    # Get current page items
+    current_items = todos[start_idx:end_idx]
+    
+    return render_template(
+        "list_all_cards.html",
+        todos=current_items,
+        current_page=page,
+        total_pages=total_pages,
+        per_page=per_page,
+        search_query=search_query
+    )
+
 @app.route('/view/<content_hash>')
 def view_card(content_hash):
     try:
@@ -322,11 +409,21 @@ def view_card(content_hash):
         if not card:
             return "Card not found", 404
             
-        content = json.loads(card.content)
+        # Pass the raw content string instead of parsing it
+        content = card.content
+        is_json = True
+        try:
+            # Verify if the content is valid JSON
+            json.loads(content)
+            is_json = True
+        except json.JSONDecodeError:
+            is_json = False
+            
         return render_template('view_card.html', 
                              content=content, 
                              content_hash=content_hash,
-                             time_claimed=card.time_claimed)
+                             time_claimed=card.time_claimed,
+                             is_json=is_json)
     except Exception as e:
         print(f"Error in view_card: {str(e)}")  # Debug log
         raise

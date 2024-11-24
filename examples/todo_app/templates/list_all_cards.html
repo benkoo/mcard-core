@@ -1,0 +1,143 @@
+{% from "components/nav.html" import nav %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Cards - Todo App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        let searchTimeout;
+        
+        function updateResults() {
+            const searchInput = document.getElementById('search-input');
+            const cardsList = document.getElementById('cards-list');
+            const paginationContainer = document.getElementById('pagination-container');
+            const perPageSelect = document.querySelector('select[name="per_page"]');
+            const query = searchInput.value.trim();
+            const perPage = perPageSelect ? perPageSelect.value : 7;
+
+            // Always fetch results, whether query is empty or not
+            fetch(`/api/search_cards?search=${encodeURIComponent(query)}&per_page=${perPage}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Update cards list
+                    cardsList.innerHTML = data.todos.map(todo => `
+                        <div class="bg-gray-50 p-4 rounded-lg shadow">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="text-sm text-gray-600 font-mono">
+                                        <p>Content Hash: ${todo.id}</p>
+                                        <p>Time Claimed: ${todo.time_claimed}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <a href="/view/${todo.id}"
+                                        class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                                        View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    // Update pagination if needed
+                    if (data.total_pages > 1) {
+                        paginationContainer.style.display = 'flex';
+                        // Update page numbers...
+                    } else {
+                        paginationContainer.style.display = 'none';
+                    }
+                });
+        }
+
+        function handleSearch(event) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(updateResults, 300);
+        }
+
+        // Initial load of all records
+        document.addEventListener('DOMContentLoaded', function() {
+            updateResults();
+        });
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold mb-2">All Cards</h1>
+                {{ nav('all_cards') }}
+            </div>
+
+            <!-- Search Form -->
+            <div class="mb-6">
+                <div class="flex gap-4">
+                    <input type="text" 
+                           id="search-input"
+                           name="search" 
+                           value="{{ search_query }}" 
+                           placeholder="Search by content hash or time claimed..." 
+                           oninput="handleSearch(event)"
+                           class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <!-- Todo List -->
+            <div id="cards-list" class="space-y-4">
+                {% for todo in todos %}
+                <div class="bg-gray-50 p-4 rounded-lg shadow">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="text-sm text-gray-600 font-mono">
+                                <p>Content Hash: {{ todo.id }}</p>
+                                <p>Time Claimed: {{ todo.time_claimed|datetime }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <a href="{{ url_for('view_card', content_hash=todo.id) }}"
+                                class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                                View
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            <div id="pagination-container" class="mt-6 flex items-center justify-between border-t pt-4" {% if total_pages <= 1 %}style="display: none;"{% endif %}>
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-600">Items per page:</span>
+                    <select name="per_page" 
+                            onchange="window.location.href='{{ url_for('list_all_cards', page=1, per_page='') }}' + this.value + '&search={{ search_query }}'"
+                            class="border rounded-lg px-2 py-1">
+                        {% for n in [5, 7, 10, 20, 50] %}
+                        <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex space-x-2">
+                    {% if current_page > 1 %}
+                    <a href="{{ url_for('list_all_cards', page=current_page-1, per_page=per_page, search=search_query) }}"
+                       class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                        Previous
+                    </a>
+                    {% endif %}
+                    
+                    <span class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg">
+                        Page {{ current_page }} of {{ total_pages }}
+                    </span>
+                    
+                    {% if current_page < total_pages %}
+                    <a href="{{ url_for('list_all_cards', page=current_page+1, per_page=per_page, search=search_query) }}"
+                       class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                        Next
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
