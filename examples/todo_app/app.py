@@ -75,8 +75,86 @@ def index():
         raise
     return render_template('index.html', todos=todos)
 
-@app.route('/add', methods=['POST'])
-def add():
+@app.route('/api/cards', methods=['POST'])
+def add_card():
+    """Generic route to add any type of card to MCard storage.
+    
+    Accepts both JSON and binary data:
+    - For JSON: use Content-Type: application/json
+    - For UTF-8 text: use Content-Type: text/plain
+    - For binary: use appropriate Content-Type (e.g., application/octet-stream, image/png)
+    """
+    try:
+        content_type = request.headers.get('Content-Type', 'application/json')
+        
+        if content_type == 'application/json':
+            # Handle JSON data
+            if not request.is_json:
+                return jsonify({"error": "Expected JSON data"}), 400
+            content = request.get_json()
+            if not content:
+                return jsonify({"error": "No content provided"}), 400
+            content_str = json.dumps(content)
+        
+        elif content_type == 'text/plain':
+            # Handle UTF-8 text data
+            content = request.get_data(as_text=True)
+            if not content:
+                return jsonify({"error": "No content provided"}), 400
+            content_str = content
+            
+        else:
+            # Handle binary data
+            content = request.get_data()
+            if not content:
+                return jsonify({"error": "No content provided"}), 400
+            
+            # Create a metadata wrapper for binary data
+            metadata = {
+                "content_type": content_type,
+                "size": len(content),
+                "encoding": "binary"
+            }
+            
+            # Store binary data directly
+            card = MCard(content=content)
+            storage = get_storage()
+            storage.save(card)
+            
+            # Create a metadata card linking to the binary data
+            metadata["binary_hash"] = card.content_hash
+            metadata_card = MCard(content=json.dumps(metadata))
+            storage.save(metadata_card)
+            storage.conn.commit()
+            
+            return jsonify({
+                "content_hash": metadata_card.content_hash,
+                "binary_hash": card.content_hash,
+                "time_claimed": card.time_claimed,
+                "metadata": metadata
+            })
+
+        # Handle JSON and text data
+        storage = get_storage()
+        card = MCard(content=content_str)
+        storage.save(card)
+        storage.conn.commit()
+        
+        return jsonify({
+            "content_hash": card.content_hash,
+            "time_claimed": card.time_claimed,
+            "content_type": content_type
+        })
+        
+    except Exception as e:
+        if 'storage' in locals():
+            storage.conn.rollback()
+        app.logger.error(f"Error adding card: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/todo/add', methods=['POST'])
+def add_todo_card():
+    """Specific route for adding todo cards with CLM support."""
     try:
         title = request.form.get('title', '').strip()
         description = request.form.get('description', '').strip()
@@ -89,6 +167,7 @@ def add():
         # Create todo with timestamp and CLM
         now = datetime.utcnow().isoformat()
         todo = {
+            "type": "todo",
             "title": title,
             "description": description,
             "done": False,
@@ -97,18 +176,24 @@ def add():
             "updated_at": now
         }
 
-        storage = get_storage()
-        print(f"Creating todo with content: {json.dumps(todo)}")  # Debug log
-        card = MCard(content=json.dumps(todo))
-        print(f"Created card with hash: {card.content_hash}, time_claimed: {card.time_claimed}")  # Debug log
-        
-        # Save to storage
-        storage.save(card)
-        storage.conn.commit()
-        
+        # Create a new request context for the internal API call
+        with app.test_request_context(
+            '/api/cards',
+            method='POST',
+            content_type='application/json',
+            data=json.dumps(todo)
+        ) as ctx:
+            ctx.push()
+            response = add_card()
+            ctx.pop()
+
+            if isinstance(response, tuple):
+                response_data, status_code = response
+                if status_code != 200:
+                    raise Exception(response_data.get('error', 'Unknown error occurred'))
+            
         return redirect(url_for('index'))
     except Exception as e:
-        storage.conn.rollback()
         app.logger.error(f"Error adding todo: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
