@@ -1,69 +1,117 @@
-# MCard CRUD App
+# MCard CRUD Application
 
-A simple CRUD (Create, Read, Update, Delete) application built with Flask and MCard for storing and managing content. This application demonstrates the basic usage of the MCard library for content storage and retrieval.
+A full-featured CRUD (Create, Read, Update, Delete) application for managing MCards, built with Flask and Bootstrap. This application demonstrates the capabilities of the MCard library while providing a user-friendly interface for card management.
 
 ## Features
 
-- Create new cards with text content or file uploads
-- View all cards in a grid layout
-- View individual card details
-- Delete cards
-- Support for various content types:
-  - Plain text
-  - JSON
-  - Binary files (with special handling for images)
-- Drag and drop file upload support
-- Duplicate content detection
-- Responsive design with Bootstrap 5
+### Core Functionality
+- Create new MCards with text or binary content
+- View existing MCards with content preview
+- Delete MCards from storage
+- Automatic content hash generation and verification
 
-## Installation
+### Advanced Features
 
-1. Make sure you have Python 3.7+ installed
-2. Install the required packages:
-   ```bash
-   pip install flask mcard
-   ```
+#### Search and Filtering
+- Real-time search functionality
+- Filter by content hash and timestamp
+- Case-insensitive search
+- Dynamic result updates
 
-3. Run the application:
+#### Pagination
+- Configurable items per page (5, 10, 25, 50)
+- Page navigation controls
+- Display of current range and total items
+- Smooth integration with search functionality
+
+#### Content Type Detection
+- Automatic file type detection for various formats:
+  - Images: PNG, JPEG, GIF, WebP, TIFF
+  - Documents: PDF, DOCX, XLSX
+  - Archives: ZIP
+  - Text: Plain text, JSON, XML, HTML, PEM certificates
+- Smart file extension suggestion
+- MIME type detection
+
+#### Content Display
+- Rich content preview:
+  - Image preview for supported formats
+  - Formatted JSON display
+  - Syntax highlighting for code
+  - Binary content information
+- Content metadata display:
+  - File type and extension
+  - Content size
+  - Creation timestamp
+  - Content hash with copy feature
+
+#### User Interface
+- Clean, responsive Bootstrap design
+- Interactive buttons and controls
+- Visual feedback for actions
+- Consistent styling across pages
+- Mobile-friendly layout
+
+## Technical Details
+
+### File Structure
+```
+mcard_crud_app/
+├── app.py              # Main application logic
+├── templates/          # HTML templates
+│   ├── base.html      # Base template with common elements
+│   ├── index.html     # Main page with card listing
+│   ├── new_card.html  # Card creation form
+│   ├── view_card.html # Card detail view
+│   └── hash_display.html  # Hash display component
+└── mcard_crud.db      # SQLite database for card storage
+```
+
+### Dependencies
+- Flask: Web framework
+- Bootstrap 5: Frontend framework
+- Font Awesome: Icons
+- MCard Library: Core functionality
+
+### Implementation Details
+- RESTful route structure
+- Proper error handling and validation
+- Secure file handling
+- Efficient database operations
+- Modular template design
+- Responsive UI components
+
+## Usage
+
+1. Start the application:
    ```bash
    python app.py
    ```
 
-4. Open your browser and navigate to `http://localhost:5000`
+2. Access the web interface:
+   - Open `http://localhost:5000` in your browser
+   - Create new cards using the "New Card" button
+   - View and manage existing cards in the main list
+   - Use search and pagination to navigate large collections
 
-## Usage
+## Development
 
-### Creating Cards
+### Adding New Features
+1. Modify app.py for new routes and logic
+2. Add/update templates in the templates directory
+3. Update static assets as needed
+4. Test thoroughly with different content types
 
-1. Click the "New Card" button in the navigation bar or on the home page
-2. Choose between:
-   - Text content: Enter text directly in the textarea
-   - File upload: Select a file or drag and drop it into the upload area
+### Best Practices
+- Follow Flask application structure
+- Use Bootstrap components consistently
+- Handle errors gracefully
+- Provide user feedback for actions
+- Maintain responsive design
+- Document new features
 
-### Viewing Cards
-
-- The home page displays all cards in a grid layout
-- Click the "View" button on a card to see its full details
-- Binary files (like images) can be previewed and downloaded
-
-### Deleting Cards
-
-- Use the "Delete" button on either the card grid or the view page
-- Confirm the deletion when prompted
-
-## Project Structure
-
-```
-mcard_crud_app/
-├── app.py              # Main application file
-├── templates/          # HTML templates
-│   ├── base.html      # Base template with common layout
-│   ├── index.html     # Home page template
-│   ├── new_card.html  # New card creation template
-│   └── view_card.html # Card detail view template
-└── README.md          # This file
-```
-
-## Contributing
-
-Feel free to submit issues and enhancement requests!
+## Security Considerations
+- Input validation for all forms
+- Safe file handling for binary content
+- Protection against common web vulnerabilities
+- Proper error message handling
