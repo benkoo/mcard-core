@@ -1,0 +1,5 @@
+{% macro render_hash(content_hash) %}
+<a href="{{ url_for('view_card', content_hash=content_hash) }}" class="font-monospace text-decoration-none" title="{{ content_hash }}">
+    {{ content_hash[:6] }}...
+</a>
+{% endmacro %}
