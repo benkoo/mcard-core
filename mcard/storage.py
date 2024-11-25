@@ -157,16 +157,14 @@ class MCardStorage:
             if not record:
                 return None
 
-            # Convert content based on original type
-            content = record[1]
-            if not record[3]:
-                content = content.decode('utf-8')
-
-            return MCard(
-                content=content,
+            # Create MCardRecord instance to handle binary content properly
+            mcard_record = MCardRecord(
                 content_hash=record[0],
-                time_claimed=record[2]  # Already a datetime with original timezone
+                content=record[1],
+                time_claimed=record[2],
+                is_binary=bool(record[3])
             )
+            return mcard_record.to_mcard()
         except sqlite3.Error as e:
             print(f"An error occurred: {e}")
             return None
@@ -177,11 +175,12 @@ class MCardStorage:
             self.cursor.execute('SELECT * FROM mcards')
             records = self.cursor.fetchall()
             return [
-                MCard(
-                    content=record[1] if record[3] else record[1].decode('utf-8'),
+                MCardRecord(
                     content_hash=record[0],
-                    time_claimed=record[2]  # Already a datetime with original timezone
-                )
+                    content=record[1],
+                    time_claimed=record[2],
+                    is_binary=bool(record[3])
+                ).to_mcard()
                 for record in records
             ]
         except sqlite3.Error as e:

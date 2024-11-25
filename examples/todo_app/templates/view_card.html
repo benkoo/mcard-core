@@ -221,14 +221,22 @@
 
                 <!-- Card Content -->
                 <div class="mb-6">
-                    <h2 class="text-lg font-semibold mb-3">Content</h2>
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-lg font-semibold">Content</h2>
+                        {% if not is_binary %}
+                            <a href="{{ url_for('edit_clm', content_hash=content_hash) }}" 
+                               class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                                <span>Edit CLM</span>
+                            </a>
+                        {% endif %}
+                    </div>
                     
                     {% if is_binary %}
                         <!-- Binary Content Display -->
                         <div class="mb-4">
                             {% if content_type.startswith('image/') %}
                                 <div class="relative">
-                                    <img src="{{ url_for('get_binary_content', content_hash=binary_hash) }}" 
+                                    <img src="{{ url_for('get_binary_content', content_hash=content_hash) }}" 
                                          alt="Image content" 
                                          class="max-w-full h-auto rounded shadow-lg border border-gray-200"
                                          style="max-height: 600px; object-fit: contain;">

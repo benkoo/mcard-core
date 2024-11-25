@@ -6,6 +6,7 @@ from flask import Flask, render_template, request, redirect, url_for, g, jsonify
 from mcard.core import MCard
 from mcard.storage import MCardStorage
 from clm import CubicalLogicModel, AbstractSpecification, SuccessCriteria, ConcreteImplementation, RealisticExpectations
+from clm import CubicalLogicModel
 import uuid
 
 app = Flask(__name__)
@@ -174,8 +175,9 @@ def add_card():
         # Check if this is a file upload
         if 'file' in request.files:
             file = request.files['file']
-            print(f"File object: {file}")  # Debug log
-            print(f"Original filename: {file.filename}")  # Debug log
+            print(f"\n=== File Upload Debug ===")
+            print(f"File object: {file}")
+            print(f"Original filename: {file.filename}")
             
             if file.filename == '':
                 return jsonify({"error": "No file selected"}), 400
@@ -185,7 +187,11 @@ def add_card():
             content_type = file.content_type or 'application/octet-stream'
             filename = file.filename
             
-            print(f"Uploading file: {filename} with type: {content_type}")  # Debug log
+            print(f"Uploading file: {filename}")
+            print(f"Content type: {content_type}")
+            print(f"Content size: {len(content)} bytes")
+            if isinstance(content, bytes):
+                print(f"First 20 bytes: {' '.join([f'{b:02x}' for b in content[:20]])}")
             
             # Check for duplicates
             duplicate_check = check_duplicate_content(storage, content)
@@ -194,7 +200,7 @@ def add_card():
                     "warning": "Same content was found, no new MCard created",
                     "metadata": duplicate_check
                 }
-                print(f"Sending duplicate response for file: {response}")  # Debug log
+                print(f"Sending duplicate response for file: {response}")
                 return jsonify(response), 409
             
             # For text files, store as UTF-8 text
@@ -219,34 +225,46 @@ def add_card():
                     storage.save(metadata_card)
                     storage.conn.commit()
                     
-                    print(f"Stored text file with metadata hash: {metadata_card.content_hash} and text hash: {card.content_hash}")  # Debug log
+                    print(f"Stored text file:")
+                    print(f"- Metadata hash: {metadata_card.content_hash}")
+                    print(f"- Text hash: {card.content_hash}")
                     return redirect(url_for('view_card', content_hash=metadata_card.content_hash))
                 except UnicodeDecodeError:
                     # If decoding fails, treat as binary
-                    print("Failed to decode as text, treating as binary")  # Debug log
+                    print("Failed to decode as text, treating as binary")
                     content_type = 'application/octet-stream'
+            
+            # Store binary content first
+            binary_card = MCard(content=content)
+            print(f"\n=== Storing Binary Content ===")
+            print(f"Content type: {content_type}")
+            print(f"Content size: {len(content)} bytes")
+            if len(content) >= 20:
+                hex_bytes = ' '.join([f'{b:02x}' for b in content[:20]])
+                print(f"First 20 bytes (hex): {hex_bytes}")
+            storage.save(binary_card)
+            storage.conn.commit()  # Commit after saving binary content
+            print(f"Stored binary content with hash: {binary_card.content_hash}")
             
             # Create a metadata wrapper for binary data
             metadata = {
                 "content_type": content_type,
                 "size": len(content),
                 "encoding": "binary",
-                "filename": filename
+                "filename": filename,
+                "binary_hash": binary_card.content_hash
             }
             
-            print(f"Created metadata: {metadata}")  # Debug log
-            
-            # Store binary data directly
-            card = MCard(content=content)
-            storage.save(card)
+            print(f"Created metadata: {metadata}")
             
             # Create a metadata card linking to the binary data
-            metadata["binary_hash"] = card.content_hash
             metadata_card = MCard(content=json.dumps(metadata))
             storage.save(metadata_card)
             storage.conn.commit()
             
-            print(f"Stored file with metadata hash: {metadata_card.content_hash} and binary hash: {card.content_hash}")  # Debug log
+            print(f"Stored file:")
+            print(f"- Metadata hash: {metadata_card.content_hash}")
+            print(f"- Binary hash: {binary_card.content_hash}")
             
             # Redirect to view page
             return redirect(url_for('view_card', content_hash=metadata_card.content_hash))
@@ -432,36 +450,32 @@ def edit_clm(content_hash):
     try:
         print(f"\n=== Editing CLM for card {content_hash} ===")  # Debug log
         storage = get_storage()
+        card = storage.get(content_hash)
         
-        # Find the latest version of this todo
-        all_cards = storage.get_all()
-        latest_card = None
-        latest_time = None
-        
-        for card in all_cards:
-            todo_data = json.loads(card.content)
-            original_id = todo_data.get('original_id', card.content_hash)
-            
-            # Check if this is the todo we're looking for
-            if original_id == content_hash:
-                updated_at = datetime.fromisoformat(todo_data['updated_at'])
-                if latest_time is None or updated_at > latest_time:
-                    latest_card = card
-                    latest_time = updated_at
-        
-        if not latest_card:
+        if not card:
             print(f"Card not found with ID: {content_hash}")  # Debug log
             return "Todo not found", 404
+
+        try:
+            todo = json.loads(card.content)
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse card content as JSON: {e}")  # Debug log
+            return "Invalid card content", 400
+
+        print(f"Card content parsed successfully: {todo}")  # Debug log
         
-        todo = json.loads(latest_card.content)
-        todo['id'] = content_hash  # Use original ID for display
-        todo['current_hash'] = latest_card.content_hash  # Add current hash for form submission
-        print(f"Todo data: {todo}")  # Debug log
-        
+        # Initialize CLM if it doesn't exist
         if not todo.get('clm'):
-            # Initialize CLM if it doesn't exist
+            print("Initializing CLM data")  # Debug log
             todo['clm'] = CubicalLogicModel.create().to_dict()
-            
+            # Save the updated content back to storage
+            storage.update(card.content_hash, json.dumps(todo))
+            storage.conn.commit()
+        
+        todo['id'] = content_hash  # Use original ID for display
+        todo['current_hash'] = card.content_hash  # Add current hash for form submission
+        print(f"Final todo data with CLM: {todo}")  # Debug log
+        
         return render_template('edit_clm.html', todo=todo)
     except Exception as e:
         print(f"Error in edit_clm: {str(e)}")  # Debug log
@@ -674,16 +688,54 @@ def view_card(content_hash):
         print(f"Content type: {type(card.content)}")
         if isinstance(card.content, bytes):
             print(f"First few bytes: {card.content[:20]}")
+        else:
+            print(f"Content preview: {str(card.content)[:100]}")
 
-        # Check if content is binary by trying to decode as UTF-8
-        is_binary = isinstance(card.content, bytes)
-        print(f"Is binary: {is_binary}")
-
+        # Try to parse as JSON first
+        content_type = 'application/octet-stream'  # Default content type
         try:
-            if is_binary:
-                print(f"Handling binary content for hash: {content_hash}")
+            if isinstance(card.content, str):
+                content = json.loads(card.content)
+                print(f"Successfully parsed JSON content: {str(content)[:200]}")
+                
+                # Check if this is a binary metadata card
+                if isinstance(content, dict) and content.get('encoding') == 'binary':
+                    print(f"Found binary metadata card")
+                    binary_hash = content.get('binary_hash')
+                    print(f"Binary hash from metadata: {binary_hash}")
+                    # Get the binary card to verify it exists
+                    binary_card = storage.get(binary_hash)
+                    if not binary_card:
+                        print(f"Binary content not found for hash: {binary_hash}")
+                        return "Binary content not found", 404
+                    print(f"Found binary content, size: {len(binary_card.content)} bytes")
+                    return render_template('view_card.html',
+                                        content_hash=binary_hash,  # Use the binary hash for viewing
+                                        time_claimed=card.time_claimed,
+                                        content=content,
+                                        content_type=content.get('content_type', content_type),
+                                        filename=content.get('filename'),
+                                        is_binary=True)
+                
+                # For todo cards, ensure CLM exists
+                if isinstance(content, dict) and content.get('type') == 'todo':
+                    if not content.get('clm'):
+                        content['clm'] = CubicalLogicModel.create().to_dict()
+                        # Save the updated content back to storage
+                        storage.update(card.content_hash, json.dumps(content))
+                        storage.conn.commit()
+                
+                # For all JSON content, convert to formatted string
+                content_str = json.dumps(content, indent=2)
+                return render_template('view_card.html', 
+                                    content_hash=card.content_hash,
+                                    time_claimed=card.time_claimed,
+                                    content=content_str,
+                                    is_binary=False)
+                
+            else:
+                print(f"Content is not a string, treating as binary")
                 # For binary content, detect type directly
-                content_type = 'application/octet-stream'
                 if isinstance(card.content, bytes):
                     if card.content.startswith(b'\x89PNG\r\n\x1a\n'):
                         content_type = 'image/png'
@@ -694,6 +746,9 @@ def view_card(content_hash):
                     elif card.content.startswith(b'GIF87a') or card.content.startswith(b'GIF89a'):
                         content_type = 'image/gif'
                         print("Detected GIF image")
+                    elif card.content.startswith(b'RIFF') and card.content[8:12] == b'WEBP':
+                        content_type = 'image/webp'
+                        print("Detected WebP image")
                 
                 print(f"Content type detected: {content_type}")
                 print(f"Content length: {len(card.content)} bytes")
@@ -702,70 +757,42 @@ def view_card(content_hash):
                 return render_template('view_card.html',
                                     content_hash=card.content_hash,
                                     time_claimed=card.time_claimed,
-                                    content={"size": len(card.content)},  # Fix the size display
+                                    content={"size": len(card.content)},
                                     is_binary=True,
-                                    binary_hash=content_hash,
                                     content_type=content_type)
-            else:
-                # Try to parse as JSON first
-                try:
-                    content = json.loads(card.content)
-                    
-                    # Check if this is a binary metadata card
-                    if isinstance(content, dict) and content.get('encoding') == 'binary':
-                        return render_template('view_card.html',
-                                            content_hash=card.content_hash,
-                                            time_claimed=card.time_claimed,
-                                            content=content,
-                                            binary_hash=content.get('binary_hash'),
-                                            content_type=content.get('content_type'),
-                                            filename=content.get('filename'),
-                                            is_binary=True)
-                    
-                    # For all other JSON content, convert to formatted string
-                    content_str = json.dumps(content, indent=2)
-                    return render_template('view_card.html', 
-                                        content_hash=card.content_hash,
-                                        time_claimed=card.time_claimed,
-                                        content=content_str,
-                                        is_binary=False)
-                    
-                except json.JSONDecodeError:
-                    # For plain text content
-                    content_str = card.content
-                    return render_template('view_card.html', 
-                                        content_hash=card.content_hash,
-                                        time_claimed=card.time_claimed,
-                                        content=content_str,
-                                        is_binary=False)
                 
-        except UnicodeDecodeError:
-            # If we get here, it's definitely binary content
-            content_type = 'application/octet-stream'
-            # Try to detect content type from the first few bytes
+        except json.JSONDecodeError:
+            print("Failed to parse JSON, checking if binary")
+            # If we get here, it's either binary content or plain text
             if isinstance(card.content, bytes):
+                # Try to detect content type from the first few bytes
                 if card.content.startswith(b'\x89PNG\r\n\x1a\n'):
                     content_type = 'image/png'
+                    print("Detected PNG image")
                 elif card.content.startswith(b'\xff\xd8\xff'):
                     content_type = 'image/jpeg'
+                    print("Detected JPEG image")
                 elif card.content.startswith(b'GIF87a') or card.content.startswith(b'GIF89a'):
                     content_type = 'image/gif'
-                elif all(c < 128 for c in card.content[:1024]):  # Check if content looks like text
-                    content_type = 'text/plain'
-            
-            return render_template('view_card.html',
-                                content_hash=card.content_hash,
-                                time_claimed=card.time_claimed,
-                                content=f"Binary content ({len(card.content)} bytes)",
-                                is_binary=True,
-                                binary_hash=content_hash,
-                                content_type=content_type)
+                    print("Detected GIF image")
+                elif card.content.startswith(b'RIFF') and len(card.content) >= 12 and card.content[8:12] == b'WEBP':
+                    content_type = 'image/webp'
+                    print("Detected WebP image")
+                    print(f"Content length: {len(card.content)} bytes")
+                    print(f"First 20 bytes: {' '.join([f'{b:02x}' for b in card.content[:20]])}")
+
+        # Handle plain text content
+        return render_template('view_card.html', 
+                            content_hash=card.content_hash,
+                            time_claimed=card.time_claimed,
+                            content=card.content,
+                            is_binary=False)
             
     except Exception as e:
         print(f"Error in view_card: {str(e)}")
         return f"Error viewing card: {str(e)}", 500
 
-@app.route('/binary/<content_hash>')
+@app.route('/get_binary_content/<content_hash>')
 def get_binary_content(content_hash):
     """Serve binary content with proper content type."""
     try:
@@ -782,27 +809,43 @@ def get_binary_content(content_hash):
         content_type = 'application/octet-stream'
         filename = None
 
-        # Check if this is a metadata card only when downloading
-        if request.args.get('download') == 'true':
+        print(f"Content type: {type(content)}")
+        if isinstance(content, str):
+            print(f"Content preview: {str(content)[:100]}")
+            # Try to parse as JSON to check if this is a metadata card
             try:
-                metadata = json.loads(card.content)
-                if isinstance(metadata, dict) and "binary_hash" in metadata:
-                    # For downloads, use the metadata to get filename and content type
+                metadata = json.loads(content)
+                print(f"Parsed metadata: {metadata}")
+                if isinstance(metadata, dict) and metadata.get('encoding') == 'binary':
+                    # This is a metadata card, get the actual binary content
                     content_type = metadata.get("content_type", "application/octet-stream")
                     filename = metadata.get("filename", "file")
-                    # Get the actual binary content
-                    binary_card = storage.get(metadata["binary_hash"])
+                    binary_hash = metadata.get("binary_hash")
+                    print(f"Found binary metadata - type: {content_type}, filename: {filename}, binary_hash: {binary_hash}")
+                    binary_card = storage.get(binary_hash)
                     if binary_card:
                         content = binary_card.content
-            except (json.JSONDecodeError, AttributeError):
-                pass
+                        print(f"Retrieved binary content, size: {len(content)} bytes")
+                        if isinstance(content, bytes):
+                            hex_bytes = ' '.join([f'{b:02x}' for b in content[:20]])
+                            print(f"Binary content first 20 bytes (hex): {hex_bytes}")
+                    else:
+                        print(f"Binary content not found for hash: {binary_hash}")
+                        return "Binary content not found", 404
+            except json.JSONDecodeError:
+                print("Not a JSON card, treating as raw binary content")
         
-        # Initialize mimetypes if not already done
-        if not mimetypes.inited:
-            mimetypes.init()
-        
-        # If we don't have content type from metadata, try to detect it
-        if content_type == 'application/octet-stream' and isinstance(content, bytes):
+        if isinstance(content, bytes):
+            # Print first 20 bytes in hex for debugging
+            hex_bytes = ' '.join([f'{b:02x}' for b in content[:20]])
+            print(f"First 20 bytes (hex): {hex_bytes}")
+            if len(content) >= 12:  # WebP needs at least 12 bytes
+                riff = content.startswith(b'RIFF')
+                webp = content[8:12] == b'WEBP'
+                print(f"RIFF header present: {riff}")
+                print(f"WEBP identifier present: {webp}")
+
+            # Try to detect content type from the first few bytes
             if content.startswith(b'\x89PNG\r\n\x1a\n'):
                 content_type = 'image/png'
                 print("Detected PNG image")
@@ -812,51 +855,27 @@ def get_binary_content(content_hash):
             elif content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
                 content_type = 'image/gif'
                 print("Detected GIF image")
-            elif content.startswith(b'%PDF'):
-                content_type = 'application/pdf'
-                print("Detected PDF document")
-            elif content.startswith(b'PK\x03\x04'):
-                content_type = 'application/zip'
-                print("Detected ZIP archive")
-        
-        # If content is string, convert to bytes
-        if isinstance(content, str):
-            content = content.encode('utf-8')
-            content_type = 'text/plain'
-        
-        print(f"Serving content with type: {content_type}")
-        print(f"Content length: {len(content)} bytes")
-        
-        # If we don't have a filename and we're downloading, generate one based on content type
-        if request.args.get('download') == 'true' and not filename:
-            ext = mimetypes.guess_extension(content_type) or ''
-            filename = f'file{ext}'
-        
-        # Create and return the response
-        headers = {
-            'Content-Type': content_type,
-            'Content-Length': str(len(content))
-        }
-        
-        # Add Content-Disposition header for downloads
+            elif content.startswith(b'RIFF') and len(content) >= 12 and content[8:12] == b'WEBP':
+                content_type = 'image/webp'
+                print("Detected WebP image")
+                print(f"Content length: {len(content)} bytes")
+                print(f"First 20 bytes: {' '.join([f'{b:02x}' for b in content[:20]])}")
+
+        # Handle download flag
         if request.args.get('download') == 'true':
-            headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-        elif not content_type.startswith(('image/', 'text/', 'application/pdf')):
-            # Force download for unknown types
-            headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        print("Response headers:", headers)
-        
-        response = Response(
-            content,
-            mimetype=content_type,
-            headers=headers
-        )
-        return response
-            
+            headers = {
+                'Content-Type': content_type,
+                'Content-Disposition': f'attachment; filename="{filename or "file"}"'
+            }
+        else:
+            headers = {'Content-Type': content_type}
+
+        print(f"Serving content with type: {content_type}, size: {len(content)} bytes")
+        return Response(content, headers=headers)
+
     except Exception as e:
-        app.logger.error(f"Error serving binary content: {str(e)}")
-        return str(e), 500
+        print(f"Error serving binary content: {str(e)}")
+        return f"Error serving binary content: {str(e)}", 500
 
 if __name__ == '__main__':
     app.run(debug=True)
