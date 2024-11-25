@@ -1,0 +1,173 @@
+{% from "components/nav.html" import nav %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New Card - MCard Todo App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="container mx-auto p-6">
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold mb-2">Create New Card</h1>
+                {{ nav('new_card') }}
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <!-- Content Type Selection -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <!-- Warning Message -->
+                    <div id="warningMessage" class="hidden mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4" role="alert">
+                        <p class="font-bold">Warning</p>
+                        <p id="warningText"></p>
+                    </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Content Type</label>
+                    <div class="flex space-x-4">
+                        <button onclick="switchMode('text')" id="textModeBtn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none">Text Mode</button>
+                        <button onclick="switchMode('file')" id="fileModeBtn" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none">File Upload</button>
+                    </div>
+                </div>
+
+                <!-- Text Input Form -->
+                <form id="textForm" action="{{ url_for('add_card') }}" method="post" class="mb-6" onsubmit="return handleSubmit(event)">                    <input type="hidden" name="content_type" value="text/plain">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="textContent">Text Content</label>
+                        <textarea name="content" id="textContent" rows="10" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter your text content here..."></textarea>
+                    </div>
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        Create Text Card
+                    </button>
+                </form>
+
+                <!-- File Upload Form -->
+                <form id="fileForm" action="{{ url_for('add_card') }}" method="post" enctype="multipart/form-data" class="mb-6 hidden" onsubmit="return handleSubmit(event)">                    <input type="hidden" name="content_type" value="application/octet-stream">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="fileContent">File Upload</label>
+                        <input type="file" name="file" id="fileContent" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <p class="text-sm text-gray-600 mt-1">Supported file types: Images (PNG, JPEG, GIF), Documents (PDF, TXT), and more.</p>
+                    </div>
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        Upload File
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchMode(mode) {
+            const textForm = document.getElementById('textForm');
+            const fileForm = document.getElementById('fileForm');
+            const textModeBtn = document.getElementById('textModeBtn');
+            const fileModeBtn = document.getElementById('fileModeBtn');
+            const warningMessage = document.getElementById('warningMessage');
+
+            // Hide warning when switching modes
+            warningMessage.classList.add('hidden');
+
+            if (mode === 'text') {
+                textForm.classList.remove('hidden');
+                fileForm.classList.add('hidden');
+                textModeBtn.classList.remove('bg-gray-500');
+                textModeBtn.classList.add('bg-blue-500');
+                fileModeBtn.classList.remove('bg-blue-500');
+                fileModeBtn.classList.add('bg-gray-500');
+            } else {
+                textForm.classList.add('hidden');
+                fileForm.classList.remove('hidden');
+                textModeBtn.classList.remove('bg-blue-500');
+                textModeBtn.classList.add('bg-gray-500');
+                fileModeBtn.classList.remove('bg-gray-500');
+                fileModeBtn.classList.add('bg-blue-500');
+            }
+        }
+    </script>
+
+    <script>
+        function formatSize(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let size = bytes;
+            let unitIndex = 0;
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            return `${size.toFixed(1)} ${units[unitIndex]}`;
+        }
+
+        function showWarning(message, metadata = null) {
+            const warningMessage = document.getElementById('warningMessage');
+            const warningText = document.getElementById('warningText');
+            
+            console.log('Warning message:', message);
+            console.log('Metadata:', metadata);
+            
+            let displayText = message;
+            
+            if (metadata && metadata.metadata) {
+                console.log('Found metadata:', metadata.metadata);
+                const meta = metadata.metadata;
+                const formattedSize = formatSize(meta.size);
+                const viewCardUrl = `/view/${meta.content_hash}`;
+                displayText += `\n\nDuplicate Card Details:\nContent Hash: <a href="${viewCardUrl}" class="text-blue-500 hover:text-blue-700 underline">${meta.content_hash}</a>\nCreated: ${meta.time_claimed}\nSize: ${formattedSize}`;
+            } else {
+                console.log('No metadata found in:', metadata);
+            }
+            
+            console.log('Final display text:', displayText);
+            // Replace newlines with <br> tags for HTML display
+            warningText.innerHTML = displayText.replace(/\n/g, '<br>');
+            warningMessage.classList.remove('hidden');
+        }
+
+        function hideWarning() {
+            const warningMessage = document.getElementById('warningMessage');
+            warningMessage.classList.add('hidden');
+        }
+
+        function handleSubmit(event) {
+            event.preventDefault();
+            hideWarning();
+
+            const form = event.target;
+            const formData = new FormData(form);
+
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+                return response.json().then(data => {
+                    console.log('Response data:', data);
+                    return { status: response.status, data };
+                });
+            })
+            .then(result => {
+                if (!result) return; // Skip if we already handled redirect
+                const { status, data } = result;
+                console.log('Processing result:', { status, data });
+                if (status === 409) {
+                    showWarning(data.warning, data);
+                    return false;
+                } else if (status === 400) {
+                    showWarning(data.error);
+                    return false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showWarning('An error occurred while processing your request.');
+            });
+
+            return false;
+        }
+    </script>
+</body>
+</html>

@@ -4,11 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Card Content</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- JSON Editor -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.10.0/jsoneditor.min.css" rel="stylesheet" type="text/css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.10.0/jsoneditor.min.js"></script>
+    <title>View Card - MCard Todo App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css" rel="stylesheet" />
     <style>
         /* Custom styling for JSON Editor */
         .jsoneditor {
@@ -177,228 +175,100 @@
             opacity: 1;
         }
         .text-content {
-            white-space: pre-wrap;
-            word-wrap: break-word;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-x: auto;
+            min-height: 200px;
+            max-height: 600px;
+            overflow-y: auto;
         }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-8">
     <div class="max-w-4xl mx-auto">
-        <div class="mb-6">
-            <h1 class="text-2xl font-bold text-gray-900 mb-2">Card Content: <span class="font-mono text-indigo-600">{{ content_hash[:8] }}...</span></h1>
-            {{ nav('todo_cards') }}
-        </div>
-
-        <div class="bg-white rounded-xl shadow-md p-6">
+        <div class="container mx-auto p-6">
             <div class="mb-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Card Details</h2>
-                <div class="grid grid-cols-1 gap-4 text-sm bg-gray-50 p-4 rounded-lg">
-                    <div>
-                        <span class="font-medium text-gray-600 inline-block w-32">Content Hash:</span>
-                        <span class="ml-2 font-mono text-indigo-600">{{ content_hash }}</span>
-                    </div>
-                    <div>
-                        <span class="font-medium text-gray-600 inline-block w-32">Time Claimed:</span>
-                        <span class="ml-2 text-gray-900">{{ time_claimed | datetime }}</span>
-                    </div>
-                </div>
+                <h1 class="text-2xl font-bold mb-2">View Card</h1>
+                {{ nav('all_cards') }}
             </div>
 
-            <div class="mb-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    Content
-                </h2>
-                <div class="content-wrapper">
-                    {% if is_json %}
-                        <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200">
-                            <div class="text-sm font-medium text-gray-600">Structured Data</div>
-                            <div class="text-sm text-gray-500" id="charCount"></div>
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <!-- Card Metadata -->
+                <div class="mb-6 text-sm text-gray-600">
+                    <p class="mb-1"><span class="font-semibold">Card Hash:</span> {{ content_hash }}</p>
+                    <p class="mb-1"><span class="font-semibold">Time Claimed:</span> {{ time_claimed }}</p>
+                    {% if is_binary %}
+                        <p class="mb-1"><span class="font-semibold">Content Type:</span> {{ content_type }}</p>
+                        <p class="mb-1"><span class="font-semibold">Size:</span> {{ content.size }} bytes</p>
+                    {% endif %}
+                </div>
+
+                <!-- Card Content -->
+                <div class="mb-6">
+                    <h2 class="text-lg font-semibold mb-3">Content</h2>
+                    
+                    {% if is_binary %}
+                        <!-- Binary Content Display -->
+                        <div class="mb-4">
+                            {% if content_type.startswith('image/') %}
+                                <div class="relative">
+                                    <img src="{{ url_for('get_binary_content', content_hash=binary_hash) }}" 
+                                         alt="Image content" 
+                                         class="max-w-full h-auto rounded shadow-lg border border-gray-200"
+                                         style="max-height: 600px; object-fit: contain;">
+                                    <div class="absolute top-2 right-2">
+                                        <a href="{{ url_for('get_binary_content', content_hash=binary_hash, download=1) }}" 
+                                           class="bg-blue-500 hover:bg-blue-700 text-white text-sm font-bold py-1 px-3 rounded inline-flex items-center opacity-75 hover:opacity-100 transition-opacity"
+                                           title="Download original image">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="p-4 bg-gray-100 rounded flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <svg class="w-8 h-8 text-gray-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                        </svg>
+                                        <div>
+                                            <p class="text-gray-700 font-medium">Binary file</p>
+                                            <p class="text-gray-500 text-sm">{{ content_type }}</p>
+                                        </div>
+                                    </div>
+                                    <a href="{{ url_for('get_binary_content', content_hash=binary_hash) }}" 
+                                       class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                        </svg>
+                                        Download File
+                                    </a>
+                                </div>
+                            {% endif %}
                         </div>
-                        <div class="content-columns">
-                            <div class="json-container">
-                                <button class="copy-button" onclick="copyToClipboard()">
-                                    Copy
-                                </button>
-                                <div id="jsoneditor"></div>
-                            </div>
-                            <div class="raw-content">
-                                <div class="empty-message">Select a node to view its raw content</div>
-                            </div>
+                        
+                        <!-- Display Metadata -->
+                        <div class="mt-4">
+                            <h3 class="text-md font-semibold mb-2">Metadata</h3>
+                            <div class="text-content">{{ content | tojson(indent=2) }}</div>
                         </div>
                     {% else %}
-                        <div class="flex items-center justify-between px-4 py-2 bg-gray-200 border-b border-gray-300">
-                            <div class="text-sm font-medium text-gray-700">Plain Text</div>
-                            <div class="text-sm text-gray-600">
-                                {{ content|length }} characters
-                            </div>
-                        </div>
-                        <div class="plain-text-container">
-                            <div class="plain-text-content">
-                                {{ content }}
-                            </div>
-                        </div>
+                        <!-- Text Content -->
+                        <div class="text-content">{{ content }}</div>
                     {% endif %}
                 </div>
             </div>
-
-            {% if previous_card %}
-            <div class="mt-6 pt-6 border-t border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Previous Version</h2>
-                <a href="{{ url_for('view_card', card_hash=previous_card) }}" 
-                   class="inline-flex items-center space-x-2 text-indigo-600 hover:text-indigo-700 font-mono transition-colors duration-200">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                    </svg>
-                    <span>{{ previous_card }}</span>
-                </a>
-            </div>
-            {% endif %}
         </div>
     </div>
 
-    {% if is_json %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const container = document.getElementById('jsoneditor');
-            const rawContent = document.querySelector('.raw-content');
-            const options = {
-                mode: 'tree',
-                modes: ['tree'],
-                mainMenuBar: false,
-                navigationBar: false,
-                statusBar: false,
-                search: false,
-                enableSort: false,
-                enableTransform: false,
-                indentation: 2,
-                onEditable: function() {
-                    return false;
-                },
-                onEvent: function(node, event) {
-                    if (event.type === 'click' || event.type === 'focus') {
-                        console.log('Selected node:', node);
-                        
-                        // Get the actual value at this path
-                        let value = editor.get();
-                        for (const key of node.path) {
-                            value = value[key];
-                        }
-                        
-                        // Create a clean object for display
-                        const displayNode = {
-                            value: value,
-                            path: node.path
-                        };
-                        
-                        displayRawContent(displayNode);
-                    }
-                }
-            };
-            
-            try {
-                // Parse the JSON content from the template
-                const content = JSON.parse({{ content | tojson | safe }});
-                const editor = new JSONEditor(container, options, content);
-                window.editor = editor;  // Store for global access
-                
-                // Expand only first two levels by default
-                setTimeout(() => {
-                    editor.collapseAll();
-                    editor.expandToLevel(2);
-                }, 100);
-                
-                // Update character count
-                document.getElementById('charCount').textContent = 
-                    `${JSON.stringify(content).length} characters`;
-            } catch (err) {
-                console.error('Error parsing JSON:', err);
-                container.innerHTML = `<div class="p-4 text-red-600">Error parsing JSON: ${err.message}</div>`;
-            }
-        });
-
-        function displayRawContent(node) {
-            const rawContentDiv = document.querySelector('.raw-content');
-            if (!node) {
-                rawContentDiv.innerHTML = '<div class="empty-message">Select a node to view its raw content</div>';
-                return;
-            }
-
-            try {
-                // Get the actual value from the node
-                const value = node.value;
-                
-                // Convert the value to a formatted string
-                let content;
-                if (typeof value === 'undefined') {
-                    content = 'undefined';
-                } else if (value === null) {
-                    content = '<span class="json-null">null</span>';
-                } else if (typeof value === 'boolean') {
-                    content = `<span class="json-boolean">${value}</span>`;
-                } else if (typeof value === 'number') {
-                    content = `<span class="json-number">${value}</span>`;
-                } else if (typeof value === 'string') {
-                    content = `"<span class="json-string">${value
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')}</span>"`;
-                } else if (typeof value === 'object') {
-                    content = JSON.stringify(value, null, 2)
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        // Format keys without adding extra quotes
-                        .replace(/"([^"]+)":/g, function(match, key) {
-                            return `"<span class="json-key">${key}</span>":`;
-                        })
-                        // Format string values
-                        .replace(/: "([^"]+)"/g, function(match, value) {
-                            return `: "<span class="json-string">${value}</span>"`;
-                        })
-                        .replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>')
-                        .replace(/\b(null)\b/g, '<span class="json-null">$1</span>')
-                        .replace(/\b(-?\d+\.?\d*(?:e[+-]?\d+)?)\b/g, '<span class="json-number">$1</span>');
-                } else {
-                    content = String(value)
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;');
-                }
-
-                rawContentDiv.innerHTML = `<pre>${content}</pre>`;
-            } catch (err) {
-                console.error('Error displaying raw content:', err, node);
-                rawContentDiv.innerHTML = `<div class="empty-message">Error displaying content: ${err.message}</div>`;
-            }
-        }
-
-        function copyToClipboard() {
-            const json = window.editor.get();
-            const formatted = JSON.stringify(json, null, 4);
-            navigator.clipboard.writeText(formatted).then(() => {
-                const button = document.querySelector('.copy-button');
-                button.textContent = 'Copied!';
-                button.style.backgroundColor = '#059669'; // green
-                setTimeout(() => {
-                    button.textContent = 'Copy';
-                    button.style.backgroundColor = '#3730a3'; // original color
-                }, 2000);
-            }).catch(err => {
-                console.error('Failed to copy:', err);
-                const button = document.querySelector('.copy-button');
-                button.textContent = 'Failed';
-                button.style.backgroundColor = '#dc2626'; // red
-                setTimeout(() => {
-                    button.textContent = 'Copy';
-                    button.style.backgroundColor = '#3730a3'; // original color
-                }, 2000);
-            });
-        }
-    </script>
-    {% endif %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-json.min.js"></script>
 </body>
 </html>
