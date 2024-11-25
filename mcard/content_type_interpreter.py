@@ -3,9 +3,13 @@ Content type detection and interpretation module for MCard CRUD application.
 Provides functionality to detect MIME types and file extensions based on content signatures.
 """
 
+import os
 import json
+import mimetypes
+from typing import Optional, Dict, Any, List, Tuple
+from .core import MCard
+from urllib.parse import quote
 import re
-from typing import Tuple, Optional
 
 class ContentTypeInterpreter:
     """Handles content type detection and interpretation for various file formats."""
@@ -93,3 +97,78 @@ class ContentTypeInterpreter:
                 return f"{size_in_bytes:.1f} {unit}"
             size_in_bytes /= 1024
         return f"{size_in_bytes:.1f} TB"
+
+    @classmethod
+    def prepare_download_response(cls, content: bytes, content_hash: str, filename_prefix: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Prepare download response headers and filename for content.
+        
+        Args:
+            content: The binary content to prepare for download
+            content_hash: The hash of the content
+            filename_prefix: Optional prefix for the filename (defaults to first 8 chars of content_hash)
+            
+        Returns:
+            Dictionary containing:
+                - mime_type: The detected MIME type
+                - filename: The suggested filename
+                - headers: Dict of headers for the response
+        """
+        mime_type, extension = cls.detect_content_type(content)
+        
+        # Remove leading dot from extension if present
+        extension = extension.lstrip('.') if extension else ''
+        
+        # Use provided prefix or default to content hash prefix
+        prefix = filename_prefix or content_hash[:8]
+        filename = f"{prefix}.{extension}" if extension else prefix
+        quoted_filename = quote(filename)
+        
+        headers = {
+            'Content-Type': mime_type,
+            'Content-Disposition': f'attachment; filename="{quoted_filename}"'
+        }
+        
+        return {
+            'mime_type': mime_type,
+            'filename': filename,
+            'headers': headers
+        }
+
+    @classmethod
+    def check_duplicate_content(cls, storage, content):
+        """Check if content already exists in storage by comparing content hashes.
+        
+        Args:
+            storage: Storage instance to check against
+            content: Content to check for duplicates
+            
+        Returns:
+            dict: Dictionary with 'found' boolean and 'hash' if found
+        """
+        try:
+            print("[ContentTypeInterpreter] Starting duplicate content check")
+            print(f"[ContentTypeInterpreter] Content type: {type(content)}")
+            print(f"[ContentTypeInterpreter] Content length: {len(content)}")
+            
+            # Create an MCard to get the content hash
+            new_card = MCard(content=content)
+            print(f"[ContentTypeInterpreter] Generated hash for new content: {new_card.content_hash}")
+            
+            # Try to get card with same hash from storage
+            existing_card = storage.get(new_card.content_hash)
+            print(f"[ContentTypeInterpreter] Existing card lookup result: {existing_card is not None}")
+            
+            if existing_card:
+                print(f"[ContentTypeInterpreter] Found existing card with matching hash: {existing_card.content_hash}")
+                return {"found": True, "hash": existing_card.content_hash}
+            
+            print("[ContentTypeInterpreter] No matching hash found")
+            return {"found": False}
+            
+        except Exception as e:
+            print(f"[ContentTypeInterpreter] Error in check_duplicate_content: {str(e)}")
+            print(f"[ContentTypeInterpreter] Error type: {type(e)}")
+            import traceback
+            print(f"[ContentTypeInterpreter] Traceback: {traceback.format_exc()}")
+            return {"found": False}

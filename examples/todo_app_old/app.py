@@ -5,6 +5,7 @@ import mimetypes
 from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response
 from mcard.core import MCard
 from mcard.storage import MCardStorage
+from mcard.content_type_interpreter import ContentTypeInterpreter
 from clm import CubicalLogicModel, AbstractSpecification, SuccessCriteria, ConcreteImplementation, RealisticExpectations
 from clm import CubicalLogicModel
 import uuid
@@ -96,32 +97,6 @@ def index():
         raise
     return render_template('index.html', todos=todos)
 
-def check_duplicate_content(storage, content):
-    """Check if content already exists in storage."""
-    try:
-        # Get all cards and check for content match
-        all_cards = storage.get_all()
-        for card in all_cards:
-            # Skip binary cards
-            try:
-                if isinstance(card.content, bytes):
-                    if card.content == content:
-                        return {"found": True, "hash": card.content_hash}
-                    continue
-                
-                # For text content
-                if card.content == content:
-                    return {"found": True, "hash": card.content_hash}
-                
-            except Exception as e:
-                print(f"Error comparing content: {e}")
-                continue
-                
-        return {"found": False}
-    except Exception as e:
-        print(f"Error checking duplicates: {e}")
-        return {"found": False}
-
 @app.route('/api/cards', methods=['POST'])
 def add_card():
     """Generic route to add any type of card to MCard storage."""
@@ -136,11 +111,14 @@ def add_card():
         if 'content' in request.form:
             print("Handling text form submission")  # Debug log
             content = request.form.get('content')
+            print(f"Content received: {content[:100]}...")  # Debug log - show first 100 chars
             if not content:
                 return jsonify({"error": "No content provided"}), 400
             
             # Check for duplicates
-            duplicate_check = check_duplicate_content(storage, content)
+            print("About to check for duplicates...")  # Debug log
+            duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
+            print(f"Duplicate check result: {duplicate_check}")  # Debug log
             if duplicate_check["found"]:
                 return jsonify({
                     "warning": "Same content was found, no new MCard created",
@@ -174,7 +152,7 @@ def add_card():
             print(f"Content size: {len(content)} bytes")
             
             # Check for duplicates
-            duplicate_check = check_duplicate_content(storage, content)
+            duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
             if duplicate_check["found"]:
                 return jsonify({
                     "warning": "Same content was found, no new MCard created",

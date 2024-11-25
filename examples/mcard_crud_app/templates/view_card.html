@@ -30,7 +30,7 @@
                     <small class="text-muted">
                         Type: <span class="badge bg-secondary">{{ content_type }}</span>
                         {% if extension %}<span class="badge bg-info">.{{ extension }}</span>{% endif %}
-                        <span class="badge bg-light text-dark">{{ size }} bytes</span>
+                        <span class="badge bg-light text-dark">{{ '{:,}'.format(size) }} bytes</span>
                     </small>
                 </div>
                 <small class="text-muted">Created: {{ card.time_claimed.strftime('%Y-%m-%d %H:%M:%S') }}</small>
@@ -43,7 +43,7 @@
                 {% else %}
                     <div class="alert alert-info">
                         <i class="fas fa-file me-2"></i>
-                        Binary content ({{ size }} bytes)
+                        Binary content ({{ '{:,}'.format(size) }} bytes)
                         {% if content_type != 'application/octet-stream' %}
                         <br>
                         <small class="text-muted">Detected format: {{ content_type }}</small>

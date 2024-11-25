@@ -1,9 +1,27 @@
 {% extends "base.html" %}
+{% from "hash_display.html" import render_hash %}
 
 {% block title %}MCard CRUD App - New Card{% endblock %}
 
 {% block content %}
 <div class="content-container">
+    {% if warning %}
+    <div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <div>
+                <strong>{{ warning }}</strong>
+                {% if hash %}
+                <div class="mt-1">
+                    Existing content hash: {{ render_hash(hash) }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
     <h1 class="mb-4">Create New Card</h1>
 
     <div class="row">
@@ -13,7 +31,7 @@
                     <h5 class="card-title mb-0">Text Content</h5>
                 </div>
                 <div class="card-body">
-                    <form action="{{ url_for('add_card') }}" method="POST">
+                    <form id="textForm" method="POST" action="{{ url_for('add_text_card') }}">
                         <div class="mb-3">
                             <label for="content" class="form-label">Content</label>
                             <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
@@ -31,8 +49,8 @@
                 <div class="card-header">
                     <h5 class="card-title mb-0">File Upload</h5>
                 </div>
-                <div class="card-body">
-                    <form action="{{ url_for('add_card') }}" method="POST" enctype="multipart/form-data">
+                <div class="card-body" id="dropZone">
+                    <form id="fileForm" method="POST" action="{{ url_for('add_file_card') }}" enctype="multipart/form-data">
                         <div class="mb-3">
                             <label for="file" class="form-label">Choose File</label>
                             <input type="file" class="form-control" id="file" name="file" required>
@@ -51,11 +69,10 @@
 {% block extra_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Add drag and drop support for file upload
-    const fileUpload = document.getElementById('file');
-    const fileUploadForm = fileUpload.closest('form');
-    const dropZone = fileUploadForm.querySelector('.card-body');
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('file');
 
+    // Add drag and drop support
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, preventDefaults, false);
     });
@@ -86,8 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
-
-        fileUpload.files = files;
+        fileInput.files = files;
     }
 });
 </script>

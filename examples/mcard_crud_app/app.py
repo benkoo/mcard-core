@@ -2,11 +2,9 @@ from datetime import datetime
 import json
 import os
 import mimetypes
-from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response, flash
+from mcard import MCard, MCardStorage, ContentTypeInterpreter
 from urllib.parse import quote
-from mcard.core import MCard
-from mcard.storage import MCardStorage
-from content_type_interpreter import ContentTypeInterpreter
 
 app = Flask(__name__)
 
@@ -32,32 +30,6 @@ def teardown_db(exception):
     storage = g.pop('storage', None)
     if storage is not None:
         storage.conn.close()
-
-def check_duplicate_content(storage, content):
-    """Check if content already exists in storage."""
-    try:
-        # Get all cards and check for content match
-        all_cards = storage.get_all()
-        for card in all_cards:
-            # Skip binary cards
-            try:
-                if isinstance(card.content, bytes):
-                    if card.content == content:
-                        return {"found": True, "hash": card.content_hash}
-                    continue
-                
-                # For text content
-                if card.content == content:
-                    return {"found": True, "hash": card.content_hash}
-                
-            except Exception as e:
-                print(f"Error comparing content: {e}")
-                continue
-                
-        return {"found": False}
-    except Exception as e:
-        print(f"Error checking duplicates: {e}")
-        return {"found": False}
 
 @app.route('/')
 def index():
@@ -141,112 +113,87 @@ def index():
     
     return render_template('index.html', cards=cards, pagination=pagination)
 
-@app.route('/api/cards', methods=['POST'])
-def add_card():
-    """Generic route to add any type of card to MCard storage."""
+@app.route('/new')
+def new_card():
+    """Display form for creating a new card."""
+    warning = request.args.get('warning')
+    hash = request.args.get('hash')
+    return render_template('new_card.html', warning=warning, hash=hash)
+
+@app.route('/add_text_card', methods=['POST'])
+def add_text_card():
+    """Add a new text card."""
+    app.logger.info('=== Starting add_text_card ===')
+    storage = get_storage()
+    content = request.form.get('content')
+    app.logger.info(f'Received content (first 100 chars): {content[:100] if content else None}')
+    
+    if not content:
+        app.logger.warning('No content provided')
+        flash('No content provided', 'error')
+        return redirect(url_for('new_card'))
+
     try:
-        print(f"Request method: {request.method}")  # Debug log
-        print(f"Request files: {list(request.files.keys())}")  # Debug log
-        print(f"Request form: {list(request.form.keys())}")  # Debug log
+        app.logger.info('Checking for duplicate text content')
         
-        storage = get_storage()
+        # Check for duplicate content
+        app.logger.info('About to call ContentTypeInterpreter.check_duplicate_content')
+        duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
+        app.logger.info(f'Duplicate check result: {duplicate_check}')
         
-        # Check if this is a text form submission
-        if 'content' in request.form:
-            print("Handling text form submission")  # Debug log
-            content = request.form.get('content')
-            if not content:
-                return jsonify({"error": "No content provided"}), 400
-            
-            # Check for duplicates
-            duplicate_check = check_duplicate_content(storage, content)
-            if duplicate_check["found"]:
-                return jsonify({
-                    "warning": "Same content was found, no new MCard created",
-                    "hash": duplicate_check["hash"]
-                }), 409
-            
-            # Store text content directly
-            card = MCard(content=content)
-            storage.save(card)
-            storage.conn.commit()
-            
-            print(f"Stored text content with hash: {card.content_hash}")  # Debug log
-            return redirect(url_for('view_card', content_hash=card.content_hash))
-            
-        # Check if this is a file upload
-        if 'file' in request.files:
-            file = request.files['file']
-            print(f"\n=== File Upload Debug ===")
-            print(f"File object: {file}")
-            print(f"Original filename: {file.filename}")
-            
-            if file.filename == '':
-                return jsonify({"error": "No file selected"}), 400
-            
-            # Get the file content
-            content = file.read()
-            content_type = file.content_type or 'application/octet-stream'
-            
-            print(f"Uploading file: {file.filename}")
-            print(f"Content type: {content_type}")
-            print(f"Content size: {len(content)} bytes")
-            
-            # Check for duplicates
-            duplicate_check = check_duplicate_content(storage, content)
-            if duplicate_check["found"]:
-                return jsonify({
-                    "warning": "Same content was found, no new MCard created",
-                    "hash": duplicate_check["hash"]
-                }), 409
-            
-            # Store binary content directly
-            card = MCard(content=content)
-            storage.save(card)
-            storage.conn.commit()
-            
-            print(f"Stored binary content with hash: {card.content_hash}")
-            return redirect(url_for('view_card', content_hash=card.content_hash))
-            
-        # Handle JSON data
-        content_type = request.headers.get('Content-Type', 'application/json')
-        if content_type == 'application/json':
-            if not request.is_json:
-                return jsonify({"error": "Expected JSON data"}), 400
-            content = request.get_json()
-            if not content:
-                return jsonify({"error": "No content provided"}), 400
-            content_str = json.dumps(content)
-        
-        elif content_type == 'text/plain':
-            # Handle UTF-8 text data
-            content = request.get_data(as_text=True)
-            if not content:
-                return jsonify({"error": "No content provided"}), 400
-            content_str = content
-            
-        else:
-            # Handle raw binary data (non-file upload)
-            content = request.get_data()
-            if not content:
-                return jsonify({"error": "No content provided"}), 400
-            
-            # Store binary data directly
-            card = MCard(content=content)
-            storage.save(card)
-            storage.conn.commit()
-            return redirect(url_for('view_card', content_hash=card.content_hash))
+        if duplicate_check["found"]:
+            app.logger.info(f'Found existing card with hash {duplicate_check["hash"]}')
+            return redirect(url_for('new_card', 
+                warning="This content already exists",
+                hash=duplicate_check["hash"]))
 
-        # Store text/JSON content
-        storage = get_storage()
-        card = MCard(content=content_str)
+        # Create and save the new card
+        app.logger.info('Creating new MCard')
+        card = MCard(content=content)
+        app.logger.info(f'Generated hash for new card: {card.content_hash}')
         storage.save(card)
-        storage.conn.commit()
+        app.logger.info(f'Successfully added text content with hash {card.content_hash}')
         return redirect(url_for('view_card', content_hash=card.content_hash))
-
     except Exception as e:
-        print(f"Error in add_card: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        app.logger.error(f'Error adding text content: {str(e)}')
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('new_card'))
+
+@app.route('/add_file_card', methods=['POST'])
+def add_file_card():
+    """Add a new file card."""
+    storage = get_storage()
+    if 'file' not in request.files:
+        flash('No file provided', 'error')
+        return redirect(url_for('new_card'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash('No file selected', 'error')
+        return redirect(url_for('new_card'))
+
+    try:
+        # Read file content as bytes
+        content = file.read()
+        app.logger.info('Checking for duplicate file content')
+        
+        # Check for duplicate content
+        duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
+        if duplicate_check["found"]:
+            app.logger.info(f'Found existing card with hash {duplicate_check["hash"]}')
+            return redirect(url_for('new_card',
+                warning="This content already exists",
+                hash=duplicate_check["hash"]))
+
+        # Create and save the new card
+        card = MCard(content=content)
+        storage.save(card)
+        app.logger.info(f'Successfully added file content with hash {card.content_hash}')
+        return redirect(url_for('view_card', content_hash=card.content_hash))
+    except Exception as e:
+        app.logger.error(f'Error adding file content: {str(e)}')
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('new_card'))
 
 @app.route('/delete/<content_hash>', methods=['POST'])
 def delete(content_hash):
@@ -259,11 +206,6 @@ def delete(content_hash):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/new_card')
-def new_card():
-    """Route to display the new card creation page."""
-    return render_template('new_card.html')
-
 @app.route('/view/<content_hash>')
 def view_card(content_hash):
     try:
@@ -274,21 +216,28 @@ def view_card(content_hash):
             
         content = card.content
         size = len(content)
-        mime_type, extension = ContentTypeInterpreter.detect_content_type(content)
-        size_str = ContentTypeInterpreter.get_content_size_str(size)
         
-        # Determine if content is viewable as image
-        is_image = mime_type.startswith('image/')
+        # Try to decode content if it's text
+        is_binary = isinstance(content, bytes)
+        if is_binary:
+            mime_type, extension = ContentTypeInterpreter.detect_content_type(content)
+            content_str = None
+            is_image = mime_type.startswith('image/')
+        else:
+            content_str = str(content)
+            mime_type = 'text/plain'
+            extension = 'txt'
+            is_image = False
         
         return render_template('view_card.html', 
                              content_hash=content_hash,
                              card=card,
-                             content=None if isinstance(content, bytes) else str(content),
-                             is_binary=isinstance(content, bytes),
+                             content=content_str,
+                             is_binary=is_binary,
                              is_image=is_image,
                              content_type=mime_type,
                              extension=extension,
-                             size=size_str)
+                             size=size)
     except Exception as e:
         print(f"Error in view_card: {str(e)}")
         return f"Error viewing card: {str(e)}", 500
@@ -307,23 +256,9 @@ def get_binary_content(content_hash):
             return "Content not found", 404
 
         content = card.content
-        mime_type, extension = ContentTypeInterpreter.detect_content_type(content)
-        
-        if isinstance(content, bytes):
-            # Remove leading dot from extension if present
-            extension = extension.lstrip('.') if extension else ''
-            filename = f"{content_hash[:8]}.{extension}" if extension else content_hash[:8]
-            quoted_filename = quote(filename)
-            
-            headers = {
-                'Content-Type': mime_type,
-                'Content-Disposition': f'attachment; filename="{quoted_filename}"'
-            }
-        else:
-            headers = {'Content-Type': mime_type}
-
-        print(f"Serving content with type: {mime_type}, size: {len(content)} bytes")
-        return Response(content, headers=headers)
+        download_info = ContentTypeInterpreter.prepare_download_response(content, content_hash)
+        print(f"Serving content with type: {download_info['mime_type']}, size: {len(content)} bytes")
+        return Response(content, headers=download_info['headers'])
 
     except Exception as e:
         print(f"Error serving binary content: {str(e)}")
@@ -338,16 +273,10 @@ def download_card(content_hash):
             return "Card not found", 404
 
         content = card.content
-        mime_type, extension = ContentTypeInterpreter.detect_content_type(content)
-        
-        # Remove leading dot from extension if present
-        extension = extension.lstrip('.') if extension else ''
-        filename = f"{content_hash[:8]}.{extension}" if extension else content_hash[:8]
-        quoted_filename = quote(filename)
-        
+        download_info = ContentTypeInterpreter.prepare_download_response(content, content_hash)
         response = Response(content)
-        response.headers.set('Content-Type', mime_type)
-        response.headers.set('Content-Disposition', f'attachment; filename="{quoted_filename}"')
+        for key, value in download_info['headers'].items():
+            response.headers.set(key, value)
         return response
 
     except Exception as e:
