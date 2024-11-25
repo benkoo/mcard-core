@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 import os
+import mimetypes
 from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response
 from mcard.core import MCard
 from mcard.storage import MCardStorage
@@ -284,7 +285,6 @@ def add_card():
             
             if not filename:
                 # Try to guess extension from content type
-                import mimetypes
                 ext = mimetypes.guess_extension(content_type) or ''
                 filename = f'file{ext}'
             
@@ -719,6 +719,7 @@ def view_card(content_hash):
                                             content=content,
                                             binary_hash=content.get('binary_hash'),
                                             content_type=content.get('content_type'),
+                                            filename=content.get('filename'),
                                             is_binary=True)
                     
                     # For all other JSON content, convert to formatted string
@@ -749,10 +750,6 @@ def view_card(content_hash):
                     content_type = 'image/jpeg'
                 elif card.content.startswith(b'GIF87a') or card.content.startswith(b'GIF89a'):
                     content_type = 'image/gif'
-                elif card.content.startswith(b'%PDF'):
-                    content_type = 'application/pdf'
-                elif card.content.startswith(b'PK\x03\x04') or card.content.startswith(b'PK\x05\x06') or card.content.startswith(b'PK\x07\x08'):
-                    content_type = 'application/zip'
                 elif all(c < 128 for c in card.content[:1024]):  # Check if content looks like text
                     content_type = 'text/plain'
             
@@ -768,7 +765,7 @@ def view_card(content_hash):
         print(f"Error in view_card: {str(e)}")
         return f"Error viewing card: {str(e)}", 500
 
-@app.route("/binary/<content_hash>")
+@app.route('/binary/<content_hash>')
 def get_binary_content(content_hash):
     """Serve binary content with proper content type."""
     try:
@@ -780,33 +777,60 @@ def get_binary_content(content_hash):
         if not card:
             print(f"Content not found for hash: {content_hash}")
             return "Content not found", 404
-        
-        print(f"Content type: {type(card.content)}")
-        if isinstance(card.content, bytes):
-            print(f"First few bytes: {card.content[:20]}")
-        
+
         content = card.content
         content_type = 'application/octet-stream'
+        filename = None
+
+        # Check if this is a metadata card only when downloading
+        if request.args.get('download') == 'true':
+            try:
+                metadata = json.loads(card.content)
+                if isinstance(metadata, dict) and "binary_hash" in metadata:
+                    # For downloads, use the metadata to get filename and content type
+                    content_type = metadata.get("content_type", "application/octet-stream")
+                    filename = metadata.get("filename", "file")
+                    # Get the actual binary content
+                    binary_card = storage.get(metadata["binary_hash"])
+                    if binary_card:
+                        content = binary_card.content
+            except (json.JSONDecodeError, AttributeError):
+                pass
         
-        # Detect content type directly from binary data
-        if isinstance(content, bytes):
+        # Initialize mimetypes if not already done
+        if not mimetypes.inited:
+            mimetypes.init()
+        
+        # If we don't have content type from metadata, try to detect it
+        if content_type == 'application/octet-stream' and isinstance(content, bytes):
             if content.startswith(b'\x89PNG\r\n\x1a\n'):
                 content_type = 'image/png'
-                print("Serving PNG image")
+                print("Detected PNG image")
             elif content.startswith(b'\xff\xd8\xff'):
                 content_type = 'image/jpeg'
-                print("Serving JPEG image")
+                print("Detected JPEG image")
             elif content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
                 content_type = 'image/gif'
-                print("Serving GIF image")
-        else:
-            print(f"Warning: Content is not bytes, it's {type(content)}")
-            # Convert to bytes if it's not already
-            if isinstance(content, str):
-                content = content.encode('utf-8')
+                print("Detected GIF image")
+            elif content.startswith(b'%PDF'):
+                content_type = 'application/pdf'
+                print("Detected PDF document")
+            elif content.startswith(b'PK\x03\x04'):
+                content_type = 'application/zip'
+                print("Detected ZIP archive")
+        
+        # If content is string, convert to bytes
+        if isinstance(content, str):
+            content = content.encode('utf-8')
+            content_type = 'text/plain'
         
         print(f"Serving content with type: {content_type}")
         print(f"Content length: {len(content)} bytes")
+        
+        # If we don't have a filename and we're downloading, generate one based on content type
+        if request.args.get('download') == 'true' and not filename:
+            ext = mimetypes.guess_extension(content_type) or ''
+            filename = f'file{ext}'
         
         # Create and return the response
         headers = {
@@ -814,9 +838,12 @@ def get_binary_content(content_hash):
             'Content-Length': str(len(content))
         }
         
-        # Only add Content-Disposition for non-image files or when explicitly downloading
-        if not content_type.startswith('image/') or request.args.get('download'):
-            headers['Content-Disposition'] = f'attachment; filename="image{mimetypes.guess_extension(content_type) or ""}"'
+        # Add Content-Disposition header for downloads
+        if request.args.get('download') == 'true':
+            headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        elif not content_type.startswith(('image/', 'text/', 'application/pdf')):
+            # Force download for unknown types
+            headers['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         print("Response headers:", headers)
         
