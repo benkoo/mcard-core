@@ -4,7 +4,7 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>All Cards</h1>
-        <div class="d-flex align-items-center">
+        <div class="d-flex align-items-center gap-3">
             <div class="me-3">
                 <label for="per_page" class="me-2">Items per page:</label>
                 <select id="per_page" class="form-select form-select-sm d-inline-block w-auto" 
@@ -14,7 +14,17 @@
                     {% endfor %}
                 </select>
             </div>
-            <a href="{{ url_for('new_card') }}" class="btn btn-primary">New Card</a>
+            <div class="btn-group me-2">
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="bi bi-table me-1"></i>Table
+                </a>
+                <a href="{{ url_for('grid_view', rows=3, cols=3) }}" class="btn btn-outline-primary">
+                    <i class="bi bi-grid-3x3-gap me-1"></i>Grid
+                </a>
+            </div>
+            <a href="{{ url_for('new_card') }}" class="btn btn-success">
+                <i class="bi bi-plus-lg me-1"></i>New Card
+            </a>
         </div>
     </div>
 

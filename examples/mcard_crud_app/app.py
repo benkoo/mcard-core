@@ -94,6 +94,63 @@ def index():
         # Redirect to new card page if there's an error
         return redirect(url_for('new_card'))
 
+@app.route('/grid')
+def grid_view():
+    try:
+        # Get grid parameters
+        page = request.args.get('page', 1, type=int)
+        rows = request.args.get('rows', 3, type=int)
+        cols = request.args.get('cols', 3, type=int)
+        
+        # Calculate items per page based on grid size
+        per_page = rows * cols
+        
+        # Get all cards using storage
+        storage = get_storage()
+        all_cards = list(storage.get_all())
+        
+        # Calculate pagination values
+        total_items = len(all_cards)
+        total_pages = max((total_items + per_page - 1) // per_page, 1)
+        
+        # Ensure page is within valid range
+        page = min(max(page, 1), total_pages)
+        
+        # Slice the cards for current page
+        start_idx = (page - 1) * per_page
+        end_idx = min(start_idx + per_page, total_items)
+        page_cards = all_cards[start_idx:end_idx]
+
+        # Convert MCard objects to dictionaries with required attributes
+        current_page_cards = []
+        for card in page_cards:
+            # Determine content type
+            content_type = "text/plain"
+            is_binary = isinstance(card.content, bytes)
+            if is_binary:
+                content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
+            
+            card_dict = {
+                'hash': card.content_hash,
+                'content': card.content,
+                'time_claimed': card.time_claimed,
+                'content_type': content_type,
+                'is_image': ContentTypeInterpreter.is_image_content(content_type),
+                'is_binary': is_binary
+            }
+            current_page_cards.append(card_dict)
+        
+        return render_template('grid.html',
+                             cards=current_page_cards,
+                             page=page,
+                             rows=rows,
+                             cols=cols,
+                             total_pages=total_pages,
+                             total_items=total_items)
+    except Exception as e:
+        app.logger.error(f"Error in grid_view: {str(e)}")
+        return redirect(url_for('new_card'))
+
 @app.route('/new')
 def new_card():
     """Display form for creating a new card."""
