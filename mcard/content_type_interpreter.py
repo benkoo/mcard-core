@@ -136,6 +136,18 @@ class ContentTypeInterpreter:
         }
 
     @classmethod
+    def is_image_content(cls, content_type: str) -> bool:
+        """Check if the content type is an image format.
+        
+        Args:
+            content_type: MIME type of the content
+            
+        Returns:
+            bool: True if content is an image type
+        """
+        return content_type.startswith('image/')
+
+    @classmethod
     def check_duplicate_content(cls, storage, content):
         """Check if content already exists in storage by comparing content hashes.
         

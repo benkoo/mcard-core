@@ -2,14 +2,24 @@ from datetime import datetime
 import json
 import os
 import mimetypes
-from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response, flash
+from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response, flash, send_file
 from mcard import MCard, MCardStorage, ContentTypeInterpreter
 from urllib.parse import quote
+from io import BytesIO
 
 app = Flask(__name__)
+app.secret_key = 'dev'  # For development only. Use a secure key in production.
 
 # Add min and max functions to Jinja2 environment
 app.jinja_env.globals.update(min=min, max=max)
+
+# Add datetime filter
+@app.template_filter('datetime')
+def format_datetime(value):
+    """Format a datetime object."""
+    if value is None:
+        return ""
+    return value.strftime('%Y-%m-%d %H:%M:%S')
 
 # Initialize database path
 db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcard_crud.db")
@@ -33,85 +43,56 @@ def teardown_db(exception):
 
 @app.route('/')
 def index():
-    """Display all cards."""
-    cards = []
-    print("\n=== Getting all cards ===")  # Debug log
     try:
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         
+        # Get all cards using storage
         storage = get_storage()
-        all_cards = storage.get_all()
-        print(f"Found {len(all_cards)} cards")  # Debug log
+        all_cards = list(storage.get_all())
         
-        # Calculate total pages
-        total_cards = len(all_cards)
-        total_pages = (total_cards + per_page - 1) // per_page
+        # Calculate pagination values
+        total_items = len(all_cards)
+        total_pages = max((total_items + per_page - 1) // per_page, 1)
         
-        # Ensure page is within bounds
-        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+        # Ensure page is within valid range
+        page = min(max(page, 1), total_pages)
         
-        # Calculate slice indices for current page
+        # Slice the cards for current page
         start_idx = (page - 1) * per_page
-        end_idx = min(start_idx + per_page, total_cards)
-        
-        # Get cards for current page
-        current_cards = all_cards[start_idx:end_idx]
-        
-        # Process each card
-        for card in current_cards:
-            try:
-                # First try to decode as UTF-8 to check if it's text
-                try:
-                    content_str = card.content.decode('utf-8') if isinstance(card.content, bytes) else card.content
-                except UnicodeDecodeError:
-                    print(f"Binary card: {card.content_hash}")
-                    cards.append({
-                        'id': card.content_hash,
-                        'type': 'binary',
-                        'size': len(card.content),
-                        'time_claimed': card.time_claimed
-                    })
-                    continue
+        end_idx = min(start_idx + per_page, total_items)
+        page_cards = all_cards[start_idx:end_idx]
 
-                # Try to parse as JSON
-                try:
-                    content = json.loads(content_str)
-                    cards.append({
-                        'id': card.content_hash,
-                        'type': 'json',
-                        'content': json.dumps(content, indent=2),
-                        'time_claimed': card.time_claimed
-                    })
-                except json.JSONDecodeError:
-                    # Plain text
-                    cards.append({
-                        'id': card.content_hash,
-                        'type': 'text',
-                        'content': content_str,
-                        'time_claimed': card.time_claimed
-                    })
-                    
-            except Exception as e:
-                print(f"Error processing card {card.content_hash}: {str(e)}")
-                continue
-
+        # Convert MCard objects to dictionaries with required attributes
+        current_page_cards = []
+        for card in page_cards:
+            # Determine content type
+            content_type = "text/plain"
+            is_binary = isinstance(card.content, bytes)
+            if is_binary:
+                content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
+            
+            card_dict = {
+                'hash': card.content_hash,
+                'content': card.content,
+                'time_claimed': card.time_claimed,
+                'content_type': content_type,
+                'is_image': ContentTypeInterpreter.is_image_content(content_type),
+                'is_binary': is_binary
+            }
+            current_page_cards.append(card_dict)
+        
+        return render_template('index.html',
+                             cards=current_page_cards,
+                             page=page,
+                             per_page=per_page,
+                             total_pages=total_pages,
+                             total_items=total_items)
     except Exception as e:
-        print(f"Error in index: {str(e)}")  # Debug log
-        raise
-        
-    # Pagination info
-    pagination = {
-        'page': page,
-        'per_page': per_page,
-        'total_pages': total_pages,
-        'total_cards': total_cards,
-        'has_prev': page > 1,
-        'has_next': page < total_pages,
-    }
-    
-    return render_template('index.html', cards=cards, pagination=pagination)
+        app.logger.error(f"Error in index: {str(e)}")
+        # Redirect to new card page if there's an error
+        return redirect(url_for('new_card'))
 
 @app.route('/new')
 def new_card():
@@ -281,6 +262,30 @@ def download_card(content_hash):
 
     except Exception as e:
         print(f"Error in download_card: {str(e)}")
+        return str(e), 500
+
+@app.route('/content/<content_hash>/thumbnail')
+def serve_thumbnail(content_hash):
+    """Serve thumbnail for image content."""
+    try:
+        storage = get_storage()
+        card = storage.get(content_hash)
+        if not card:
+            return "Content not found", 404
+
+        # Detect content type
+        content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
+        
+        # Only serve if it's an image
+        if ContentTypeInterpreter.is_image_content(content_type):
+            return send_file(
+                BytesIO(card.content),
+                mimetype=content_type
+            )
+        
+        return "Not an image", 400
+    except Exception as e:
+        app.logger.error(f'Error serving thumbnail: {str(e)}')
         return str(e), 500
 
 if __name__ == '__main__':
