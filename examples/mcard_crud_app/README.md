@@ -1,16 +1,27 @@
 # MCard CRUD Application
 
-A full-featured CRUD (Create, Read, Update, Delete) application for managing MCards, built with Flask and Bootstrap. This application demonstrates the capabilities of the MCard library while providing a user-friendly interface for card management.
+A comprehensive CRUD (Create, Read, Update, Delete) application for managing MCards, built with Flask and Bootstrap 5. This application showcases the capabilities of the MCard library while providing an intuitive and responsive interface for card management.
 
 ## Features
 
 ### Core Functionality
 - Create new MCards with text or binary content
-- View existing MCards with content preview
+- View and manage existing MCards with rich content preview
 - Delete MCards from storage
 - Automatic content hash generation and verification
 
 ### Advanced Features
+
+#### Multiple View Options
+- **Table View**: Traditional list view with detailed information
+  - Sortable columns
+  - Compact information display
+  - Quick actions per row
+- **Grid View**: Visual card-based layout
+  - Configurable grid dimensions (2x2 to 5x5)
+  - Responsive card design
+  - Visual content previews
+  - Easy view switching with state preservation
 
 #### Search and Filtering
 - Real-time search functionality
@@ -18,39 +29,41 @@ A full-featured CRUD (Create, Read, Update, Delete) application for managing MCa
 - Case-insensitive search
 - Dynamic result updates
 
-#### Pagination
+#### Smart Pagination
 - Configurable items per page (5, 10, 25, 50)
+- Adaptive pagination based on view type
 - Page navigation controls
 - Display of current range and total items
-- Smooth integration with search functionality
+- State preservation across view changes
 
-#### Content Type Detection
-- Automatic file type detection for various formats:
+#### Intelligent Content Handling
+- **Automatic Content Type Detection**:
   - Images: PNG, JPEG, GIF, WebP, TIFF
   - Documents: PDF, DOCX, XLSX
   - Archives: ZIP
   - Text: Plain text, JSON, XML, HTML, PEM certificates
 - Smart file extension suggestion
-- MIME type detection
+- MIME type detection and handling
 
-#### Content Display
-- Rich content preview:
-  - Image preview for supported formats
+#### Rich Content Display
+- **Dynamic Content Preview**:
+  - Image thumbnails with responsive sizing
   - Formatted JSON display
   - Syntax highlighting for code
   - Binary content information
-- Content metadata display:
+- **Detailed Metadata**:
   - File type and extension
   - Content size
   - Creation timestamp
   - Content hash with copy feature
 
-#### User Interface
-- Clean, responsive Bootstrap design
-- Interactive buttons and controls
+#### Modern User Interface
+- Clean, responsive Bootstrap 5 design
+- Interactive buttons with icons
 - Visual feedback for actions
-- Consistent styling across pages
+- Consistent styling across views
 - Mobile-friendly layout
+- Intuitive navigation between views
 
 ## Technical Details
 
@@ -60,26 +73,29 @@ mcard_crud_app/
 ├── app.py              # Main application logic
 ├── templates/          # HTML templates
 │   ├── base.html      # Base template with common elements
-│   ├── index.html     # Main page with card listing
+│   ├── index.html     # Table view layout
+│   ├── grid.html      # Grid view layout
 │   ├── new_card.html  # Card creation form
 │   ├── view_card.html # Card detail view
-│   └── hash_display.html  # Hash display component
+│   └── components/    # Reusable template components
 └── mcard_crud.db      # SQLite database for card storage
 ```
 
 ### Dependencies
-- Flask: Web framework
-- Bootstrap 5: Frontend framework
-- Font Awesome: Icons
-- MCard Library: Core functionality
+- **Flask**: Web framework for routing and application logic
+- **Bootstrap 5**: Modern frontend framework for responsive design
+- **Bootstrap Icons**: Comprehensive icon library
+- **MCard Library**: Core functionality for card management
+- **SQLite**: Lightweight database for persistent storage
 
 ### Implementation Details
-- RESTful route structure
+- RESTful API architecture
 - Proper error handling and validation
-- Secure file handling
+- Secure file handling and storage
 - Efficient database operations
-- Modular template design
+- Modular template design with component reuse
 - Responsive UI components
+- State management across view changes
 
 ## Usage
 
@@ -90,28 +106,23 @@ mcard_crud_app/
 
 2. Access the web interface:
    - Open `http://localhost:5000` in your browser
+   - Toggle between Table and Grid views using the view switcher
    - Create new cards using the "New Card" button
-   - View and manage existing cards in the main list
+   - Configure grid dimensions (2-5 rows/columns) in Grid view
    - Use search and pagination to navigate large collections
 
 ## Development
 
 ### Adding New Features
-1. Modify app.py for new routes and logic
+1. Modify `app.py` for new routes and logic
 2. Add/update templates in the templates directory
-3. Update static assets as needed
-4. Test thoroughly with different content types
+3. Follow the modular component pattern in `templates/components`
+4. Maintain consistent styling with Bootstrap 5
+5. Test thoroughly across different view modes
 
 ### Best Practices
-- Follow Flask application structure
-- Use Bootstrap components consistently
-- Handle errors gracefully
-- Provide user feedback for actions
-- Maintain responsive design
-- Document new features
-
-## Security Considerations
-- Input validation for all forms
-- Safe file handling for binary content
-- Protection against common web vulnerabilities
-- Proper error message handling
+- Follow RESTful routing conventions
+- Implement proper error handling
+- Use template inheritance for consistency
+- Maintain responsive design principles
+- Document new features and changes
