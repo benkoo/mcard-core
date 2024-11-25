@@ -87,50 +87,23 @@
     </script>
 
     <script>
-        function formatSize(bytes) {
-            const units = ['B', 'KB', 'MB', 'GB'];
-            let size = bytes;
-            let unitIndex = 0;
-            while (size >= 1024 && unitIndex < units.length - 1) {
-                size /= 1024;
-                unitIndex++;
-            }
-            return `${size.toFixed(1)} ${units[unitIndex]}`;
-        }
-
-        function showWarning(message, metadata = null) {
-            const warningMessage = document.getElementById('warningMessage');
+        function showWarning(message, hash = null) {
+            const warningDiv = document.getElementById('warningMessage');
             const warningText = document.getElementById('warningText');
+            warningDiv.classList.remove('hidden');
+            warningText.textContent = message;
             
-            console.log('Warning message:', message);
-            console.log('Metadata:', metadata);
-            
-            let displayText = message;
-            
-            if (metadata && metadata.metadata) {
-                console.log('Found metadata:', metadata.metadata);
-                const meta = metadata.metadata;
-                const formattedSize = formatSize(meta.size);
-                const viewCardUrl = `/view/${meta.content_hash}`;
-                displayText += `\n\nDuplicate Card Details:\nContent Hash: <a href="${viewCardUrl}" class="text-blue-500 hover:text-blue-700 underline">${meta.content_hash}</a>\nCreated: ${meta.time_claimed}\nSize: ${formattedSize}`;
-            } else {
-                console.log('No metadata found in:', metadata);
+            if (hash) {
+                const viewLink = document.createElement('a');
+                viewLink.href = `/view/${hash}`;
+                viewLink.textContent = 'View existing content';
+                viewLink.className = 'text-blue-500 hover:text-blue-700 ml-2';
+                warningText.appendChild(viewLink);
             }
-            
-            console.log('Final display text:', displayText);
-            // Replace newlines with <br> tags for HTML display
-            warningText.innerHTML = displayText.replace(/\n/g, '<br>');
-            warningMessage.classList.remove('hidden');
-        }
-
-        function hideWarning() {
-            const warningMessage = document.getElementById('warningMessage');
-            warningMessage.classList.add('hidden');
         }
 
         function handleSubmit(event) {
             event.preventDefault();
-            hideWarning();
 
             const form = event.target;
             const formData = new FormData(form);
@@ -154,7 +127,7 @@
                 const { status, data } = result;
                 console.log('Processing result:', { status, data });
                 if (status === 409) {
-                    showWarning(data.warning, data);
+                    showWarning(data.warning, data.hash);
                     return false;
                 } else if (status === 400) {
                     showWarning(data.error);

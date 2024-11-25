@@ -57,6 +57,13 @@ class RealisticExpectations:
             traces=["A list of execution traces for the todo."],
             external_feedback={}
         )
+        
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "practical_boundaries": self.practical_boundaries,
+            "traces": self.traces,
+            "external_feedback": self.external_feedback
+        }
 
 @dataclass
 class CubicalLogicModel:
@@ -88,11 +95,7 @@ class CubicalLogicModel:
                 "activities": self.concrete_impl.activities,
                 "outputs": self.concrete_impl.outputs
             },
-            "realistic_expectations": {
-                "practical_boundaries": self.realistic_expectations.practical_boundaries,
-                "traces": self.realistic_expectations.traces,
-                "external_feedback": self.realistic_expectations.external_feedback
-            }
+            "realistic_expectations": self.realistic_expectations.to_dict()
         }
 
     @classmethod
