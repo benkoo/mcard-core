@@ -58,6 +58,47 @@ def check_duplicate_content(storage, content):
         print(f"Error checking duplicates: {e}")
         return {"found": False}
 
+def detect_content_type(content):
+    """Detect content type and extension from content."""
+    if isinstance(content, bytes):
+        # Common binary file signatures
+        signatures = {
+            b'\x89PNG\r\n\x1a\n': ('image/png', 'png'),
+            b'\xff\xd8\xff': ('image/jpeg', 'jpg'),
+            b'GIF87a': ('image/gif', 'gif'),
+            b'GIF89a': ('image/gif', 'gif'),
+            b'II*\x00': ('image/tiff', 'tiff'),
+            b'MM\x00*': ('image/tiff', 'tiff'),
+            b'PK\x03\x04': ('application/zip', 'zip'),
+            b'%PDF': ('application/pdf', 'pdf'),
+            b'\x50\x4B\x03\x04\x14\x00\x06\x00': ('application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx'),
+            b'\x50\x4B\x03\x04\x14\x00\x08\x00': ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx')
+        }
+        
+        # Check for WEBP (special case due to offset)
+        if content.startswith(b'RIFF') and len(content) > 12 and content[8:12] == b'WEBP':
+            return 'image/webp', 'webp'
+            
+        # Check other signatures
+        for sig, (mime_type, ext) in signatures.items():
+            if content.startswith(sig):
+                return mime_type, ext
+                
+        return 'application/octet-stream', 'bin'
+    else:
+        # Text content
+        try:
+            json.loads(content)
+            return 'application/json', 'json'
+        except (json.JSONDecodeError, TypeError):
+            if content.startswith('<?xml'):
+                return 'application/xml', 'xml'
+            elif content.startswith('<!DOCTYPE html>') or content.startswith('<html'):
+                return 'text/html', 'html'
+            elif any(content.startswith(s) for s in ['-----BEGIN ', '-----BEGIN PGP']):
+                return 'application/x-pem-file', 'pem'
+            return 'text/plain', 'txt'
+
 @app.route('/')
 def index():
     """Display all cards."""
@@ -272,25 +313,19 @@ def view_card(content_hash):
             return "Card not found", 404
             
         is_binary = isinstance(card.content, bytes)
-        content_type = None
+        content_type, extension = detect_content_type(card.content)
         
-        if is_binary:
-            # Detect image type
-            if card.content.startswith(b'\x89PNG'):
-                content_type = 'image/png'
-            elif card.content.startswith(b'\xff\xd8\xff'):
-                content_type = 'image/jpeg'
-            elif card.content.startswith(b'GIF87a') or card.content.startswith(b'GIF89a'):
-                content_type = 'image/gif'
-            elif card.content.startswith(b'RIFF') and card.content[8:12] == b'WEBP':
-                content_type = 'image/webp'
+        # Determine if content is viewable as image
+        is_image = content_type.startswith('image/')
         
         return render_template('view_card.html', 
                              content_hash=content_hash,
                              card=card,
                              content=None if is_binary else str(card.content),
                              is_binary=is_binary,
-                             is_image=content_type is not None,
+                             is_image=is_image,
+                             content_type=content_type,
+                             extension=extension,
                              size=len(card.content) if card.content else 0)
     except Exception as e:
         print(f"Error in view_card: {str(e)}")
@@ -310,7 +345,7 @@ def get_binary_content(content_hash):
             return "Content not found", 404
 
         content = card.content
-        content_type = 'application/octet-stream'
+        content_type, extension = detect_content_type(content)
         filename = None
 
         if isinstance(content, bytes):
@@ -352,38 +387,7 @@ def download_card(content_hash):
         if not card:
             return "Card not found", 404
 
-        is_binary = isinstance(card.content, bytes)
-        
-        # Set default content type and extension
-        content_type = 'text/plain'
-        extension = 'txt'
-        
-        if is_binary:
-            # Check for image types
-            if card.content.startswith(b'\x89PNG'):
-                content_type = 'image/png'
-                extension = 'png'
-            elif card.content.startswith(b'\xff\xd8\xff'):
-                content_type = 'image/jpeg'
-                extension = 'jpg'
-            elif card.content.startswith(b'GIF87a') or card.content.startswith(b'GIF89a'):
-                content_type = 'image/gif'
-                extension = 'gif'
-            elif card.content.startswith(b'RIFF') and card.content[8:12] == b'WEBP':
-                content_type = 'image/webp'
-                extension = 'webp'
-            else:
-                content_type = 'application/octet-stream'
-                extension = 'bin'
-        else:
-            # Check for JSON content
-            try:
-                json.loads(card.content)
-                content_type = 'application/json'
-                extension = 'json'
-            except (json.JSONDecodeError, TypeError):
-                pass  # Keep default text/plain
-        
+        content_type, extension = detect_content_type(card.content)
         filename = f"{content_hash[:8]}.{extension}"
         quoted_filename = quote(filename)
         

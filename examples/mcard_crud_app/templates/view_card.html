@@ -25,16 +25,30 @@
     <div class="card">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Hash: {{ render_hash(content_hash) }}</h5>
+                <div>
+                    <h5 class="card-title mb-0">Hash: {{ render_hash(content_hash) }}</h5>
+                    <small class="text-muted">
+                        Type: <span class="badge bg-secondary">{{ content_type }}</span>
+                        {% if extension %}<span class="badge bg-info">.{{ extension }}</span>{% endif %}
+                        <span class="badge bg-light text-dark">{{ size }} bytes</span>
+                    </small>
+                </div>
                 <small class="text-muted">Created: {{ card.time_claimed.strftime('%Y-%m-%d %H:%M:%S') }}</small>
             </div>
         </div>
         <div class="card-body">
             {% if is_binary %}
                 {% if is_image %}
-                    <img src="{{ url_for('get_binary_content', content_hash=content_hash) }}" alt="Binary content" class="binary-preview">
+                    <img src="{{ url_for('get_binary_content', content_hash=content_hash) }}" alt="Binary content" class="binary-preview img-fluid">
                 {% else %}
-                    <p>Binary content ({{ size }} bytes)</p>
+                    <div class="alert alert-info">
+                        <i class="fas fa-file me-2"></i>
+                        Binary content ({{ size }} bytes)
+                        {% if content_type != 'application/octet-stream' %}
+                        <br>
+                        <small class="text-muted">Detected format: {{ content_type }}</small>
+                        {% endif %}
+                    </div>
                 {% endif %}
             {% else %}
                 <pre class="card-text"><code>{{ content }}</code></pre>
