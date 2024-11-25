@@ -6,6 +6,7 @@ from flask import Flask, render_template, request, redirect, url_for, g, jsonify
 from urllib.parse import quote
 from mcard.core import MCard
 from mcard.storage import MCardStorage
+from content_type_interpreter import ContentTypeInterpreter
 
 app = Flask(__name__)
 
@@ -57,47 +58,6 @@ def check_duplicate_content(storage, content):
     except Exception as e:
         print(f"Error checking duplicates: {e}")
         return {"found": False}
-
-def detect_content_type(content):
-    """Detect content type and extension from content."""
-    if isinstance(content, bytes):
-        # Common binary file signatures
-        signatures = {
-            b'\x89PNG\r\n\x1a\n': ('image/png', 'png'),
-            b'\xff\xd8\xff': ('image/jpeg', 'jpg'),
-            b'GIF87a': ('image/gif', 'gif'),
-            b'GIF89a': ('image/gif', 'gif'),
-            b'II*\x00': ('image/tiff', 'tiff'),
-            b'MM\x00*': ('image/tiff', 'tiff'),
-            b'PK\x03\x04': ('application/zip', 'zip'),
-            b'%PDF': ('application/pdf', 'pdf'),
-            b'\x50\x4B\x03\x04\x14\x00\x06\x00': ('application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx'),
-            b'\x50\x4B\x03\x04\x14\x00\x08\x00': ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx')
-        }
-        
-        # Check for WEBP (special case due to offset)
-        if content.startswith(b'RIFF') and len(content) > 12 and content[8:12] == b'WEBP':
-            return 'image/webp', 'webp'
-            
-        # Check other signatures
-        for sig, (mime_type, ext) in signatures.items():
-            if content.startswith(sig):
-                return mime_type, ext
-                
-        return 'application/octet-stream', 'bin'
-    else:
-        # Text content
-        try:
-            json.loads(content)
-            return 'application/json', 'json'
-        except (json.JSONDecodeError, TypeError):
-            if content.startswith('<?xml'):
-                return 'application/xml', 'xml'
-            elif content.startswith('<!DOCTYPE html>') or content.startswith('<html'):
-                return 'text/html', 'html'
-            elif any(content.startswith(s) for s in ['-----BEGIN ', '-----BEGIN PGP']):
-                return 'application/x-pem-file', 'pem'
-            return 'text/plain', 'txt'
 
 @app.route('/')
 def index():
@@ -312,21 +272,23 @@ def view_card(content_hash):
         if not card:
             return "Card not found", 404
             
-        is_binary = isinstance(card.content, bytes)
-        content_type, extension = detect_content_type(card.content)
+        content = card.content
+        size = len(content)
+        mime_type, extension = ContentTypeInterpreter.detect_content_type(content)
+        size_str = ContentTypeInterpreter.get_content_size_str(size)
         
         # Determine if content is viewable as image
-        is_image = content_type.startswith('image/')
+        is_image = mime_type.startswith('image/')
         
         return render_template('view_card.html', 
                              content_hash=content_hash,
                              card=card,
-                             content=None if is_binary else str(card.content),
-                             is_binary=is_binary,
+                             content=None if isinstance(content, bytes) else str(content),
+                             is_binary=isinstance(content, bytes),
                              is_image=is_image,
-                             content_type=content_type,
+                             content_type=mime_type,
                              extension=extension,
-                             size=len(card.content) if card.content else 0)
+                             size=size_str)
     except Exception as e:
         print(f"Error in view_card: {str(e)}")
         return f"Error viewing card: {str(e)}", 500
@@ -345,34 +307,22 @@ def get_binary_content(content_hash):
             return "Content not found", 404
 
         content = card.content
-        content_type, extension = detect_content_type(content)
-        filename = None
-
+        mime_type, extension = ContentTypeInterpreter.detect_content_type(content)
+        
         if isinstance(content, bytes):
-            # Try to detect content type from the first few bytes
-            if content.startswith(b'\x89PNG\r\n\x1a\n'):
-                content_type = 'image/png'
-                filename = 'image.png'
-            elif content.startswith(b'\xff\xd8\xff'):
-                content_type = 'image/jpeg'
-                filename = 'image.jpg'
-            elif content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
-                content_type = 'image/gif'
-                filename = 'image.gif'
-            elif content.startswith(b'RIFF') and content[8:12] == b'WEBP':
-                content_type = 'image/webp'
-                filename = 'image.webp'
-
-        # Handle download flag
-        if request.args.get('download') == 'true':
+            # Remove leading dot from extension if present
+            extension = extension.lstrip('.') if extension else ''
+            filename = f"{content_hash[:8]}.{extension}" if extension else content_hash[:8]
+            quoted_filename = quote(filename)
+            
             headers = {
-                'Content-Type': content_type,
-                'Content-Disposition': f'attachment; filename="{filename or "file"}"'
+                'Content-Type': mime_type,
+                'Content-Disposition': f'attachment; filename="{quoted_filename}"'
             }
         else:
-            headers = {'Content-Type': content_type}
+            headers = {'Content-Type': mime_type}
 
-        print(f"Serving content with type: {content_type}, size: {len(content)} bytes")
+        print(f"Serving content with type: {mime_type}, size: {len(content)} bytes")
         return Response(content, headers=headers)
 
     except Exception as e:
@@ -387,12 +337,16 @@ def download_card(content_hash):
         if not card:
             return "Card not found", 404
 
-        content_type, extension = detect_content_type(card.content)
-        filename = f"{content_hash[:8]}.{extension}"
+        content = card.content
+        mime_type, extension = ContentTypeInterpreter.detect_content_type(content)
+        
+        # Remove leading dot from extension if present
+        extension = extension.lstrip('.') if extension else ''
+        filename = f"{content_hash[:8]}.{extension}" if extension else content_hash[:8]
         quoted_filename = quote(filename)
         
-        response = Response(card.content)
-        response.headers.set('Content-Type', content_type)
+        response = Response(content)
+        response.headers.set('Content-Type', mime_type)
         response.headers.set('Content-Disposition', f'attachment; filename="{quoted_filename}"')
         return response
 
