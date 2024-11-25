@@ -418,7 +418,7 @@ def delete(content_hash):
         if storage.delete(content_hash):
             print(f"Successfully deleted card with ID: {content_hash}")  # Debug log
             storage.conn.commit()
-            return redirect(url_for('index'))
+            return redirect(url_for('list_all_cards'))
         else:
             print(f"Card not found with ID: {content_hash}")  # Debug log
             return "Todo not found", 404

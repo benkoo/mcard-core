@@ -304,6 +304,50 @@
                 console.error('Failed to copy text: ', err);
             });
         }
+
+        // Delete modal functions
+        function showDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        function hideDeleteModal() {
+            document.getElementById('deleteModal').classList.add('hidden');
+        }
     </script>
+
+    <!-- Remove Card Button -->
+<div class="max-w-4xl mx-auto mt-8">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between">
+            <div class="text-red-600">
+                <span class="mr-2">⚠️</span>
+                <span class="font-semibold">Danger Zone</span>
+            </div>
+            <button onclick="showDeleteModal()" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Remove this Card
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Warning Modal -->
+<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-xl max-w-md">
+        <div class="mb-4">
+            <h3 class="text-xl font-bold text-gray-900 mb-2">⚠️ Warning</h3>
+            <p class="text-gray-600">Are you sure you want to remove this card? This action cannot be undone.</p>
+        </div>
+        <div class="flex justify-end space-x-4">
+            <button onclick="hideDeleteModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Cancel
+            </button>
+            <form action="{{ url_for('delete', content_hash=content_hash) }}" method="post" class="inline">
+                <button type="submit" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Remove Card
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
 </body>
 </html>
