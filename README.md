@@ -47,12 +47,21 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - `time_claimed`: A timezone-aware timestamp with microsecond precision
 
 ### Storage Features
-- SQLite-based persistent storage
+- SQLite-based persistent storage with connection pooling
 - Binary content support
-- Batch operations for efficient bulk processing
+- Efficient batch operations for saving, retrieving, and deleting
 - Transaction management with automatic rollback
-- Timezone preservation across operations
 - Thread-safe connection management
+- Time-based query support
+- Pagination for large result sets
+
+### Time Management
+- Configurable timezone support
+- UTC and local time handling
+- Custom time and date formats
+- Time range operations
+- Timezone conversion utilities
+- Time comparison and validation functions
 
 ### Collection Management
 - Automatic temporal ordering
@@ -114,27 +123,53 @@ all_cards = collection.get_all_cards()
 card = collection.get_card_by_hash(card1.content_hash)
 ```
 
-### Advanced Features
+### Time Management
 
-#### Binary Content
 ```python
-# Store binary data
-binary_card = MCard(content=b"Binary data")
-storage.save(binary_card)
+from mcard import TimeService, TimeSettings
+from datetime import datetime, timedelta
 
-# Content type is preserved
-retrieved = storage.get(binary_card.content_hash)
-assert isinstance(retrieved.content, bytes)
+# Initialize time service with custom settings
+settings = TimeSettings(
+    timezone="America/New_York",
+    time_format="%Y-%m-%d %H:%M:%S %Z",
+    use_utc=False
+)
+time_service = TimeService(settings)
+
+# Get current time in configured timezone
+now = time_service.get_current_time()
+
+# Create and validate time ranges
+start = now - timedelta(days=1)
+end = now
+time_range = time_service.create_time_range(start=start, end=end)
+
+# Format times according to settings
+formatted = time_service.format_time(now)
+
+# Convert between timezones
+utc_time = time_service.convert_timezone(now, "UTC")
 ```
+
+### Advanced Features
 
 #### Batch Operations
 ```python
 # Create multiple cards
 cards = [MCard(content=f"Card {i}") for i in range(100)]
 
-# Efficient batch save
-saved, skipped = storage.save_many(cards)
+# Efficient batch save with transaction
+with storage.transaction():
+    saved, skipped = storage.save_many(cards)
 print(f"Saved: {saved}, Skipped: {skipped}")
+
+# Batch retrieve
+hashes = [card.content_hash for card in cards]
+retrieved = storage.get_many(hashes)
+
+# Batch delete
+deleted = storage.delete_many(hashes)
 ```
 
 #### Time Range Queries
@@ -145,6 +180,32 @@ from datetime import datetime, timedelta
 start_time = datetime.now() - timedelta(hours=1)
 end_time = datetime.now()
 recent_cards = collection.get_cards_in_timerange(start_time, end_time)
+
+# Get cards with pagination
+page_size = 10
+page_number = 1
+cards = collection.get_cards_in_timerange(
+    start_time,
+    end_time,
+    limit=page_size,
+    offset=(page_number - 1) * page_size
+)
+```
+
+### Configuration
+
+MCard can be configured through environment variables:
+
+```bash
+# Time settings
+export MCARD_TIMEZONE="America/New_York"
+export MCARD_TIME_FORMAT="%Y-%m-%d %H:%M:%S %Z"
+export MCARD_DATE_FORMAT="%Y-%m-%d"
+export MCARD_USE_UTC=false
+
+# Database settings
+export MCARD_DB_PATH="cards.db"
+export MCARD_POOL_SIZE=5
 ```
 
 ### Thread Safety
@@ -153,7 +214,7 @@ When using MCard in a web application or multi-threaded environment:
 
 ```python
 from flask import Flask, g
-from mcard import MCardStorage, MCardCollection
+from mcard import MCardStorage, MCardCollection, TimeService
 
 app = Flask(__name__)
 DB_PATH = "cards.db"
@@ -168,11 +229,16 @@ def get_collection():
         g.collection = MCardCollection(get_storage())
     return g.collection
 
+def get_time_service():
+    if 'time_service' not in g:
+        g.time_service = TimeService()
+    return g.time_service
+
 @app.teardown_appcontext
 def teardown_db(exception):
     storage = g.pop('storage', None)
     if storage is not None:
-        storage.conn.close()
+        storage.close()
 ```
 
 ## Examples
@@ -184,6 +250,7 @@ A complete example of using MCard in a web application can be found in the `exam
 - Content-addressable storage for todo items
 - Integration with Flask's application context
 - Best practices for error handling and logging
+- Time-aware operations and timezone handling
 
 See the [Todo App README](examples/todo_app/README.md) for more details.
 
@@ -191,7 +258,7 @@ See the [Todo App README](examples/todo_app/README.md) for more details.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/mcard-core.git
+git clone https://github.com/benkoo/mcard-core.git
 cd mcard-core
 ```
 
@@ -203,7 +270,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 3. Install development dependencies:
 ```bash
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 4. Run tests:
@@ -211,53 +278,10 @@ pip install -r requirements.txt
 pytest
 ```
 
-## Project Structure
+## Contributing
 
-```
-mcard-core/
-├── mcard/              # Core library implementation
-│   ├── core.py        # MCard class definition (Pydantic model)
-│   ├── storage.py     # SQLite storage implementation
-│   └── collection.py  # Collection management with temporal ordering
-├── examples/          # Example applications
-│   └── todo_app/     # Complete Todo application example
-├── tests/            # Test suite
-└── scripts/          # Utility scripts
-```
-
-## Best Practices
-
-1. **Thread Safety**
-   - Use thread-local storage in multi-threaded environments
-   - Properly manage database connections
-   - Use appropriate transaction management
-   - Take advantage of the copy-on-read pattern
-
-2. **Error Handling**
-   - Always use try/except blocks for database operations
-   - Implement proper transaction rollback on errors
-   - Include comprehensive error logging
-   - Verify content hashes after retrieval
-
-3. **Data Integrity**
-   - Let MCard handle content hash generation
-   - Maintain proper temporal ordering
-   - Use transaction-based updates
-   - Preserve timezone information
-
-4. **Performance**
-   - Use batch operations for multiple cards
-   - Close database connections when done
-   - Use time range queries for large collections
-   - Implement proper connection pooling
-   - Take advantage of in-memory sorting
-
-5. **Content Management**
-   - Use appropriate content types (string, bytes, etc.)
-   - Verify content integrity after operations
-   - Handle binary content appropriately
-   - Maintain timezone awareness
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
