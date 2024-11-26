@@ -280,6 +280,9 @@ class ContentTypeInterpreter:
             # Check for binary patterns
             # Look at first 1024 bytes for null bytes or high number of non-ASCII chars
             sample = content[:1024]
+            if not sample:  # Handle empty content
+                return False
+                
             null_count = sample.count(b'\x00')
             non_ascii = sum(1 for b in sample if b > 0x7F)
             

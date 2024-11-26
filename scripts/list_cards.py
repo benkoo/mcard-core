@@ -6,94 +6,113 @@ Attempts to decode binary content as UTF-8 text and shows original timezone info
 """
 
 import sys
+import asyncio
 from pathlib import Path
-from datetime import datetime
 import argparse
+from typing import Optional
+from datetime import datetime
+from dotenv import load_dotenv
 
 # Add the project root to the Python path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.append(str(PROJECT_ROOT))
 
-from mcard.storage import MCardStorage
-from mcard import config
+# Load environment variables from .env file
+load_dotenv(PROJECT_ROOT / ".env")
 
-def format_content(content):
-    """
-    Format content for display, attempting to decode binary content as UTF-8.
-    Limits display to 100 characters.
-    """
-    # If content is already a string, use it directly
+# Debug: Print environment variables
+import os
+print("Environment variables:")
+print(f"MCARD_DB_PATH: {os.getenv('MCARD_DB_PATH')}")
+
+from mcard import SQLiteCardRepository, AppSettings, DatabaseSettings
+from mcard.domain.models.exceptions import StorageError
+
+def format_content(content) -> str:
+    """Format content for display, attempting to decode binary content as UTF-8."""
+    if content is None:
+        return "[Empty content]"
+        
     if isinstance(content, str):
         content_str = content
     else:
-        # Try to decode as UTF-8 if it's bytes
         try:
             if isinstance(content, bytes):
-                content_str = content.decode('utf-8')
+                # Check if it looks like text
+                if not any(b for b in content if b < 32 and b not in (9, 10, 13)):
+                    content_str = content.decode('utf-8')
+                else:
+                    return f"[Binary content ({len(content)} bytes)]"
             else:
                 content_str = str(content)
         except UnicodeDecodeError:
-            return "[Binary content]"
+            return f"[Binary content ({len(content)} bytes)]"
     
     # Limit to 100 characters
     if len(content_str) > 100:
         return content_str[:100] + "..."
     return content_str
 
-def format_datetime(dt):
-    """
-    Format datetime with timezone information.
-    Shows both the time and the timezone name/offset.
-    """
-    # Format the date and time
-    time_str = dt.strftime('%Y-%m-%d %H:%M:%S')
-    
-    # Get timezone information
-    if dt.tzinfo:
-        # Get timezone name if available, otherwise use offset
+async def list_cards(db_path: Optional[str] = None, limit: Optional[int] = None) -> None:
+    """List all cards in the database with optional limit."""
+    try:
+        # Load settings, override db_path if provided
+        settings = AppSettings(
+            database=DatabaseSettings(
+                db_path=db_path or os.getenv('MCARD_DB_PATH'),
+                pool_size=int(os.getenv('MCARD_DB_POOL_SIZE', '5')),
+                timeout=float(os.getenv('MCARD_DB_TIMEOUT', '30.0'))
+            )
+        )
+        
+        print(f"Using database path: {settings.database.db_path}")
+        
+        # Create repository
+        repo = SQLiteCardRepository(
+            db_path=settings.database.db_path,
+            pool_size=settings.database.pool_size
+        )
+        
         try:
-            tz_name = dt.tzinfo.tzname(dt)
-            if tz_name:
-                tz_str = tz_name
-            else:
-                tz_str = dt.strftime('%z')  # Format: +HHMM or -HHMM
-        except:
-            tz_str = dt.strftime('%z')
-    else:
-        tz_str = 'UTC'
-    
-    return f"{time_str} {tz_str}"
+            # Get all cards
+            cards = await repo.get_all(limit=limit)
+            
+            if not cards:
+                print("No cards found in the database.")
+                return
+            
+            # Print header
+            print(f"\nFound {len(cards)} cards in {settings.database.db_path}:")
+            print("-" * 80)
+            
+            # Print each card
+            for card in cards:
+                content = format_content(card.content)
+                print(f"Hash: {card.hash}")
+                print(f"Time: {card.g_time.isoformat()}")
+                print(f"Content: {content}")
+                print("-" * 80)
+                
+        finally:
+            # Always close the repository
+            await repo.close()
+            
+    except StorageError as e:
+        print(f"Error accessing database: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
 
 def main():
-    """Main function to list all cards in the database."""
+    """Parse arguments and run the script."""
     parser = argparse.ArgumentParser(description="List all cards in the MCard database.")
-    parser.add_argument("--test", action="store_true", help="Use test database")
+    parser.add_argument("--db", help="Path to the database file (overrides MCARD_DB_PATH)")
+    parser.add_argument("--limit", type=int, help="Maximum number of cards to display")
     args = parser.parse_args()
-
-    # Load environment variables
-    config.load_config()
-
-    # Initialize storage with appropriate database
-    storage = MCardStorage(test=args.test)
-    print(f"\nUsing database at: {storage.db_path}\n")
-
-    # Get all records
-    records = storage.get_all()
     
-    if not records:
-        print("No cards found in database.")
-        return
-
-    # Print records
-    print(f"Found {len(records)} cards:\n")
-    for record in records:
-        content = format_content(record.content)
-        time_str = format_datetime(record.time_claimed)
-        print(f"Hash: {record.content_hash}")
-        print(f"Time: {time_str}")
-        print(f"Content: {content}")
-        print("-" * 80)
+    asyncio.run(list_cards(db_path=args.db, limit=args.limit))
 
 if __name__ == "__main__":
     main()

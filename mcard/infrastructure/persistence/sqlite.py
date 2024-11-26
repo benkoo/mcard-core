@@ -48,11 +48,10 @@ class SQLiteCardRepository:
             return
 
         async with self._pool_lock:
-            if not self._connection_pool:
-                if len(self._connection_pool) < self.pool_size:
-                    conn = await aiosqlite.connect(self.db_path)
-                else:
-                    raise StorageError("Connection pool exhausted")
+            if len(self._connection_pool) < self.pool_size:
+                conn = await aiosqlite.connect(self.db_path)
+            elif not self._connection_pool:
+                raise StorageError("Connection pool exhausted")
             else:
                 conn = self._connection_pool.pop()
 
