@@ -72,9 +72,9 @@ def index():
             # Check for SVG content first
             if ContentTypeInterpreter.is_svg_content(content):
                 content_type = 'image/svg+xml'
-                is_binary = False
                 is_image = True
                 is_svg = True
+                extension = 'svg'  # Add this line to set extension for SVG files
                 # Ensure content is string for SVG
                 content_str = content if isinstance(content, str) else content.decode('utf-8')
                 content = content_str
@@ -223,6 +223,7 @@ def view_card(content_hash):
         content_type = 'image/svg+xml'
         is_image = True
         is_svg = True
+        extension = 'svg'  # Add this line to set extension for SVG files
         # Ensure content is string for SVG
         content = content if isinstance(content, str) else content.decode('utf-8')
     else:
