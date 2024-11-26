@@ -1,128 +1,115 @@
 # MCard CRUD Application
 
-A comprehensive CRUD (Create, Read, Update, Delete) application for managing MCards, built with Flask and Bootstrap 5. This application showcases the capabilities of the MCard library while providing an intuitive and responsive interface for card management.
+A comprehensive CRUD (Create, Read, Update, Delete) application for managing MCards, built with Flask and Bootstrap 5. This application demonstrates the capabilities of the MCard library while providing an intuitive web interface for card management.
 
 ## Features
 
 ### Core Functionality
-- Create new MCards with text or binary content
-- View and manage existing MCards with rich content preview
+- Create new MCards with text or file content
+- View and download card content with proper content type handling
 - Delete MCards from storage
 - Automatic content hash generation and verification
+- Binary and text content support
 
-### Advanced Features
+### Content Management
+- **Intelligent Content Handling**:
+  - Automatic content type detection
+  - SVG content special handling with inline rendering
+  - Image content with thumbnail generation
+  - Binary content download support
+  - Text content formatting
+- **Content Type Support**:
+  - Images: SVG, PNG, JPEG, GIF, and other common formats
+  - Text: Plain text, JSON, and other text formats
+  - Binary: Any binary content with proper MIME type detection
 
-#### Multiple View Options
-- **Table View**: Traditional list view with detailed information
-  - Sortable columns
-  - Compact information display
-  - Quick actions per row
-- **Grid View**: Visual card-based layout
-  - Configurable grid dimensions (2x2 to 5x5)
-  - Responsive card design
-  - Visual content previews
-  - Easy view switching with state preservation
-
-#### Search and Filtering
-- Real-time search functionality
-- Filter by content hash and timestamp
-- Case-insensitive search
-- Dynamic result updates
-
-#### Smart Pagination
-- Configurable items per page (5, 10, 25, 50)
-- Adaptive pagination based on view type
-- Page navigation controls
-- Display of current range and total items
-- State preservation across view changes
-
-#### Intelligent Content Handling
-- **Automatic Content Type Detection**:
-  - Images: PNG, JPEG, GIF, WebP, TIFF
-  - Documents: PDF, DOCX, XLSX
-  - Archives: ZIP
-  - Text: Plain text, JSON, XML, HTML, PEM certificates
-- Smart file extension suggestion
-- MIME type detection and handling
-
-#### Rich Content Display
-- **Dynamic Content Preview**:
-  - Image thumbnails with responsive sizing
-  - Formatted JSON display
-  - Syntax highlighting for code
-  - Binary content information
-- **Detailed Metadata**:
-  - File type and extension
-  - Content size
-  - Creation timestamp
-  - Content hash with copy feature
-
-#### Modern User Interface
-- Clean, responsive Bootstrap 5 design
-- Interactive buttons with icons
-- Visual feedback for actions
-- Consistent styling across views
-- Mobile-friendly layout
-- Intuitive navigation between views
+### User Interface
+- **Clean Bootstrap 5 Design**:
+  - Responsive layout for all screen sizes
+  - Intuitive navigation
+  - Clear content presentation
+- **Card Management**:
+  - Create new cards with text or file upload
+  - View card details with content preview
+  - Download card content
+  - Delete cards with confirmation
+- **Pagination**:
+  - Configurable items per page
+  - Page navigation controls
+  - Current page indicator
 
 ## Technical Details
 
-### File Structure
+### Project Structure
 ```
 mcard_crud_app/
-├── app.py              # Main application logic
-├── templates/          # HTML templates
-│   ├── base.html      # Base template with common elements
-│   ├── index.html     # Table view layout
+├── app.py              # Main Flask application
+├── templates/          # Jinja2 templates
+│   ├── base.html      # Base template with layout
+│   ├── index.html     # Main card listing
 │   ├── grid.html      # Grid view layout
 │   ├── new_card.html  # Card creation form
 │   ├── view_card.html # Card detail view
-│   └── components/    # Reusable template components
-└── mcard_crud.db      # SQLite database for card storage
+│   └── components/    # Reusable components
+└── mcard_crud.db      # SQLite database
 ```
 
 ### Dependencies
-- **Flask**: Web framework for routing and application logic
-- **Bootstrap 5**: Modern frontend framework for responsive design
-- **Bootstrap Icons**: Comprehensive icon library
-- **MCard Library**: Core functionality for card management
-- **SQLite**: Lightweight database for persistent storage
+- **Flask**: Web application framework
+- **MCard**: Core library for card management
+- **Bootstrap 5**: Frontend styling and components
+- **SQLite**: Database storage
 
-### Implementation Details
-- RESTful API architecture
-- Proper error handling and validation
-- Secure file handling and storage
-- Efficient database operations
-- Modular template design with component reuse
-- Responsive UI components
-- State management across view changes
+### Implementation Features
+- Thread-safe database connections
+- Proper MIME type detection and handling
+- Secure file uploads
+- Error handling and user feedback
+- Template inheritance for consistent UI
+- Jinja2 custom filters for formatting
 
-## Usage
+## Setup and Usage
 
-1. Start the application:
+1. **Installation**:
    ```bash
-   python app.py
+   # Clone the repository
+   git clone [repository-url]
+   cd mcard-core
+   
+   # Install dependencies
+   pip install -r requirements.txt
    ```
 
-2. Access the web interface:
-   - Open `http://localhost:5000` in your browser
-   - Toggle between Table and Grid views using the view switcher
-   - Create new cards using the "New Card" button
-   - Configure grid dimensions (2-5 rows/columns) in Grid view
-   - Use search and pagination to navigate large collections
+2. **Running the Application**:
+   ```bash
+   cd examples/mcard_crud_app
+   python app.py
+   ```
+   The application will be available at `http://localhost:5000`
+
+3. **Using the Application**:
+   - Visit the homepage to see existing cards
+   - Click "New Card" to create a card
+   - Use text input or file upload to add content
+   - View, download, or delete cards from the main interface
 
 ## Development
 
 ### Adding New Features
-1. Modify `app.py` for new routes and logic
-2. Add/update templates in the templates directory
-3. Follow the modular component pattern in `templates/components`
-4. Maintain consistent styling with Bootstrap 5
-5. Test thoroughly across different view modes
+1. Modify `app.py` for new routes and functionality
+2. Add templates in the `templates` directory
+3. Update static assets as needed
 
 ### Best Practices
-- Follow RESTful routing conventions
-- Implement proper error handling
-- Use template inheritance for consistency
-- Maintain responsive design principles
-- Document new features and changes
+- Use proper error handling
+- Follow Flask application factory pattern
+- Keep templates modular and reusable
+- Maintain consistent styling
+- Handle content types appropriately
+
+## Security Notes
+- The application uses a development secret key
+- Implement proper security measures for production
+- Validate all file uploads
+- Use secure database connections
+- Implement user authentication if needed
