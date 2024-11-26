@@ -18,9 +18,22 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.append(str(PROJECT_ROOT))
 
 # Load environment variables from .env file
-load_dotenv(PROJECT_ROOT / ".env")
+ENV_FILE = PROJECT_ROOT / ".env"
+print(f"Loading environment from: {ENV_FILE} (exists: {ENV_FILE.exists()})")
+load_dotenv(ENV_FILE, override=True)
 
 from mcard import SQLiteCardRepository, AppSettings, DatabaseSettings, MCard
+from mcard.domain.models.config import HashingSettings, HashAlgorithm
+from mcard.domain.services.hashing import DefaultHashingService, set_hashing_service
+
+print(f"MCARD_HASH_ALGORITHM environment variable: {os.environ.get('MCARD_HASH_ALGORITHM')}")
+hash_algo = os.environ.get('MCARD_HASH_ALGORITHM', 'sha256')
+hashing_settings = HashingSettings(algorithm=hash_algo)
+print(f"Using hash algorithm: {hashing_settings.algorithm}")
+
+# Initialize the hashing service with our settings
+hashing_service = DefaultHashingService(settings=hashing_settings)
+set_hashing_service(hashing_service)
 
 def is_binary(file_path: Path) -> bool:
     """Check if a file is binary based on its mimetype."""

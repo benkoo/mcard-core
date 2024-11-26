@@ -55,6 +55,14 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - `hash`: A cryptographic hash of the content, using SHA-256 by default (configurable to other algorithms)
 - `g_time`: A timezone-aware timestamp with microsecond precision
 
+### Hash Collision Protection
+- Comprehensive test suite for detecting and handling hash collisions
+- Automated switching to stronger hashing algorithms when potential collisions are detected
+- Configurable hash algorithm selection through `HashingSettings`
+- Built-in safeguards to maintain data integrity
+- Collision-aware hashing service with progressive algorithm strengthening (MD5 → SHA1 → SHA256 → SHA512)
+- Async support for repository-based collision detection
+
 ### Storage Features
 - SQLite-based persistent storage with connection pooling
 - Binary content support with automatic text/binary detection
@@ -97,17 +105,23 @@ pip install mcard-core
 
 ```python
 from mcard import MCard, get_now_with_located_zone
-from mcard import HashingSettings
+from mcard import HashingSettings, CollisionAwareHashingService
 
 # Create a card with default SHA-256 hashing
 card = MCard(content="Hello, World!")
 print(f"Hash (SHA-256): {card.hash}")
 print(f"Global Time: {card.g_time}")  # e.g., 2024-01-24 15:30:45.123456+00:00
 
-# Configure different hashing algorithm
-settings = HashingSettings(algorithm="blake2b")
-card = MCard(content="Hello, World!", hashing_settings=settings)
-print(f"Hash (BLAKE2b): {card.hash}")
+# Use collision-aware hashing with automatic algorithm strengthening
+settings = HashingSettings(algorithm="md5")  # Starts with MD5
+service = CollisionAwareHashingService(settings)
+card = MCard(content="Hello, World!", hashing_service=service)
+print(f"Initial Hash (MD5): {card.hash}")
+
+# If a collision is detected, it automatically upgrades to stronger algorithms
+collision_content = "Different content with same MD5"
+card2 = MCard(content=collision_content, hashing_service=service)
+print(f"New Hash (Stronger Algorithm): {card2.hash}")
 
 # Create a card with explicit global time
 now = get_now_with_located_zone()  # Microsecond precision timestamp
@@ -248,6 +262,10 @@ cards = collection.get_cards_in_timerange(
 MCard can be configured through environment variables:
 
 ```bash
+# Hashing settings
+export MCARD_HASH_ALGORITHM="sha256"  # Default hashing algorithm (md5, sha1, sha256, sha512)
+export MCARD_COLLISION_AWARE="true"   # Enable collision-aware hashing
+
 # Time settings
 export MCARD_TIMEZONE="America/New_York"  # Default timezone for timestamps
 export MCARD_TIME_FORMAT="%Y-%m-%d %H:%M:%S %Z"  # Time format for display
