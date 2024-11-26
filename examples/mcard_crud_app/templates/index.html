@@ -1,9 +1,108 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% from "components/table.html" import render_table %}
+{% from "components/grid.html" import render_grid %}
+
+{% block title %}MCard CRUD App - Cards{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    /* Grid specific styles */
+    .preview-container {
+        height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    .preview-container img {
+        max-height: 140px;
+        max-width: 100%;
+        object-fit: contain;
+    }
+    
+    .preview-container svg {
+        max-height: 140px;
+        max-width: 100%;
+    }
+    
+    .preview-text {
+        height: 150px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        overflow: auto;
+        font-family: monospace;
+        white-space: pre-wrap;
+    }
+    
+    .preview-binary {
+        height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        color: #6c757d;
+    }
+    
+    .svg-preview svg {
+        width: 100%;
+        height: 100%;
+    }
+    
+    /* Common styles */
+    .name-cell {
+        width: 150px;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .preview-cell {
+        width: 220px;
+        max-width: 220px;
+    }
+    
+    .type-cell {
+        width: 120px;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .hash-cell {
+        width: 200px;
+        max-width: 200px;
+        font-family: monospace;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .time-cell {
+        width: 150px;
+        max-width: 150px;
+        white-space: nowrap;
+    }
+    
+    .action-cell {
+        width: 120px;
+        max-width: 120px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>All Cards</h1>
+        <h1 class="mb-0">MCards</h1>
         <div class="d-flex align-items-center gap-3">
             <div class="me-3">
                 <label for="per_page" class="me-2">Items per page:</label>
@@ -14,107 +113,97 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="btn-group me-2">
-                <a href="{{ url_for('index') }}" class="btn btn-primary">
-                    <i class="bi bi-table me-1"></i>Table
-                </a>
-                <a href="{{ url_for('grid_view', rows=3, cols=3) }}" class="btn btn-outline-primary">
-                    <i class="bi bi-grid-3x3-gap me-1"></i>Grid
-                </a>
+            <div class="btn-group" role="group" aria-label="View toggle">
+                <button type="button" class="btn btn-outline-primary active" id="tableViewBtn">
+                    <i class="bi bi-table"></i> Table
+                </button>
+                <button type="button" class="btn btn-outline-primary" id="gridViewBtn">
+                    <i class="bi bi-grid"></i> Grid
+                </button>
             </div>
-            <a href="{{ url_for('new_card') }}" class="btn btn-success">
-                <i class="bi bi-plus-lg me-1"></i>New Card
+            <a href="{{ url_for('new_card') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> New Card
             </a>
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-striped table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th scope="col">#</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">Content</th>
-                    <th scope="col">Created</th>
-                    <th scope="col">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for card in cards %}
-                <tr>
-                    <td>{{ loop.index + (page - 1) * per_page }}</td>
-                    <td>
-                        {% if card.is_image %}
-                            <i class="bi bi-image" title="Image"></i>
-                        {% elif card.is_binary %}
-                            <i class="bi bi-file-binary" title="Binary"></i>
-                        {% else %}
-                            <i class="bi bi-file-text" title="Text"></i>
-                        {% endif %}
-                    </td>
-                    <td style="max-width: 300px;">
-                        {% if card.is_image %}
-                            <div class="d-flex align-items-center justify-content-center" style="height: 80px;">
-                                <img src="{{ url_for('serve_thumbnail', content_hash=card.hash) }}" 
-                                     class="img-thumbnail" 
-                                     style="max-height: 70px; width: auto; object-fit: contain;" 
-                                     alt="Image thumbnail">
-                            </div>
-                        {% elif card.is_binary %}
-                            <div class="d-flex align-items-center" style="height: 80px;">
-                                <span class="text-muted">Binary content ({{ card.content|length }} bytes)</span>
-                            </div>
-                        {% else %}
-                            <div class="text-preview" style="height: 80px; overflow-y: auto; font-size: 0.9em;">
-                                {{ card.content[:200] }}
-                                {% if card.content|length > 200 %}...{% endif %}
-                            </div>
-                        {% endif %}
-                    </td>
-                    <td>{{ card.time_claimed|datetime }}</td>
-                    <td>
-                        <div class="btn-group" role="group">
-                            <a href="{{ url_for('view_card', content_hash=card.hash) }}" 
-                               class="btn btn-sm btn-outline-primary">View</a>
-                            <a href="{{ url_for('download_card', content_hash=card.hash) }}" 
-                               class="btn btn-sm btn-outline-secondary">Download</a>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div id="tableView">
+        {{ render_table(cards) }}
     </div>
 
-    {% if total_pages > 1 %}
+    <div id="gridView" style="display: none;">
+        {{ render_grid(cards) }}
+    </div>
+
+    {% if total_items > 0 %}
     <nav aria-label="Page navigation" class="mt-4">
         <div class="d-flex justify-content-between align-items-center">
             <div class="text-muted">
                 Showing {{ cards|length }} of {{ total_items }} items
             </div>
             <ul class="pagination mb-0">
-                <li class="page-item {% if page == 1 %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('index', page=page-1, per_page=per_page) }}">&laquo;</a>
+                {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('index', page=page-1, per_page=per_page) }}">Previous</a>
                 </li>
+                {% endif %}
                 
                 {% for p in range(1, total_pages + 1) %}
-                    {% if p == page %}
-                    <li class="page-item active">
-                        <span class="page-link">{{ p }}</span>
-                    </li>
-                    {% else %}
-                    <li class="page-item">
-                        <a class="page-link" href="{{ url_for('index', page=p, per_page=per_page) }}">{{ p }}</a>
-                    </li>
-                    {% endif %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('index', page=p, per_page=per_page) }}">{{ p }}</a>
+                </li>
                 {% endfor %}
                 
-                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('index', page=page+1, per_page=per_page) }}">&raquo;</a>
+                {% if page < total_pages %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('index', page=page+1, per_page=per_page) }}">Next</a>
                 </li>
+                {% endif %}
             </ul>
         </div>
     </nav>
     {% endif %}
 </div>
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tableViewBtn = document.getElementById('tableViewBtn');
+    const gridViewBtn = document.getElementById('gridViewBtn');
+    const tableView = document.getElementById('tableView');
+    const gridView = document.getElementById('gridView');
+
+    function showTableView() {
+        tableView.style.display = 'block';
+        gridView.style.display = 'none';
+        tableViewBtn.classList.add('active');
+        gridViewBtn.classList.remove('active');
+    }
+
+    function showGridView() {
+        tableView.style.display = 'none';
+        gridView.style.display = 'block';
+        tableViewBtn.classList.remove('active');
+        gridViewBtn.classList.add('active');
+    }
+
+    tableViewBtn.addEventListener('click', showTableView);
+    gridViewBtn.addEventListener('click', showGridView);
+
+    // Initialize with table view
+    showTableView();
+});
+</script>
+{% endblock %}
 {% endblock %}

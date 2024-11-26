@@ -44,7 +44,11 @@ class ContentTypeInterpreter:
         if not isinstance(content, bytes):
             content = str(content).encode('utf-8')
 
-        # First check for binary file signatures
+        # Check for SVG content first
+        if cls.is_svg_content(content):
+            return 'image/svg+xml', '.svg'
+
+        # Then check for binary file signatures
         for signature, (mime_type, extension) in cls.SIGNATURES.items():
             if content.startswith(signature):
                 return mime_type, f".{extension}"
@@ -78,6 +82,26 @@ class ContentTypeInterpreter:
         except UnicodeDecodeError:
             # If content can't be decoded as text, it's binary
             return 'application/octet-stream', None
+
+    @classmethod
+    def is_svg_content(cls, content) -> bool:
+        """
+        Check if the content is SVG by looking for SVG markers.
+        
+        Args:
+            content: The content to analyze (bytes or str)
+            
+        Returns:
+            bool: True if content is SVG, False otherwise
+        """
+        if isinstance(content, bytes):
+            try:
+                content = content.decode('utf-8')
+            except UnicodeDecodeError:
+                return False
+        
+        content = content.strip().lower()
+        return (content.startswith('<?xml') or content.startswith('<svg')) and '</svg>' in content
 
     @classmethod
     def get_content_size_str(cls, size_in_bytes: int) -> str:

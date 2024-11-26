@@ -67,21 +67,42 @@ def index():
         # Convert MCard objects to dictionaries with required attributes
         current_page_cards = []
         for card in page_cards:
-            # Determine content type
-            content_type = "text/plain"
-            is_binary = isinstance(card.content, bytes)
-            if is_binary:
-                content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
+            content = card.content
             
-            card_dict = {
-                'hash': card.content_hash,
-                'content': card.content,
-                'time_claimed': card.time_claimed,
+            # Check for SVG content first
+            if ContentTypeInterpreter.is_svg_content(content):
+                content_type = 'image/svg+xml'
+                is_binary = False
+                is_image = True
+                is_svg = True
+                # Ensure content is string for SVG
+                content_str = content if isinstance(content, str) else content.decode('utf-8')
+                content = content_str
+            else:
+                # Determine content type for non-SVG content
+                is_binary = isinstance(content, bytes)
+                is_svg = False
+                if is_binary:
+                    content_type, _ = ContentTypeInterpreter.detect_content_type(content)
+                    content_str = None
+                    is_image = content_type.startswith('image/')
+                else:
+                    content_str = str(content)
+                    content_type = 'text/plain'
+                    is_image = False
+                    content = content_str
+
+            current_page_cards.append({
+                'content_hash': card.content_hash,
+                'content': content,
                 'content_type': content_type,
-                'is_image': ContentTypeInterpreter.is_image_content(content_type),
-                'is_binary': is_binary
-            }
-            current_page_cards.append(card_dict)
+                'is_image': is_image,
+                'is_svg': is_svg,
+                'svg_content': content_str if is_svg else None,
+                'time_claimed': card.time_claimed,
+                'is_binary': is_binary,
+                'name': f'Card {card.content_hash[:8]}'  # Generate a name if none exists
+            })
         
         return render_template('index.html',
                              cards=current_page_cards,
@@ -91,65 +112,13 @@ def index():
                              total_items=total_items)
     except Exception as e:
         app.logger.error(f"Error in index: {str(e)}")
-        # Redirect to new card page if there's an error
-        return redirect(url_for('new_card'))
-
-@app.route('/grid')
-def grid_view():
-    try:
-        # Get grid parameters
-        page = request.args.get('page', 1, type=int)
-        rows = request.args.get('rows', 3, type=int)
-        cols = request.args.get('cols', 3, type=int)
-        
-        # Calculate items per page based on grid size
-        per_page = rows * cols
-        
-        # Get all cards using storage
-        storage = get_storage()
-        all_cards = list(storage.get_all())
-        
-        # Calculate pagination values
-        total_items = len(all_cards)
-        total_pages = max((total_items + per_page - 1) // per_page, 1)
-        
-        # Ensure page is within valid range
-        page = min(max(page, 1), total_pages)
-        
-        # Slice the cards for current page
-        start_idx = (page - 1) * per_page
-        end_idx = min(start_idx + per_page, total_items)
-        page_cards = all_cards[start_idx:end_idx]
-
-        # Convert MCard objects to dictionaries with required attributes
-        current_page_cards = []
-        for card in page_cards:
-            # Determine content type
-            content_type = "text/plain"
-            is_binary = isinstance(card.content, bytes)
-            if is_binary:
-                content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
-            
-            card_dict = {
-                'hash': card.content_hash,
-                'content': card.content,
-                'time_claimed': card.time_claimed,
-                'content_type': content_type,
-                'is_image': ContentTypeInterpreter.is_image_content(content_type),
-                'is_binary': is_binary
-            }
-            current_page_cards.append(card_dict)
-        
-        return render_template('grid.html',
-                             cards=current_page_cards,
-                             page=page,
-                             rows=rows,
-                             cols=cols,
-                             total_pages=total_pages,
-                             total_items=total_items)
-    except Exception as e:
-        app.logger.error(f"Error in grid_view: {str(e)}")
-        return redirect(url_for('new_card'))
+        flash(f"An error occurred: {str(e)}", "error")
+        return render_template('index.html',
+                             cards=[],
+                             page=1,
+                             per_page=10,
+                             total_pages=1,
+                             total_items=0)
 
 @app.route('/new')
 def new_card():
@@ -191,7 +160,7 @@ def add_text_card():
         app.logger.info(f'Generated hash for new card: {card.content_hash}')
         storage.save(card)
         app.logger.info(f'Successfully added text content with hash {card.content_hash}')
-        return redirect(url_for('view_card', content_hash=card.content_hash))
+        return redirect(url_for('index'))
     except Exception as e:
         app.logger.error(f'Error adding text content: {str(e)}')
         flash(f'Error: {str(e)}', 'error')
@@ -227,123 +196,127 @@ def add_file_card():
         card = MCard(content=content)
         storage.save(card)
         app.logger.info(f'Successfully added file content with hash {card.content_hash}')
-        return redirect(url_for('view_card', content_hash=card.content_hash))
+        return redirect(url_for('index'))
     except Exception as e:
         app.logger.error(f'Error adding file content: {str(e)}')
         flash(f'Error: {str(e)}', 'error')
         return redirect(url_for('new_card'))
 
-@app.route('/delete/<content_hash>', methods=['POST'])
-def delete(content_hash):
-    """Delete a card."""
-    try:
-        storage = get_storage()
-        storage.delete(content_hash)
-        storage.conn.commit()
-        return redirect(url_for('index'))
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/view/<content_hash>')
 def view_card(content_hash):
-    try:
-        storage = get_storage()
-        card = storage.get(content_hash)
-        if not card:
-            return "Card not found", 404
-            
-        content = card.content
-        size = len(content)
-        
-        # Try to decode content if it's text
-        is_binary = isinstance(content, bytes)
+    """View a card's content."""
+    storage = get_storage()
+    card = storage.get(content_hash)
+    
+    if not card:
+        flash('No card found', 'error')
+        return redirect(url_for('index'))
+    
+    content = card.content
+    is_binary = isinstance(content, bytes)
+    
+    # Get content size
+    size = len(content) if content else 0
+    
+    # Check for SVG content first
+    if ContentTypeInterpreter.is_svg_content(content):
+        content_type = 'image/svg+xml'
+        is_image = True
+        is_svg = True
+        # Ensure content is string for SVG
+        content = content if isinstance(content, str) else content.decode('utf-8')
+    else:
+        # Determine content type for non-SVG content
+        is_svg = False
         if is_binary:
-            mime_type, extension = ContentTypeInterpreter.detect_content_type(content)
-            content_str = None
-            is_image = mime_type.startswith('image/')
+            content_type, extension = ContentTypeInterpreter.detect_content_type(content)
+            is_image = content_type.startswith('image/')
+            content = None  # Don't pass binary content to template
         else:
-            content_str = str(content)
-            mime_type = 'text/plain'
+            content = str(content)
+            content_type = 'text/plain'
             extension = 'txt'
             is_image = False
-        
-        return render_template('view_card.html', 
-                             content_hash=content_hash,
-                             card=card,
-                             content=content_str,
-                             is_binary=is_binary,
-                             is_image=is_image,
-                             content_type=mime_type,
-                             extension=extension,
-                             size=size)
-    except Exception as e:
-        print(f"Error in view_card: {str(e)}")
-        return f"Error viewing card: {str(e)}", 500
+    
+    return render_template('view_card.html',
+                         card=card,
+                         content=content,
+                         content_type=content_type,
+                         extension=extension,
+                         size=size,
+                         is_binary=is_binary,
+                         is_image=is_image,
+                         is_svg=is_svg)
 
-@app.route('/get_binary_content/<content_hash>')
+@app.route('/binary/<content_hash>')
 def get_binary_content(content_hash):
     """Serve binary content with proper content type."""
-    try:
-        storage = get_storage()
-        print(f"\n=== Get Binary Content Debug ===")
-        print(f"Retrieving binary content for hash: {content_hash}")
-        
-        card = storage.get(content_hash)
-        if not card:
-            print(f"Content not found for hash: {content_hash}")
-            return "Content not found", 404
-
-        content = card.content
-        download_info = ContentTypeInterpreter.prepare_download_response(content, content_hash)
-        print(f"Serving content with type: {download_info['mime_type']}, size: {len(content)} bytes")
-        return Response(content, headers=download_info['headers'])
-
-    except Exception as e:
-        print(f"Error serving binary content: {str(e)}")
-        return f"Error serving binary content: {str(e)}", 500
+    storage = get_storage()
+    card = storage.get(content_hash)
+    
+    if not card or not isinstance(card.content, bytes):
+        return 'No binary content found', 404
+    
+    content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
+    return Response(card.content, mimetype=content_type)
 
 @app.route('/download/<content_hash>')
 def download_card(content_hash):
-    try:
-        storage = get_storage()
-        card = storage.get(content_hash)
-        if not card:
-            return "Card not found", 404
+    """Download a card's content."""
+    storage = get_storage()
+    card = storage.get(content_hash)
+    
+    if not card:
+        flash('No card found', 'error')
+        return redirect(url_for('index'))
+    
+    content = card.content
+    is_binary = isinstance(content, bytes)
+    
+    if is_binary:
+        content_type, extension = ContentTypeInterpreter.detect_content_type(content)
+        filename = f"card_{content_hash[:8]}.{extension}"
+        return send_file(
+            BytesIO(content),
+            mimetype=content_type,
+            as_attachment=True,
+            download_name=filename
+        )
+    else:
+        # For text content, create a text file
+        content_str = str(content)
+        filename = f"card_{content_hash[:8]}.txt"
+        return send_file(
+            BytesIO(content_str.encode('utf-8')),
+            mimetype='text/plain',
+            as_attachment=True,
+            download_name=filename
+        )
 
-        content = card.content
-        download_info = ContentTypeInterpreter.prepare_download_response(content, content_hash)
-        response = Response(content)
-        for key, value in download_info['headers'].items():
-            response.headers.set(key, value)
-        return response
+@app.route('/delete/<content_hash>', methods=['POST'])
+def delete(content_hash):
+    """Delete a card."""
+    storage = get_storage()
+    storage.delete(content_hash)
+    flash('Card deleted successfully', 'success')
+    return redirect(url_for('index'))
 
-    except Exception as e:
-        print(f"Error in download_card: {str(e)}")
-        return str(e), 500
-
-@app.route('/content/<content_hash>/thumbnail')
+@app.route('/thumbnail/<content_hash>')
 def serve_thumbnail(content_hash):
     """Serve thumbnail for image content."""
-    try:
-        storage = get_storage()
-        card = storage.get(content_hash)
-        if not card:
-            return "Content not found", 404
-
-        # Detect content type
-        content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
-        
-        # Only serve if it's an image
-        if ContentTypeInterpreter.is_image_content(content_type):
-            return send_file(
-                BytesIO(card.content),
-                mimetype=content_type
-            )
-        
-        return "Not an image", 400
-    except Exception as e:
-        app.logger.error(f'Error serving thumbnail: {str(e)}')
-        return str(e), 500
+    storage = get_storage()
+    card = storage.get(content_hash)
+    
+    if not card or not isinstance(card.content, bytes):
+        return 'No image content found', 404
+    
+    content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
+    if not content_type.startswith('image/'):
+        return 'Not an image', 400
+    
+    # For now, just serve the original image
+    # TODO: Implement actual thumbnail generation
+    return Response(card.content, mimetype=content_type)
 
 if __name__ == '__main__':
     app.run(debug=True)

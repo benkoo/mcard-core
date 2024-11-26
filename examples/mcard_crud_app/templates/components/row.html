@@ -1,0 +1,84 @@
+{% from 'components/actions.html' import render_actions %}
+
+{% macro render_row(card) %}
+<style>
+    .preview-cell {
+        width: 70px;
+        max-width: 100px;
+        height: 75px !important;
+    }
+    
+    .preview-container {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        margin: 5px;
+    }
+    
+    .preview-container img {
+        max-height: 65px;
+        max-width: 100%;
+        object-fit: contain;
+    }
+    
+    .preview-container svg {
+        max-height: 65px;
+        max-width: 100%;
+    }
+
+    .text-preview {
+        padding: 5px;
+        width: 100%;
+        overflow: auto;
+        max-height: 65px;
+    }
+</style>
+
+<tr>
+    <!-- Preview -->
+    <td class="preview-cell">
+        {% if card.is_image %}
+            {% if card.is_svg and card.svg_content %}
+                <div class="preview-container">
+                    {{ card.svg_content|safe }}
+                </div>
+            {% else %}
+                <div class="preview-container">
+                    <img src="{{ url_for('get_binary_content', content_hash=card.content_hash) }}" alt="Preview">
+                </div>
+            {% endif %}
+        {% else %}
+            {% if card.content %}
+                <div class="preview-container">
+                    <div class="text-preview">
+                        <pre style="margin: 0; font-size: 0.875rem;">{{ card.content[:100] }}...</pre>
+                    </div>
+                </div>
+            {% else %}
+                <div class="preview-container">
+                    [Binary Content]
+                </div>
+            {% endif %}
+        {% endif %}
+    </td>
+    
+    <!-- Name -->
+    <td>{{ card.name if card.name else 'Untitled' }}</td>
+    
+    <!-- Type -->
+    <td>{{ card.content_type }}</td>
+    
+    <!-- Hash -->
+    <td><code>{{ card.content_hash }}</code></td>
+    
+    <!-- Created At -->
+    <td>{{ card.time_claimed.strftime('%Y-%m-%d %H:%M:%S') if card.time_claimed else 'N/A' }}</td>
+    
+    <!-- Actions -->
+    <td>{{ render_actions(card) }}</td>
+</tr>
+{% endmacro %}

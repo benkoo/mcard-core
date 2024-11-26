@@ -3,20 +3,45 @@
 
 {% block title %}MCard CRUD App - View Card{% endblock %}
 
+{% block styles %}
+{{ super() }}
+<style>
+    .svg-container {
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.25rem;
+    }
+    .svg-container svg {
+        width: 100%;
+        height: auto;
+        min-height: 200px;
+    }
+    .binary-preview {
+        max-height: 600px;
+        width: auto;
+        margin: 0 auto;
+        display: block;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="content-container">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2>View Card</h2>
         <div class="btn-group">
-            <a href="{{ url_for('download_card', content_hash=content_hash) }}" class="btn btn-primary">
-                <i class="fas fa-download me-1"></i> Download
+            <a href="{{ url_for('download_card', content_hash=card.content_hash) }}" class="btn btn-primary">
+                <i class="bi bi-download me-1"></i> Download
             </a>
             <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i> Back
+                <i class="bi bi-arrow-left me-1"></i> Back
             </a>
-            <form action="{{ url_for('delete', content_hash=content_hash) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this card?');">
+            <form action="{{ url_for('delete', content_hash=card.content_hash) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this card?');">
                 <button type="submit" class="btn btn-outline-danger">
-                    <i class="fas fa-trash"></i> Delete
+                    <i class="bi bi-trash"></i> Delete
                 </button>
             </form>
         </div>
@@ -26,7 +51,7 @@
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h5 class="card-title mb-0">Hash: {{ render_hash(content_hash) }}</h5>
+                    <h5 class="card-title mb-0">Hash: {{ render_hash(card.content_hash) }}</h5>
                     <small class="text-muted">
                         Type: <span class="badge bg-secondary">{{ content_type }}</span>
                         {% if extension %}<span class="badge bg-info">.{{ extension }}</span>{% endif %}
@@ -37,12 +62,16 @@
             </div>
         </div>
         <div class="card-body">
-            {% if is_binary %}
+            {% if content_type == 'image/svg+xml' %}
+                <div class="svg-container">
+                    {{ content|safe }}
+                </div>
+            {% elif is_binary %}
                 {% if is_image %}
-                    <img src="{{ url_for('get_binary_content', content_hash=content_hash) }}" alt="Binary content" class="binary-preview img-fluid">
+                    <img src="{{ url_for('get_binary_content', content_hash=card.content_hash) }}" alt="Binary content" class="binary-preview img-fluid">
                 {% else %}
                     <div class="alert alert-info">
-                        <i class="fas fa-file me-2"></i>
+                        <i class="bi bi-file me-2"></i>
                         Binary content ({{ '{:,}'.format(size) }} bytes)
                         {% if content_type != 'application/octet-stream' %}
                         <br>

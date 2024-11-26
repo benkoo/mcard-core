@@ -1,0 +1,97 @@
+{% from 'components/actions.html' import render_actions %}
+
+{% macro render_grid(cards) %}
+<style>
+    .grid-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        overflow: hidden;
+    }
+    
+    .card-preview {
+        height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        overflow: hidden;
+        padding: 1rem;
+    }
+    
+    .card-preview img {
+        max-height: 180px;
+        max-width: 100%;
+        object-fit: contain;
+    }
+    
+    .card-preview svg {
+        max-height: 180px;
+        max-width: 100%;
+    }
+    
+    .text-preview {
+        padding: 1rem;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+    }
+    
+    .card-info {
+        padding: 1rem;
+    }
+    
+    .card-info p {
+        margin: 0;
+        font-size: 0.875rem;
+    }
+    
+    .card-actions {
+        padding: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+</style>
+
+<div class="grid-container">
+    {% for card in cards %}
+    <div class="card">
+        <div class="card-preview">
+            {% if card.is_image %}
+                {% if card.is_svg and card.svg_content %}
+                    {{ card.svg_content|safe }}
+                {% else %}
+                    <img src="{{ url_for('get_binary_content', content_hash=card.content_hash) }}" alt="Preview">
+                {% endif %}
+            {% else %}
+                {% if card.content %}
+                    <div class="text-preview">
+                        <pre style="margin: 0; font-size: 0.875rem;">{{ card.content[:200] }}...</pre>
+                    </div>
+                {% else %}
+                    [Binary Content]
+                {% endif %}
+            {% endif %}
+        </div>
+        <div class="card-info">
+            <p><strong>Name:</strong> {{ card.name if card.name else 'Untitled' }}</p>
+            <p><strong>Type:</strong> {{ card.content_type }}</p>
+            <p><strong>Hash:</strong> <code>{{ card.content_hash[:8] }}...</code></p>
+            <p><strong>Created:</strong> {{ card.time_claimed.strftime('%Y-%m-%d %H:%M:%S') if card.time_claimed else 'N/A' }}</p>
+        </div>
+        <div class="card-actions">
+            {{ render_actions(card) }}
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="alert alert-info text-center">No cards found</div>
+    </div>
+    {% endfor %}
+</div>
+{% endmacro %}
