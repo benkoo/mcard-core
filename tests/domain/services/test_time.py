@@ -4,7 +4,10 @@ from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from mcard.domain.models.config import TimeSettings
 from mcard.domain.models.exceptions import ValidationError
-from mcard.domain.services.time import TimeService, get_time_service, set_time_service
+from mcard.domain.services.time import (
+    TimeService, get_time_service, set_time_service,
+    get_now_with_located_zone
+)
 
 class TestTimeService:
     """Test suite for TimeService."""
@@ -150,6 +153,53 @@ class TestTimeService:
         assert len(timezones) > 0
         assert "UTC" in timezones
         assert "America/New_York" in timezones
+
+    def test_get_now_with_located_zone(self):
+        """Test getting current time with located zone."""
+        # Initialize with UTC settings
+        set_time_service(TimeService(TimeSettings(use_utc=True)))
+        result = get_now_with_located_zone()
+        assert result.tzinfo == timezone.utc
+        
+        # Test with specific timezone
+        set_time_service(TimeService(TimeSettings(timezone="America/New_York", use_utc=False)))
+        result = get_now_with_located_zone()
+        assert str(result.tzinfo) == "America/New_York"
+        
+        # Reset to default
+        set_time_service(None)
+        result = get_now_with_located_zone()
+        assert result.tzinfo is not None  # Ensure timezone info is present
+
+    def test_parse_time_missing_timezone(self, time_settings):
+        """Test parsing time string without timezone info."""
+        service = TimeService(time_settings)
+        # Test with UTC settings
+        test_str = "2023-01-01 12:00:00"
+        parsed = service.parse_time(test_str)
+        assert parsed.tzinfo == timezone.utc
+        
+        # Test with specific timezone
+        service = TimeService(TimeSettings(timezone="America/New_York", use_utc=False))
+        parsed = service.parse_time(test_str)
+        assert str(parsed.tzinfo) == "America/New_York"
+
+    def test_time_range_boundary_conditions(self, time_settings):
+        """Test time range boundary conditions."""
+        service = TimeService(time_settings)
+        start = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2023, 1, 1, 14, 0, 0, tzinfo=timezone.utc)
+        time_range = service.create_time_range(start, end)
+        
+        # Test exact boundary times
+        assert service.is_within_range(start, time_range)  # Start time should be included
+        assert service.is_within_range(end, time_range)    # End time should be included
+        
+        # Test just outside boundaries
+        before = start - timedelta(microseconds=1)
+        after = end + timedelta(microseconds=1)
+        assert not service.is_within_range(before, time_range)
+        assert not service.is_within_range(after, time_range)
 
 def test_global_time_service():
     """Test global time service management."""

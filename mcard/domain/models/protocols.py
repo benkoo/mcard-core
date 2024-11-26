@@ -1,9 +1,10 @@
 """
 Core domain protocols for MCard.
 """
-from typing import Protocol, Optional, Any, Union, List
+from typing import Protocol, Optional, Any, Union, List, runtime_checkable
 from datetime import datetime
 
+@runtime_checkable
 class HashingService(Protocol):
     """Abstract hashing service."""
     def hash_content(self, content: bytes) -> str:
@@ -14,6 +15,7 @@ class HashingService(Protocol):
         """Validate a hash string."""
         ...
 
+@runtime_checkable
 class CardRepository(Protocol):
     """Abstract card repository."""
     async def save(self, card: 'MCard') -> None:
@@ -127,6 +129,7 @@ class CardRepository(Protocol):
         """Rollback the current transaction."""
         ...
 
+@runtime_checkable
 class ContentTypeService(Protocol):
     """Abstract content type service."""
     def detect_type(self, content: Union[str, bytes]) -> str:

@@ -17,10 +17,13 @@ class TimeService:
 
     def get_current_time(self) -> datetime:
         """Get current time with timezone."""
-        now = datetime.now(timezone.utc if self.settings.use_utc else None)
-        if self.settings.timezone and not self.settings.use_utc:
-            now = now.astimezone(ZoneInfo(self.settings.timezone))
-        return now
+        if self.settings.use_utc:
+            return datetime.now(timezone.utc)
+        elif self.settings.timezone:
+            return datetime.now(ZoneInfo(self.settings.timezone))
+        else:
+            # Default to UTC if no timezone specified
+            return datetime.now(timezone.utc)
 
     def format_time(self, dt: datetime, use_date_format: bool = False) -> str:
         """Format datetime according to settings."""

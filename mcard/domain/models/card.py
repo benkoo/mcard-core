@@ -31,13 +31,12 @@ class MCard(BaseModel):
         if values.get('hash') is None:
             from ..services.hashing import get_hashing_service
             content = values.get('content')
-            if content is not None:
-                hashing_service = get_hashing_service()
-                if isinstance(content, str):
-                    content = content.encode('utf-8')
-                elif not isinstance(content, bytes):
-                    content = str(content).encode('utf-8')
-                values['hash'] = hashing_service.hash_content(content)
+            hashing_service = get_hashing_service()
+            if isinstance(content, str):
+                content = content.encode('utf-8')
+            elif not isinstance(content, bytes):
+                content = str(content).encode('utf-8')
+            values['hash'] = hashing_service.hash_content(content)
         return values
 
     @model_validator(mode='after')

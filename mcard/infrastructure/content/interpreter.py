@@ -49,9 +49,27 @@ class ContentTypeInterpreter:
                 text_content = content.decode('utf-8', errors='ignore')
                 if ContentTypeInterpreter.is_svg_content(text_content):
                     return 'image/svg+xml'
-                return 'application/xml'
+                # Validate XML structure
+                try:
+                    ET.fromstring(content)
+                    return 'application/xml'
+                except ET.ParseError:
+                    pass
             except:
                 pass
+        
+        # Try to detect JSON
+        try:
+            text_content = content.decode('utf-8', errors='ignore')
+            text_content = text_content.strip()
+            if text_content.startswith('{') and text_content.endswith('}'):
+                try:
+                    json.loads(text_content)
+                    return 'application/json'
+                except json.JSONDecodeError:
+                    pass
+        except:
+            pass
         
         return 'application/octet-stream'
 
@@ -73,13 +91,15 @@ class ContentTypeInterpreter:
             try:
                 # Convert string to bytes for consistent handling
                 content_bytes = content.encode('utf-8')
-                is_xml = ContentTypeInterpreter.is_xml_content(content_bytes)
-                if is_xml:
+                try:
+                    ET.fromstring(content_bytes)
                     # Check if it's specifically an SVG
                     if ContentTypeInterpreter.is_svg_content(content):
                         return 'image/svg+xml', 'svg'
                     # Generic XML
                     return 'application/xml', 'xml'
+                except ET.ParseError:
+                    pass
             except Exception:
                 pass
             
@@ -87,57 +107,149 @@ class ContentTypeInterpreter:
             return 'text/plain', 'txt'
         
         elif isinstance(content, bytes):
-            # Detect MIME type using signatures
-            mime_type = ContentTypeInterpreter._detect_by_signature(content)
-            
-            # If no specific binary format detected, check for text formats
-            if mime_type == 'application/octet-stream':
-                # Try to decode as UTF-8
+            # First try to detect XML content
+            if content.startswith(b'<?xml') or content.lstrip(b' \t\n\r').startswith(b'<'):
                 try:
                     text_content = content.decode('utf-8')
-                    
-                    # Check for JSON
                     try:
-                        json.loads(text_content)
-                        return 'application/json', 'json'
-                    except json.JSONDecodeError:
-                        pass
-                    
-                    # Check for XML
-                    if ContentTypeInterpreter.is_xml_content(content):
+                        ET.fromstring(content)
                         if ContentTypeInterpreter.is_svg_content(text_content):
                             return 'image/svg+xml', 'svg'
                         return 'application/xml', 'xml'
-                    
-                    # Default to text/plain for decodeable content
-                    return 'text/plain', 'txt'
+                    except ET.ParseError:
+                        # Invalid XML should be treated as text
+                        return 'text/plain', 'txt'
                 except UnicodeDecodeError:
                     pass
+
+            # Then check for binary signatures at the start
+            for signature, mime_type in ContentTypeInterpreter.SIGNATURES.items():
+                if content.startswith(signature):
+                    return mime_type, ContentTypeInterpreter.get_extension(mime_type)
+
+            # If no specific binary format detected, check for text formats
+            try:
+                text_content = content.decode('utf-8')
+                text_content = text_content.strip()
+                
+                # Check for JSON
+                if text_content.startswith('{') and text_content.endswith('}'):
+                    try:
+                        # Check for comments
+                        lines = text_content.split('\n')
+                        if any(line.strip().startswith('//') for line in lines):
+                            return 'text/plain', 'txt'
+                        json.loads(text_content)
+                        return 'application/json', 'json'
+                    except json.JSONDecodeError:
+                        return 'text/plain', 'txt'
+                
+                # Default to text/plain for decodeable content
+                return 'text/plain', 'txt'
+            except UnicodeDecodeError:
+                pass
             
-            # Get extension from mime type
-            extension = mimetypes.guess_extension(mime_type, strict=False)
-            if extension:
-                # Remove the leading dot
-                extension = extension[1:]
-            else:
-                # Fallback extensions for common types
-                extension = {
-                    'image/jpeg': 'jpg',
-                    'image/png': 'png',
-                    'image/gif': 'gif',
-                    'image/svg+xml': 'svg',
-                    'application/pdf': 'pdf',
-                    'application/json': 'json',
-                    'text/plain': 'txt',
-                    'text/html': 'html',
-                    'application/zip': 'zip',
-                    'application/xml': 'xml',
-                    'text/xml': 'xml'
-                }.get(mime_type, '')
+            # Check for mixed content
+            if content.startswith(b'<?xml'):
+                return 'application/xml', 'xml'
             
-            return mime_type, extension
-        
+            return 'application/octet-stream', ''
+
         raise ValidationError("Content must be string or bytes")
+
+    def validate_content(self, content: Union[str, bytes]) -> bool:
+        """Validate content based on its detected type."""
+        if not content:
+            raise ValidationError("Empty content")
+
+        try:
+            mime_type, _ = self.detect_content_type(content)
+
+            # For text content, try to validate as JSON or XML first
+            if mime_type == 'text/plain':
+                if isinstance(content, bytes):
+                    text_content = content.decode('utf-8')
+                else:
+                    text_content = content
+
+                # Try JSON first
+                text_content = text_content.strip()
+                if text_content.startswith('{') and text_content.endswith('}'):
+                    try:
+                        # Check for comments
+                        lines = text_content.split('\n')
+                        if any(line.strip().startswith('//') for line in lines):
+                            raise ValidationError("Invalid JSON content")
+                        json.loads(text_content)
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        raise ValidationError("Invalid JSON content")
+
+                # Then try XML
+                elif (text_content.startswith('<?xml') or 
+                      text_content.lstrip().startswith('<')):
+                    try:
+                        ET.fromstring(text_content.encode('utf-8'))
+                    except (ET.ParseError, UnicodeDecodeError):
+                        raise ValidationError("Invalid XML content")
+
+                # Ensure it's valid UTF-8
+                try:
+                    if isinstance(content, bytes):
+                        content.decode('utf-8')
+                except UnicodeDecodeError:
+                    raise ValidationError("Invalid text content: not UTF-8 encoded")
+
+            # Handle text-based content types
+            elif mime_type == 'application/json':
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8')
+                try:
+                    # Check for comments before attempting to parse
+                    lines = content.split('\n')
+                    if any(line.strip().startswith('//') for line in lines):
+                        raise ValidationError("Invalid JSON content")
+                    json.loads(content)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    raise ValidationError("Invalid JSON content")
+
+            elif mime_type == 'application/xml' or mime_type == 'image/svg+xml':
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8')
+                try:
+                    ET.fromstring(content)
+                except (ET.ParseError, UnicodeDecodeError):
+                    raise ValidationError("Invalid XML content")
+                # Check for mixed content (XML + binary)
+                if isinstance(content, str):
+                    content = content.encode('utf-8')
+                for signature in ContentTypeInterpreter.SIGNATURES:
+                    if signature in content and not content.startswith(signature):
+                        raise ValidationError("Invalid XML content")
+
+            # Handle binary content types
+            elif mime_type.startswith('image/'):
+                # Basic validation for image formats
+                if mime_type == 'image/png' and len(content) <= 8:  # PNG header is 8 bytes
+                    raise ValidationError("Invalid content: truncated PNG file")
+                elif mime_type == 'image/jpeg' and len(content) <= 3:  # JPEG header is 3 bytes
+                    raise ValidationError("Invalid content: truncated JPEG file")
+                elif mime_type == 'image/gif' and len(content) <= 6:  # GIF header is 6 bytes
+                    raise ValidationError("Invalid content: truncated GIF file")
+
+            elif mime_type == 'application/pdf':
+                if not content.startswith(b'%PDF-'):
+                    raise ValidationError("Invalid PDF content")
+
+            elif mime_type == 'application/zip':
+                if len(content) <= 4:  # ZIP header is 4 bytes
+                    raise ValidationError("Invalid ZIP content")
+
+            return True
+
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise ValidationError(f"Invalid content: {str(e)}")
 
     @staticmethod
     def is_binary_content(content: Union[str, bytes]) -> bool:
@@ -165,8 +277,6 @@ class ContentTypeInterpreter:
         # Try to decode as UTF-8
         try:
             content.decode('utf-8')
-            return False
-        except UnicodeDecodeError:
             # Check for binary patterns
             # Look at first 1024 bytes for null bytes or high number of non-ASCII chars
             sample = content[:1024]
@@ -175,6 +285,8 @@ class ContentTypeInterpreter:
             
             # If more than 30% non-ASCII or contains null bytes, likely binary
             return (null_count > 0) or (non_ascii / len(sample) > 0.3)
+        except UnicodeDecodeError:
+            return True
 
     @staticmethod
     def is_xml_content(content: Union[str, bytes]) -> bool:
@@ -199,17 +311,36 @@ class ContentTypeInterpreter:
         if not ContentTypeInterpreter.is_xml_content(content):
             return False
         
-        content = content.strip().lower()
-        
-        # Check for SVG namespace or SVG root element
-        return (
-            'xmlns="http://www.w3.org/2000/svg"' in content or
-            'xmlns:svg="http://www.w3.org/2000/svg"' in content or
-            content.startswith('<?xml') and '<svg' in content[:1000] or
-            content.startswith('<svg')
-        )
+        try:
+            # Parse XML and check for SVG namespace
+            tree = ET.fromstring(content)
+            return (
+                tree.tag == 'svg' or
+                tree.tag.endswith('}svg') or
+                any(attr.endswith('xmlns') and 'svg' in value
+                    for attr, value in tree.attrib.items())
+            )
+        except Exception:
+            return False
 
     @staticmethod
-    def validate_content(content: Any) -> bool:
-        """Validate content type."""
-        return isinstance(content, (str, bytes, bytearray))
+    def get_extension(mime_type: str) -> str:
+        """Get file extension from MIME type."""
+        extension = {
+            'image/jpeg': 'jpg',
+            'image/png': 'png',
+            'image/gif': 'gif',
+            'image/svg+xml': 'svg',
+            'application/pdf': 'pdf',
+            'application/json': 'json',
+            'text/plain': 'txt',
+            'text/html': 'html',
+            'application/zip': 'zip',
+            'application/xml': 'xml',
+            'text/xml': 'xml'
+        }.get(mime_type) or mimetypes.guess_extension(mime_type, strict=False)
+
+        if extension and extension.startswith('.'):
+            extension = extension[1:]
+        
+        return extension or ''
