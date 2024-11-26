@@ -6,6 +6,7 @@ import importlib
 from typing import Optional, Callable
 from ..models.config import HashFunction, HashingSettings
 from ..models.exceptions import HashingError
+import asyncio
 
 class DefaultHashingService:
     """Default implementation of hashing service."""
@@ -97,3 +98,76 @@ def set_hashing_service(service: DefaultHashingService) -> None:
     """Set the global hashing service instance."""
     global _default_service
     _default_service = service
+
+
+class CollisionAwareHashingService(DefaultHashingService):
+    """A hashing service that automatically upgrades to stronger algorithms when collisions are detected."""
+
+    # Algorithm strength order from weakest to strongest
+    ALGORITHM_STRENGTH = [
+        HashFunction.MD5,
+        HashFunction.SHA1,
+        HashFunction.SHA256,
+        HashFunction.SHA512
+    ]
+
+    def __init__(self, settings: Optional[HashingSettings] = None, card_repository = None):
+        """Initialize with settings and optional card repository for collision detection."""
+        super().__init__(settings or HashingSettings())
+        self._card_repository = card_repository
+        self._collision_cache = {}  # Cache to store known collisions
+        self._current_algorithm_index = self.ALGORITHM_STRENGTH.index(self._settings.algorithm)
+
+    def hash_content(self, content: bytes) -> str:
+        """Hash content and check for collisions, upgrading algorithm if needed."""
+        current_hash = super().hash_content(content)
+        
+        # Skip collision check if we're already using the strongest algorithm
+        if self._settings.algorithm == self.ALGORITHM_STRENGTH[-1]:
+            return current_hash
+
+        # Check for collision in cache first
+        if current_hash in self._collision_cache:
+            return self._handle_collision(content)
+
+        # Check for collision in repository if available
+        if self._card_repository:
+            try:
+                existing_card = asyncio.run(self._card_repository.get(current_hash))
+                if existing_card and existing_card.content != content:
+                    # Store collision info
+                    self._collision_cache[current_hash] = {
+                        'content1': existing_card.content,
+                        'content2': content,
+                        'algorithm': self._settings.algorithm
+                    }
+                    return self._handle_collision(content)
+            except Exception:
+                # If repository check fails, continue with current hash
+                pass
+
+        return current_hash
+
+    def _handle_collision(self, content: bytes) -> str:
+        """Handle hash collision by upgrading to a stronger algorithm."""
+        # Find next stronger algorithm
+        next_index = self._current_algorithm_index + 1
+        if next_index >= len(self.ALGORITHM_STRENGTH):
+            raise HashingError("No stronger hashing algorithm available")
+
+        # Upgrade algorithm
+        new_algorithm = self.ALGORITHM_STRENGTH[next_index]
+        self._settings.algorithm = new_algorithm
+        self._current_algorithm_index = next_index
+
+        # Return hash with stronger algorithm
+        return super().hash_content(content)
+
+    def store_collision(self, content1: bytes, content2: bytes, algorithm: HashFunction) -> None:
+        """Store a known collision case."""
+        hash_value = super().hash_content(content1)
+        self._collision_cache[hash_value] = {
+            'content1': content1,
+            'content2': content2,
+            'algorithm': algorithm
+        }
