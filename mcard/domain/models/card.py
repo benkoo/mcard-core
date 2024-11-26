@@ -28,15 +28,7 @@ class MCard(BaseModel):
     @model_validator(mode='before')
     def ensure_hash(cls, values):
         """Ensure hash is present and valid."""
-        if values.get('hash') is None:
-            from ..services.hashing import get_hashing_service
-            content = values.get('content')
-            hashing_service = get_hashing_service()
-            if isinstance(content, str):
-                content = content.encode('utf-8')
-            elif not isinstance(content, bytes):
-                content = str(content).encode('utf-8')
-            values['hash'] = hashing_service.hash_content(content)
+        # Hash will be computed and set explicitly before saving
         return values
 
     @model_validator(mode='after')

@@ -24,17 +24,14 @@ load_dotenv(ENV_FILE, override=True)
 
 from mcard import SQLiteCardRepository, AppSettings, DatabaseSettings, MCard
 from mcard.domain.models.config import HashingSettings, HashAlgorithm
-from mcard.domain.services.hashing import DefaultHashingService, set_hashing_service
+from mcard.domain.services.hashing import CollisionAwareHashingService, set_hashing_service
 
 print(f"MCARD_HASH_ALGORITHM environment variable: {os.environ.get('MCARD_HASH_ALGORITHM')}")
 hash_algo = os.environ.get('MCARD_HASH_ALGORITHM', 'sha256')
 hashing_settings = HashingSettings(algorithm=hash_algo)
 print(f"Using hash algorithm: {hashing_settings.algorithm}")
 
-# Initialize the hashing service with our settings
-hashing_service = DefaultHashingService(settings=hashing_settings)
-set_hashing_service(hashing_service)
-
+# Initialize the hashing service with our settings and repository
 def is_binary(file_path: Path) -> bool:
     """Check if a file is binary based on its mimetype."""
     mime_type, _ = mimetypes.guess_type(str(file_path))
@@ -64,7 +61,11 @@ async def load_cards(cards_dir: Path, db_path: str) -> None:
             db_path=settings.database.db_path,
             pool_size=settings.database.pool_size
         )
-        
+
+        # Initialize the hashing service with our settings and repository
+        hashing_service = CollisionAwareHashingService(settings=hashing_settings, card_repository=repo)
+        set_hashing_service(hashing_service)
+
         try:
             # Find all files recursively
             files = [f for f in cards_dir.rglob('*') if f.is_file()]
@@ -86,8 +87,19 @@ async def load_cards(cards_dir: Path, db_path: str) -> None:
                             content = f.read()
                         print(f"  Content length: {len(content)} characters")
                     
-                    # Create and store card
-                    card = MCard(content=content)
+                    # Prepare content for hashing
+                    if isinstance(content, str):
+                        content_bytes = content.encode('utf-8')
+                    elif isinstance(content, bytes):
+                        content_bytes = content
+                    else:
+                        content_bytes = str(content).encode('utf-8')
+
+                    # Compute hash first
+                    hash_value = await hashing_service.hash_content(content_bytes)
+                    
+                    # Create and store card with pre-computed hash
+                    card = MCard(content=content, hash=hash_value)
                     await repo.save(card)
                     print(f"  Stored as card with hash: {card.hash}")
                     
