@@ -1,0 +1,7 @@
+<nav class="navigation">
+    <ul>
+        <li><a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>Home</a></li>
+        <li><a href="{{ url_for('card_catalog') }}" {% if request.endpoint == 'card_catalog' %}class="active"{% endif %}>Card Catalog</a></li>
+        <li><a href="{{ url_for('new_card') }}" {% if request.endpoint == 'new_card' %}class="active"{% endif %}>New Card</a></li>
+    </ul>
+</nav>

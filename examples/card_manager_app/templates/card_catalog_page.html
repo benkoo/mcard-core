@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Card Catalog{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Card Catalog</h1>
+    <a href="{{ url_for('new_card') }}" class="btn btn-primary">Add New Card</a>
+</div>
+
+{% with %}
+    {% include 'multi_card_container.html' with context %}
+{% endwith %}
+
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding: 0 20px;
+    }
+    .page-header h1 {
+        font-size: 28px;
+        font-weight: bold;
+        color: #333;
+        margin: 0;
+    }
+</style>
+{% endblock %}

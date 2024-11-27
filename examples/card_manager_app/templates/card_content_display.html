@@ -1,0 +1,76 @@
+{% macro render_content(card, preview_mode=false) %}
+<style>
+    .content-display {
+        margin: 10px 0;
+    }
+    
+    .text-display {
+        width: 100%;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-family: monospace;
+        resize: vertical;
+        {% if preview_mode %}
+        max-height: 150px;
+        {% else %}
+        min-height: 200px;
+        {% endif %}
+    }
+    
+    .binary-preview {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+    
+    .card-image {
+        max-width: 100%;
+        {% if preview_mode %}
+        max-height: 150px;
+        {% endif %}
+        height: auto;
+        display: block;
+        margin: 0 auto;
+    }
+    
+    .pdf-viewer {
+        width: 100%;
+        {% if preview_mode %}
+        height: 200px;
+        {% else %}
+        height: 800px;
+        {% endif %}
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+</style>
+
+<div class="content-display">
+    {% if card.content_type == 'binary' %}
+        {% if card.is_image %}
+            <img src="data:image/jpeg;base64,{{ card.content }}" alt="Card Image" class="card-image">
+        {% elif card.is_pdf %}
+            <embed src="data:application/pdf;base64,{{ card.content }}" 
+                   type="application/pdf"
+                   class="pdf-viewer">
+        {% else %}
+            <div class="binary-preview">
+                <p>Binary content {% if preview_mode %}(preview){% endif %}:</p>
+                {% if card.hex_preview %}
+                    <pre>{{ card.hex_preview }}</pre>
+                {% endif %}
+                <a href="data:application/octet-stream;base64,{{ card.content }}" 
+                   download="{{ card.filename if card.filename else 'download' }}"
+                   class="btn btn-primary mt-2">Download Binary Content</a>
+            </div>
+        {% endif %}
+    {% elif card.is_text %}
+        <div class="text-content">
+            <textarea class="text-display" readonly>{{ card.text_content if card.text_content else (card.content[:500] + '...' if preview_mode and card.content|length > 500 else card.content) }}</textarea>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}

@@ -1,0 +1,84 @@
+{% from "macros/card_content_display.html" import render_card_content with context %}
+
+<div class="card-detail">
+    {% if card %}
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Card Details</h5>
+                <p><strong>Hash:</strong> {{ card.hash }}</p>
+                <p><strong>Content Type:</strong> {{ card.content_type }}</p>
+                <p><strong>Size:</strong> {{ card.content|length }} bytes</p>
+
+                <div class="content-preview">
+                    <h6>Content Preview:</h6>
+                    {{ render_card_content(card, preview_mode=false, view_mode='detail') }}
+                </div>
+
+                <div class="btn-group" role="group">
+                    <button class="delete-btn" data-hash="{{ card.hash }}">Delete</button>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <p>Card not found.</p>
+    {% endif %}
+</div>
+
+<style>
+    .card-detail {
+        padding: 20px;
+    }
+
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .card-body {
+        padding: 20px;
+    }
+
+    .card-title {
+        margin-bottom: 20px;
+        color: #333;
+    }
+
+    .content-preview {
+        margin: 20px 0;
+    }
+
+    .content-preview h6 {
+        color: #495057;
+        margin-bottom: 10px;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteBtn = document.querySelector('.delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                if (confirm('Are you sure you want to delete this card?')) {
+                    fetch(`/cards/{{ card.hash }}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            window.location.href = "{{ url_for('card_catalog') }}";
+                        } else {
+                            alert('Error deleting card');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error deleting card');
+                    });
+                }
+            });
+        }
+    });
+</script>

@@ -1,47 +1,67 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Card Manager</title>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        .card-list { max-height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; }
-        .card-item { padding: 5px; border-bottom: 1px solid #eee; }
-        .card-item:last-child { border-bottom: none; }
-    </style>
-</head>
-<body>
-    <h1>Card Manager</h1>
-    <div>
-        <h2>Create New Card</h2>
-        <textarea id="cardContent" rows="4" cols="50" placeholder="Enter card content..."></textarea><br>
-        <button onclick="createCard()">Create Card</button>
+{% extends "base.html" %}
+
+{% block title %}Welcome to Card Manager{% endblock %}
+
+{% block content %}
+<div class="welcome-container">
+    <h1>Welcome to Card Manager</h1>
+    <p class="welcome-text">Manage your MCards with ease. Create, view, and organize your cards all in one place.</p>
+    
+    <div class="action-cards">
+        <a href="{{ url_for('card_catalog') }}" class="action-card">
+            <h2>Browse Cards</h2>
+            <p>View and manage your existing cards</p>
+        </a>
+        <a href="{{ url_for('new_card') }}" class="action-card">
+            <h2>Create New Card</h2>
+            <p>Add a new card to your collection</p>
+        </a>
     </div>
-    <div>
-        <h2>All Cards</h2>
-        <div class="card-list" id="cardList"></div>
-    </div>
+</div>
 
-    <script>
-        async function fetchCards() {
-            const response = await fetch('/cards');
-            const cards = await response.json();
-            const cardList = document.getElementById('cardList');
-            cardList.innerHTML = cards.map(card => `<div class="card-item">${card.content}</div>`).join('');
-        }
-
-        async function createCard() {
-            const content = document.getElementById('cardContent').value;
-            await fetch('/card', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content })
-            });
-            fetchCards();
-        }
-
-        fetchCards();
-    </script>
-</body>
-</html>
+<style>
+    .welcome-container {
+        max-width: 800px;
+        margin: 40px auto;
+        text-align: center;
+    }
+    .welcome-container h1 {
+        font-size: 36px;
+        color: #333;
+        margin-bottom: 20px;
+    }
+    .welcome-text {
+        font-size: 18px;
+        color: #666;
+        margin-bottom: 40px;
+    }
+    .action-cards {
+        display: flex;
+        gap: 30px;
+        justify-content: center;
+        margin-top: 40px;
+    }
+    .action-card {
+        background: white;
+        border-radius: 8px;
+        padding: 30px;
+        text-decoration: none;
+        color: inherit;
+        flex: 1;
+        max-width: 300px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .action-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    .action-card h2 {
+        color: #4CAF50;
+        margin-bottom: 10px;
+    }
+    .action-card p {
+        color: #666;
+    }
+</style>
+{% endblock %}
