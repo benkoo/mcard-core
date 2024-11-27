@@ -27,6 +27,16 @@ The `hash` is calculated using SHA-256 by default but can be configured to use d
 
 The `g_time` (global time) is a crucial concept in MCard that ensures consistent temporal ordering across different timezones and systems. It represents the moment when a card is claimed in the global timeline, with microsecond precision (e.g., "2024-01-24 15:30:45.123456+00:00"), making it possible to establish clear and precise precedence relationships between cards regardless of where they were created.
 
+## MCard Data Structure
+
+The `MCard` class is a simple data structure designed to encapsulate content-addressable data. It consists of three tightly coupled fields:
+
+- `content`: The actual content of the MCard, which can be a string or bytes.
+- `hash`: A SHA-256 hash of the content, computed at initialization. The hash computation is configurable and extensible, allowing for different cryptographic hash functions to be used as needed.
+- `g_time`: The timestamp when the hash was computed, recorded with local timezone information and microsecond precision, stored as a string.
+
+The `MCard` class is designed to operate independently of third-party libraries, utilizing Python's built-in `hashlib` for hashing and `datetime` for time handling.
+
 ## Theoretical Foundation
 
 MCard's design is rooted in Category Theory, where:
@@ -42,7 +52,7 @@ This aligns with Lambda Calculus's three fundamental abstractions:
 3. **Eta Abstraction**: Function equivalence
    - In MCard: Different paths yielding equivalent results
 
-Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose programming system. However, it does so with a stronger theoretical foundation that enables:
+Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose programming system. However, it does so with a stronger theoretical bend that enables:
 - Formal verification of transformations
 - Guaranteed composition properties
 - Traceable data lineage
@@ -88,16 +98,57 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - Efficient in-memory sorting
 - Real-time collection refresh capability
 
+## Dependencies
+
+The project relies on several key dependencies:
+- `python-dateutil`
+- `SQLAlchemy`
+- `pydantic`
+- `aiosqlite`
+- `pytest` and `pytest-asyncio` for testing
+
 ## Installation
 
+To set up the project, follow these steps:
+
+1. Create a virtual environment:
+   ```bash
+   python -m venv .venv
+   ```
+
+2. Activate the virtual environment:
+   - On macOS and Linux:
+     ```bash
+     source .venv/bin/activate
+     ```
+   - On Windows:
+     ```bash
+     .venv\Scripts\activate
+     ```
+
+3. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Testing
+
+To run the tests, ensure that your `PYTHONPATH` is set correctly. You can run all tests using:
+
 ```bash
-pip install mcard-core
+pytest
 ```
 
-## Requirements
+## Project Structure
 
-- Python 3.8+
-- pydantic >= 2.0.0
+- `mcard/`: Contains the core library code.
+- `tests/`: Includes all test cases.
+- `examples/`: Provides example scripts demonstrating library usage.
+
+## Recent Changes
+
+- Updated the handling of the `g_time` field in the `CardResponse` model.
+- Modified the `create_card`, `get_card`, and `list_cards` functions to ensure the correct handling of `g_time` as a string.
 
 ## Usage
 
