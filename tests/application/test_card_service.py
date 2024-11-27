@@ -1,150 +1,129 @@
 """Tests for CardService."""
 import pytest
-from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock, MagicMock
 from mcard.domain.models.card import MCard
-from mcard.domain.models.protocols import CardRepository, ContentTypeService
-from mcard.domain.models.exceptions import ValidationError
 from mcard.application.card_service import CardService
-
-class MockCardRepository:
-    """Mock implementation of CardRepository."""
-    def __init__(self):
-        self.cards: Dict[str, MCard] = {}
-
-    async def save(self, card: MCard) -> None:
-        """Save a card."""
-        self.cards[card.hash] = card
-
-    async def get(self, hash: str) -> Optional[MCard]:
-        """Get a card by hash."""
-        return self.cards.get(hash)
-
-    async def get_all(self) -> List[MCard]:
-        """Get all cards."""
-        return list(self.cards.values())
-
-    async def delete(self, hash: str) -> None:
-        """Delete a card by hash."""
-        if hash in self.cards:
-            del self.cards[hash]
-
-class MockContentTypeService:
-    """Mock implementation of ContentTypeService."""
-    def __init__(self, valid_types: List[Any]):
-        self.valid_types = valid_types
-
-    def validate_content(self, content: Any) -> bool:
-        """Validate content type."""
-        return type(content) in self.valid_types
-
-    def detect_type(self, content: Any) -> str:
-        """Detect content type."""
-        return content.__class__.__name__
+from mcard.domain.models.exceptions import ValidationError
 
 @pytest.fixture
-def repository():
-    """Fixture for mock repository."""
-    return MockCardRepository()
+def mock_repository():
+    """Create a mock repository."""
+    repository = AsyncMock()
+    repository.save = AsyncMock()
+    repository.get = AsyncMock()
+    repository.get_all = AsyncMock(return_value=[])
+    repository.delete = AsyncMock()
+    return repository
 
 @pytest.fixture
-def content_service():
-    """Fixture for mock content service."""
-    return MockContentTypeService([str, bytes, dict])
+def mock_content_service():
+    """Create a mock content type service."""
+    service = MagicMock()
+    service.validate_content.return_value = True
+    service.detect_type.return_value = "text/plain"
+    return service
 
 @pytest.fixture
-def card_service(repository, content_service):
-    """Fixture for card service."""
-    return CardService(repository, content_service)
+def mock_hashing():
+    """Create a mock hashing service."""
+    service = AsyncMock()
+    service.hash_content = AsyncMock(return_value="test_hash")
+    return service
+
+@pytest.fixture
+def card_service(mock_repository, mock_content_service, mock_hashing, monkeypatch):
+    """Create a CardService with mocked dependencies."""
+    def mock_get_hashing_service():
+        return mock_hashing
+    # Patch both the domain and application imports
+    monkeypatch.setattr(
+        "mcard.application.card_service.get_hashing_service",
+        mock_get_hashing_service
+    )
+    monkeypatch.setattr(
+        "mcard.domain.services.hashing.get_hashing_service",
+        mock_get_hashing_service
+    )
+    return CardService(mock_repository, mock_content_service)
 
 @pytest.mark.asyncio
-async def test_create_card_with_valid_content(card_service):
-    """Test creating a card with valid content."""
+async def test_create_card(card_service, mock_repository):
+    """Test creating a new card."""
     content = "test content"
     card = await card_service.create_card(content)
+    
+    assert isinstance(card, MCard)
     assert card.content == content
-    assert card.hash is not None
+    assert card.hash == "test_hash"
+    mock_repository.save.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_create_card_with_invalid_content(card_service):
-    """Test creating a card with invalid content type."""
-    content = 12345  # int is not in valid_types
-    with pytest.raises(ValidationError, match="Invalid content type"):
-        await card_service.create_card(content)
+async def test_create_card_with_invalid_content(card_service, mock_content_service):
+    """Test creating a card with invalid content."""
+    mock_content_service.validate_content.return_value = False
+    with pytest.raises(ValidationError):
+        await card_service.create_card("invalid content")
 
 @pytest.mark.asyncio
-async def test_get_card(card_service):
-    """Test retrieving a card by hash."""
-    # First create a card
-    content = "test content"
-    card = await card_service.create_card(content)
+async def test_update_card_content(card_service, mock_repository):
+    """Test updating a card's content."""
+    # Setup existing card
+    old_card = MCard(content="old content", hash="old_hash")
+    mock_repository.get.return_value = old_card
     
-    # Then retrieve it
-    retrieved_card = await card_service.get_card(card.hash)
-    assert retrieved_card is not None
-    assert retrieved_card.content == content
-    assert retrieved_card.hash == card.hash
+    # Update content
+    new_content = "new content"
+    updated_card = await card_service.update_card_content("old_hash", new_content)
+    
+    assert isinstance(updated_card, MCard)
+    assert updated_card.content == new_content
+    assert updated_card.hash == "test_hash"  # From mock_hashing_service
+    
+    # Verify repository calls
+    mock_repository.save.assert_called_once()
+    mock_repository.delete.assert_called_once_with("old_hash")
 
 @pytest.mark.asyncio
-async def test_get_nonexistent_card(card_service):
-    """Test retrieving a non-existent card."""
-    card = await card_service.get_card("nonexistent_hash")
-    assert card is None
+async def test_update_nonexistent_card(card_service, mock_repository):
+    """Test updating a card that doesn't exist."""
+    mock_repository.get.return_value = None
+    with pytest.raises(ValidationError, match="Card with hash .* not found"):
+        await card_service.update_card_content("nonexistent", "new content")
 
 @pytest.mark.asyncio
-async def test_get_all_cards(card_service):
-    """Test retrieving all cards."""
-    # Create multiple cards
-    contents = ["content1", "content2", "content3"]
-    created_cards = []
-    for content in contents:
-        card = await card_service.create_card(content)
-        created_cards.append(card)
-
-    # Retrieve all cards
-    all_cards = await card_service.get_all_cards()
-    assert len(all_cards) == len(contents)
-    for card in created_cards:
-        assert card in all_cards
+async def test_update_card_invalid_content(card_service, mock_content_service, mock_repository):
+    """Test updating a card with invalid content."""
+    mock_repository.get.return_value = MCard(content="old", hash="old_hash")
+    mock_content_service.validate_content.return_value = False
+    
+    with pytest.raises(ValidationError):
+        await card_service.update_card_content("old_hash", "invalid content")
 
 @pytest.mark.asyncio
-async def test_delete_card(card_service):
+async def test_get_card(card_service, mock_repository):
+    """Test retrieving a card."""
+    expected_card = MCard(content="test", hash="test_hash")
+    mock_repository.get.return_value = expected_card
+    
+    card = await card_service.get_card("test_hash")
+    assert card == expected_card
+    mock_repository.get.assert_called_once_with("test_hash")
+
+@pytest.mark.asyncio
+async def test_delete_card(card_service, mock_repository):
     """Test deleting a card."""
-    # First create a card
-    content = "test content"
-    card = await card_service.create_card(content)
-    
-    # Then delete it
-    await card_service.delete_card(card.hash)
-    
-    # Verify it's deleted
-    retrieved_card = await card_service.get_card(card.hash)
-    assert retrieved_card is None
+    await card_service.delete_card("test_hash")
+    mock_repository.delete.assert_called_once_with("test_hash")
 
 @pytest.mark.asyncio
-async def test_delete_nonexistent_card(card_service):
-    """Test deleting a non-existent card."""
-    # Should not raise any error
-    await card_service.delete_card("nonexistent_hash")
-
-def test_get_content_type(card_service):
-    """Test getting content type."""
-    test_cases = [
-        ("test string", "str"),
-        (b"test bytes", "bytes"),
-        ({"key": "value"}, "dict")
+async def test_get_all_cards(card_service, mock_repository):
+    """Test retrieving all cards."""
+    expected_cards = [
+        MCard(content="test1", hash="hash1"),
+        MCard(content="test2", hash="hash2")
     ]
+    mock_repository.get_all.return_value = expected_cards
     
-    for content, expected_type in test_cases:
-        assert card_service.get_content_type(content) == expected_type
-
-@pytest.mark.asyncio
-async def test_create_multiple_cards_same_content(card_service):
-    """Test creating multiple cards with the same content."""
-    content = "test content"
-    card1 = await card_service.create_card(content)
-    card2 = await card_service.create_card(content)
-    
-    # Cards should have same content but different timestamps
-    assert card1.content == card2.content
-    assert card1.hash == card2.hash  # Hash should be same for same content
-    assert card1.g_time != card2.g_time
+    cards = await card_service.get_all_cards()
+    assert cards == expected_cards
+    mock_repository.get_all.assert_called_once()

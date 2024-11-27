@@ -1,191 +1,265 @@
 """
 SQLite implementation of the card repository.
 """
+import asyncio
 import sqlite3
 import aiosqlite
-import asyncio
-from contextlib import asynccontextmanager
+from typing import Optional, List, Union
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
-from mcard.domain.models.card import MCard
-from mcard.domain.models.exceptions import StorageError, ValidationError
-from mcard.infrastructure.content.interpreter import ContentTypeInterpreter
+from contextlib import asynccontextmanager
+from ...domain.models.card import MCard
+from ...domain.models.exceptions import StorageError, ValidationError
+from ...domain.services.hashing import get_hashing_service
+from dateutil import parser
+import logging
+import time
 
 class SQLiteCardRepository:
-    """SQLite implementation of card repository."""
+    """SQLite implementation of the card repository."""
 
-    def __init__(self, db_path: str, pool_size: int = 5, max_content_size: int = 100 * 1024 * 1024):
-        """Initialize repository with database path and connection pool."""
+    def __init__(self, db_path: str):
+        """Initialize the repository."""
         self.db_path = db_path
-        self.pool_size = pool_size
-        self.max_content_size = max_content_size
-        self._connection_pool: List[aiosqlite.Connection] = []
-        self._pool_lock = asyncio.Lock()
-        self._transaction_connections: Dict[int, aiosqlite.Connection] = {}
-        self._transaction_levels: Dict[int, int] = {}  # Track nesting level
-        self._initialize_db()
+        self._connection = None
+        self._lock = asyncio.Lock()
+        self._init_done = False
+        self.max_content_size = 10 * 1024 * 1024  # 10MB
+        self.connection_pool_limit = 5  # Example limit, adjust based on requirements
 
-    def _initialize_db(self) -> None:
-        """Initialize database schema."""
+    async def close_connection(self):
+        """Close the database connection if it exists."""
+        if self._connection is not None:
+            await self._connection.close()
+            self._connection = None
+
+    async def _get_connection(self) -> aiosqlite.Connection:
+        """Get a database connection with retry logic."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS cards (
-                        hash TEXT PRIMARY KEY,
-                        content BLOB,
-                        g_time TIMESTAMP
-                    )
-                """)
-        except sqlite3.Error as e:
-            raise StorageError(f"Failed to initialize database: {str(e)}")
+            if self._connection is None:
+                self._connection = await aiosqlite.connect(
+                    self.db_path,
+                    timeout=30.0,  # Increased timeout for busy waiting
+                )
+                await self._connection.execute("PRAGMA journal_mode=WAL")
+                await self._connection.execute("PRAGMA busy_timeout=10000")  # 10 second timeout
+                self._connection.row_factory = aiosqlite.Row
+            # Test if connection is valid
+            await self._connection.execute("SELECT 1")
+            return self._connection
+        except (sqlite3.Error, AttributeError) as e:
+            # Connection is invalid, close it and create a new one
+            await self.close_connection()
+            try:
+                self._connection = await aiosqlite.connect(
+                    self.db_path,
+                    timeout=30.0,
+                )
+                await self._connection.execute("PRAGMA journal_mode=WAL")
+                await self._connection.execute("PRAGMA busy_timeout=10000")
+                self._connection.row_factory = aiosqlite.Row
+                return self._connection
+            except Exception as e:
+                raise StorageError(f"Failed to connect to database: {str(e)}") from e
+
+    async def _init_db(self):
+        """Initialize the database schema."""
+        logging.debug("Initializing database schema...")
+        async with self._lock:
+            conn = await self._get_connection()
+            try:
+                await conn.execute("CREATE TABLE IF NOT EXISTS cards (hash TEXT PRIMARY KEY, content BLOB, g_time TEXT)")
+                await conn.commit()
+                logging.debug("Database schema initialized successfully.")
+            except Exception as e:
+                logging.error(f"Error initializing database schema: {e}")
+            logging.debug("Database schema initialized successfully")
+            self._init_done = True
+
+    def _validate_content_size(self, content: Union[bytes, str]) -> None:
+        """Validate content size."""
+        size = len(content.encode('utf-8') if isinstance(content, str) else content)
+        if size > self.max_content_size:
+            raise ValidationError(f"Content size exceeds maximum limit of {self.max_content_size} bytes")
+
+    def _encode_content(self, content: Union[bytes, str]) -> bytes:
+        """Encode content as bytes."""
+        return content.encode('utf-8') if isinstance(content, str) else content
+
+    async def __aenter__(self):
+        """Enter async context."""
+        logging.debug("Entering async context and checking initialization")
+        if not self._init_done:
+            logging.debug("Database not initialized, calling _init_db")
+            await self._init_db()
+        else:
+            logging.debug("Database already initialized")
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit async context."""
+        if self._connection is not None:
+            logging.debug("Closing database connection")
+            try:
+                await self._connection.close()
+                logging.debug("Database connection closed successfully")
+            except Exception as e:
+                logging.error(f"Error closing connection: {e}")
+            finally:
+                self._connection = None
+                self._init_done = False
 
     @asynccontextmanager
-    async def _get_connection(self) -> aiosqlite.Connection:
-        """Get a connection from the pool."""
-        task_id = id(asyncio.current_task())
-        if task_id in self._transaction_connections:
-            yield self._transaction_connections[task_id]
-            return
-
-        async with self._pool_lock:
-            if len(self._connection_pool) < self.pool_size:
-                conn = await aiosqlite.connect(self.db_path)
-            elif not self._connection_pool:
-                raise StorageError("Connection pool exhausted")
-            else:
-                conn = self._connection_pool.pop()
-
-        try:
-            yield conn
-        finally:
-            if not self._transaction_connections.get(task_id):
-                async with self._pool_lock:
-                    self._connection_pool.append(conn)
-
-    def _validate_content_size(self, content: bytes) -> None:
-        """Validate content size."""
-        if len(content) > self.max_content_size:
-            raise ValidationError(f"Content size exceeds maximum limit of {self.max_content_size} bytes")
+    async def transaction(self):
+        """Transaction context manager."""
+        logging.debug("Acquiring lock for transaction")
+        async with self._lock:
+            conn = await self._get_connection()
+            try:
+                logging.debug("Starting transaction")
+                await conn.execute("BEGIN IMMEDIATE")
+                yield
+                logging.debug("Committing transaction")
+                await conn.commit()
+            except Exception:
+                logging.debug("Rolling back transaction due to exception")
+                await conn.rollback()
+                raise
 
     async def save(self, card: MCard) -> None:
         """Save a card to the database."""
-        content = card.content
-        if isinstance(content, str):
-            content = content.encode('utf-8')
-        
-        self._validate_content_size(content)
-        
         try:
-            conn = self._transaction_connections.get(id(asyncio.current_task()))
-            if conn:
-                # Use transaction connection if in transaction
+            content = card.content
+            self._validate_content_size(content)
+            
+            # Encode content as bytes for hashing and storage
+            encoded_content = self._encode_content(content)
+            
+            # Compute hash if needed
+            if card.hash == "temp_hash":
+                hashing_service = get_hashing_service()
+                computed_hash = hashing_service.hash_content_sync(encoded_content)
+                card = MCard(content=card.content, hash=computed_hash, g_time=card.g_time)
+
+            # Convert g_time to a datetime object if it's a string
+            if isinstance(card.g_time, str):
+                card_g_time = parser.parse(card.g_time)
+            else:
+                card_g_time = card.g_time
+
+            # Remove timezone or convert to UTC if necessary
+            card_g_time = card_g_time.replace(tzinfo=None)
+            card_g_time = datetime.fromisoformat(card_g_time.isoformat())
+
+            async with self._lock:
+                conn = await self._get_connection()
                 await conn.execute(
                     "INSERT OR REPLACE INTO cards (hash, content, g_time) VALUES (?, ?, ?)",
-                    (card.hash, sqlite3.Binary(content), card.g_time.astimezone(timezone.utc).isoformat())
+                    (card.hash, sqlite3.Binary(encoded_content), card_g_time.isoformat())
                 )
-            else:
-                # Use connection pool if not in transaction
-                async with self._get_connection() as db:
-                    await db.execute(
-                        "INSERT OR REPLACE INTO cards (hash, content, g_time) VALUES (?, ?, ?)",
-                        (card.hash, sqlite3.Binary(content), card.g_time.astimezone(timezone.utc).isoformat())
-                    )
-                    await db.commit()
-        except sqlite3.Error as e:
+                await conn.commit()
+        except Exception as e:
             raise StorageError(f"Failed to save card: {str(e)}")
 
     async def get(self, hash_str: str) -> Optional[MCard]:
         """Retrieve a card by its hash."""
         if not isinstance(hash_str, str):
             raise StorageError("Hash must be a string")
-            
+
         try:
-            conn = self._transaction_connections.get(id(asyncio.current_task()))
-            if conn:
-                # Use transaction connection if in transaction
-                conn.row_factory = aiosqlite.Row
-                async with conn.execute(
-                    "SELECT * FROM cards WHERE hash = ?",
+            async with self._lock:
+                conn = await self._get_connection()
+                cursor = await conn.execute(
+                    "SELECT hash, content, g_time FROM cards WHERE hash = ?",
                     (hash_str,)
-                ) as cursor:
-                    row = await cursor.fetchone()
-            else:
-                # Use connection pool if not in transaction
-                async with self._get_connection() as db:
-                    db.row_factory = aiosqlite.Row
-                    async with db.execute(
-                        "SELECT * FROM cards WHERE hash = ?",
-                        (hash_str,)
-                    ) as cursor:
-                        row = await cursor.fetchone()
-            
-            if row is None:
-                return None
-            
-            content = bytes(row['content'])
-            # Attempt to decode as UTF-8 if it looks like text
-            if not any(b for b in content if b < 32 and b not in (9, 10, 13)):  # Not control chars except tab, newline, carriage return
-                try:
-                    content = content.decode('utf-8')
-                except UnicodeDecodeError:
-                    pass  # Keep as bytes if we can't decode
-            
-            # Parse timestamp and ensure UTC
-            g_time = datetime.fromisoformat(row['g_time'])
-            if g_time.tzinfo is None:
-                g_time = g_time.replace(tzinfo=timezone.utc)
-            else:
-                g_time = g_time.astimezone(timezone.utc)
-            
-            return MCard(
-                content=content,
-                hash=row['hash'],
-                g_time=g_time
-            )
-        except sqlite3.Error as e:
+                )
+                row = await cursor.fetchone()
+
+                if row is None:
+                    raise StorageError(f"Card with hash {hash_str} not found.")
+
+                content = bytes(row['content'])
+                # Attempt to decode as UTF-8 if it looks like text
+                if not any(b for b in content if b < 32 and b not in (9, 10, 13)):
+                    try:
+                        content = content.decode('utf-8')
+                    except UnicodeDecodeError:
+                        pass  # Keep as bytes if we can't decode
+
+                # Parse timestamp
+                g_time = datetime.fromisoformat(row['g_time'])
+                if g_time.tzinfo is None:
+                    g_time = g_time.replace(tzinfo=timezone.utc)
+                else:
+                    g_time = g_time.astimezone(timezone.utc)
+
+                return MCard(
+                    content=content,
+                    hash=row['hash'],
+                    g_time=g_time
+                )
+        except Exception as e:
             raise StorageError(f"Failed to retrieve card: {str(e)}")
 
     async def save_many(self, cards: List[MCard]) -> None:
-        """Save multiple cards to the database."""
+        """Save multiple cards at once."""
         if not cards:
             return
 
-        if not all(isinstance(card, MCard) for card in cards):
-            raise StorageError("All items must be MCard instances")
+        # Log the start of the batch save operation
+        logging.debug(f"Starting batch save for {len(cards)} cards.")
+        
+        # Log the time taken for encoding and hashing
+        encoding_start_time = time.time()
+        
+        new_cards = []
+        values = []
+        for card in cards:
+            content = card.content
+            self._validate_content_size(content)
 
-        try:
-            values = []
-            for card in cards:
-                content = card.content
-                if isinstance(content, str):
-                    content = content.encode('utf-8')
-                elif not isinstance(content, bytes):
-                    raise StorageError(f"Invalid content type: {type(content)}")
-                
-                self._validate_content_size(content)
-                values.append((
-                    card.hash,
-                    sqlite3.Binary(content),
-                    card.g_time.astimezone(timezone.utc).isoformat()
-                ))
-
-            conn = self._transaction_connections.get(id(asyncio.current_task()))
-            if conn:
-                # Use transaction connection if in transaction
-                await conn.executemany(
-                    "INSERT OR REPLACE INTO cards (hash, content, g_time) VALUES (?, ?, ?)",
-                    values
-                )
+            # Encode content as bytes for hashing and storage
+            encoded_content = self._encode_content(content)
+            
+            # Compute hash if needed
+            if card.hash == "temp_hash":
+                hashing_service = get_hashing_service()
+                computed_hash = hashing_service.hash_content_sync(encoded_content)
+                card = MCard(content=card.content, hash=computed_hash, g_time=card.g_time)
+            
+            # Convert g_time to a datetime object if it's a string
+            if isinstance(card.g_time, str):
+                card_g_time = parser.parse(card.g_time)
             else:
-                # Use connection pool if not in transaction
-                async with self._get_connection() as db:
-                    await db.executemany(
-                        "INSERT OR REPLACE INTO cards (hash, content, g_time) VALUES (?, ?, ?)",
-                        values
-                    )
-                    await db.commit()
-        except sqlite3.Error as e:
-            raise StorageError(f"Failed to save cards: {str(e)}")
+                card_g_time = card.g_time
+
+            # Remove timezone or convert to UTC if necessary
+            card_g_time = card_g_time.replace(tzinfo=None)
+            card_g_time = datetime.fromisoformat(card_g_time.isoformat())
+
+            new_cards.append(card)
+            values.append((
+                card.hash,
+                sqlite3.Binary(encoded_content),
+                card_g_time.isoformat()
+            ))
+
+        encoding_duration = time.time() - encoding_start_time
+        logging.debug(f"Encoding and hashing completed in {encoding_duration:.2f} seconds.")
+
+        async with self._lock:
+            conn = await self._get_connection()
+            await conn.executemany(
+                "INSERT OR REPLACE INTO cards (hash, content, g_time) VALUES (?, ?, ?)",
+                values
+            )
+            await conn.commit()
+        
+        # Log the end of the batch save operation
+        logging.debug("Batch save operation completed.")
+        
+        # Update the input list with new cards that have computed hashes
+        cards.clear()
+        cards.extend(new_cards)
 
     async def get_many(self, hash_strs: List[str]) -> List[MCard]:
         """Retrieve multiple cards by their hashes."""
@@ -196,46 +270,52 @@ class SQLiteCardRepository:
             raise StorageError("All hashes must be strings")
 
         try:
-            async with self._get_connection() as db:
-                db.row_factory = aiosqlite.Row
+            async with self._lock:
+                conn = await self._get_connection()
                 placeholders = ','.join('?' * len(hash_strs))
-                async with db.execute(
+                cursor = await conn.execute(
                     f"SELECT * FROM cards WHERE hash IN ({placeholders})",
                     hash_strs
-                ) as cursor:
-                    rows = await cursor.fetchall()
+                )
+                rows = await cursor.fetchall()
                     
-                    cards = []
-                    for row in rows:
-                        content = bytes(row['content'])
-                        # Attempt to decode as UTF-8 if it looks like text
-                        if not any(b for b in content if b < 32 and b not in (9, 10, 13)):
-                            try:
-                                content = content.decode('utf-8')
-                            except UnicodeDecodeError:
-                                pass  # Keep as bytes if we can't decode
+                cards = []
+                for row in rows:
+                    content = bytes(row['content'])
+                    # Attempt to decode as UTF-8 if it looks like text
+                    if not any(b for b in content if b < 32 and b not in (9, 10, 13)):
+                        try:
+                            content = content.decode('utf-8')
+                        except UnicodeDecodeError:
+                            pass  # Keep as bytes if we can't decode
                         
-                        # Parse timestamp and ensure UTC
-                        g_time = datetime.fromisoformat(row['g_time'])
-                        if g_time.tzinfo is None:
-                            g_time = g_time.replace(tzinfo=timezone.utc)
-                        else:
-                            g_time = g_time.astimezone(timezone.utc)
-                        
-                        cards.append(MCard(
-                            content=content,
-                            hash=row['hash'],
-                            g_time=g_time
-                        ))
-                    return cards
-        except sqlite3.Error as e:
+                    # Parse timestamp and ensure UTC
+                    g_time = datetime.fromisoformat(row['g_time'])
+                    if g_time.tzinfo is None:
+                        g_time = g_time.replace(tzinfo=timezone.utc)
+                    else:
+                        g_time = g_time.astimezone(timezone.utc)
+                    
+                    cards.append(MCard(
+                        content=content,
+                        hash=row['hash'],
+                        g_time=g_time
+                    ))
+                return cards
+        except Exception as e:
             raise StorageError(f"Failed to retrieve cards: {str(e)}")
 
     async def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
         """Retrieve all cards with pagination support."""
         try:
-            async with self._get_connection() as db:
-                db.row_factory = aiosqlite.Row
+            # Log the start of the get_all operation
+            logging.debug("Starting get_all operation.")
+            
+            # Log the time taken for query execution
+            query_start_time = time.time()
+            
+            async with self._lock:
+                conn = await self._get_connection()
                 query = "SELECT * FROM cards ORDER BY g_time DESC"
                 params = []
                 
@@ -247,35 +327,54 @@ class SQLiteCardRepository:
                         params.append(offset)
 
                 cards = []
-                async with db.execute(query, params) as cursor:
-                    async for row in cursor:
-                        content = row['content']
-                        if not ContentTypeInterpreter.is_binary_content(content):
+                cursor = await conn.execute(query, params)
+                async for row in cursor:
+                    content = bytes(row['content'])
+                    # Attempt to decode as UTF-8 if it looks like text
+                    if not any(b for b in content if b < 32 and b not in (9, 10, 13)):
+                        try:
                             content = content.decode('utf-8')
+                        except UnicodeDecodeError:
+                            pass  # Keep as bytes if we can't decode
                         
-                        g_time = datetime.fromisoformat(row['g_time'])
-                        if g_time.tzinfo is None:
-                            g_time = g_time.replace(tzinfo=timezone.utc)
-                        
-                        cards.append(MCard(
-                            content=content,
-                            hash=row['hash'],
-                            g_time=g_time
-                        ))
-                return cards
-        except sqlite3.Error as e:
+                    g_time = datetime.fromisoformat(row['g_time'])
+                    if g_time.tzinfo is None:
+                        g_time = g_time.replace(tzinfo=timezone.utc)
+                    else:
+                        g_time = g_time.astimezone(timezone.utc)
+                    
+                    cards.append(MCard(
+                        content=content,
+                        hash=row['hash'],
+                        g_time=g_time
+                    ))
+
+            query_duration = time.time() - query_start_time
+            logging.debug(f"Query execution completed in {query_duration:.2f} seconds.")
+
+            # Log the end of the get_all operation
+            logging.debug("get_all operation completed.")
+            return cards
+        except Exception as e:
             raise StorageError(f"Failed to retrieve cards: {str(e)}")
 
     async def delete(self, hash_str: str) -> None:
         """Delete a card by its hash."""
         try:
-            async with self._get_connection() as db:
-                await db.execute(
+            async with self._lock:
+                conn = await self._get_connection()
+                cursor = await conn.execute(
+                    "SELECT 1 FROM cards WHERE hash = ?",
+                    (hash_str,)
+                )
+                if await cursor.fetchone() is None:
+                    raise StorageError(f"Card with hash {hash_str} not found.")
+                await conn.execute(
                     "DELETE FROM cards WHERE hash = ?",
                     (hash_str,)
                 )
-                await db.commit()
-        except sqlite3.Error as e:
+                await conn.commit()
+        except Exception as e:
             raise StorageError(f"Failed to delete card: {str(e)}")
 
     async def delete_many(self, hash_strs: List[str]) -> None:
@@ -284,77 +383,13 @@ class SQLiteCardRepository:
             return
 
         try:
-            async with self._get_connection() as db:
+            async with self._lock:
+                conn = await self._get_connection()
                 placeholders = ','.join('?' * len(hash_strs))
-                await db.execute(
+                await conn.execute(
                     f"DELETE FROM cards WHERE hash IN ({placeholders})",
                     hash_strs
                 )
-                await db.commit()
-        except sqlite3.Error as e:
+                await conn.commit()
+        except Exception as e:
             raise StorageError(f"Failed to delete cards: {str(e)}")
-
-    async def _cleanup_transaction(self, task_id: int) -> None:
-        """Clean up transaction resources."""
-        if task_id in self._transaction_connections:
-            conn = self._transaction_connections[task_id]
-            await conn.close()
-            del self._transaction_connections[task_id]
-            del self._transaction_levels[task_id]
-
-    @asynccontextmanager
-    async def transaction(self):
-        """Transaction context manager with support for nested transactions using savepoints."""
-        task_id = id(asyncio.current_task())
-        
-        # Get or create transaction level counter
-        level = self._transaction_levels.get(task_id, 0)
-        self._transaction_levels[task_id] = level + 1
-        
-        # Create savepoint name for this level
-        savepoint = f"sp_level_{level}"
-        
-        # Create new connection at outermost level
-        is_outermost = level == 0
-        if is_outermost:
-            conn = await aiosqlite.connect(self.db_path)
-            await conn.execute("BEGIN IMMEDIATE")  # Use IMMEDIATE to prevent other writes
-            self._transaction_connections[task_id] = conn
-        else:
-            # Create savepoint for nested transaction
-            conn = self._transaction_connections[task_id]
-            await conn.execute(f"SAVEPOINT {savepoint}")
-        
-        try:
-            yield
-            # Commit at outermost level, release savepoint otherwise
-            if is_outermost:
-                await self._transaction_connections[task_id].commit()
-            else:
-                await conn.execute(f"RELEASE SAVEPOINT {savepoint}")
-        except:
-            # Rollback at outermost level, rollback to savepoint otherwise
-            if is_outermost:
-                await self._transaction_connections[task_id].rollback()
-            else:
-                await conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
-            raise
-        finally:
-            # Decrement nesting level
-            self._transaction_levels[task_id] -= 1
-            # Cleanup at outermost level
-            if is_outermost:
-                await self._cleanup_transaction(task_id)
-
-    async def close(self) -> None:
-        """Close all connections."""
-        async with self._pool_lock:
-            for conn in self._connection_pool:
-                await conn.close()
-            self._connection_pool.clear()
-            
-            # Close any active transaction connections
-            for conn in self._transaction_connections.values():
-                await conn.close()
-            self._transaction_connections.clear()
-            self._transaction_levels.clear()

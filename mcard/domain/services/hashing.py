@@ -37,8 +37,8 @@ class DefaultHashingService:
         
         return getattr(hashlib, self._settings.algorithm)
 
-    def hash_content(self, content: bytes) -> str:
-        """Hash the given content."""
+    def hash_content_sync(self, content: bytes) -> str:
+        """Hash the given content synchronously."""
         if not content:
             raise HashingError("Cannot hash empty content")
         
@@ -55,6 +55,10 @@ class DefaultHashingService:
                 raise HashingError(f"Invalid custom hash length: got {len(result)}, expected {self._settings.custom_hash_length}")
         
         return result
+
+    async def hash_content(self, content: bytes) -> str:
+        """Hash the given content."""
+        return self.hash_content_sync(content)
 
     def validate_hash(self, hash_str: str) -> bool:
         """Validate a hash string."""
@@ -74,7 +78,7 @@ class DefaultHashingService:
         """Verify that content matches a hash."""
         if not self.validate_hash(hash_str):
             return False
-        return self.hash_content(content) == hash_str
+        return self.hash_content_sync(content) == hash_str
 
     def get_hash_length(self) -> int:
         """Get the expected length of hash strings."""
@@ -127,7 +131,7 @@ class CollisionAwareHashingService(DefaultHashingService):
     def _handle_collision(self, content1: bytes, content2: bytes):
         """Handle hash collision by upgrading to a stronger algorithm."""
         # Store collision in cache
-        current_hash = super().hash_content(content1)
+        current_hash = super().hash_content_sync(content1)
         self._collision_cache[current_hash] = (content1, content2)
         
         # Upgrade to stronger algorithm
@@ -148,7 +152,7 @@ class CollisionAwareHashingService(DefaultHashingService):
             raise HashingError(f"Invalid algorithm: {algorithm}")
 
         # Store in collision cache
-        current_hash = super().hash_content(content1)
+        current_hash = super().hash_content_sync(content1)
         self._collision_cache[current_hash] = (content1, content2)
 
     async def hash_content(self, content: bytes) -> str:
@@ -157,7 +161,7 @@ class CollisionAwareHashingService(DefaultHashingService):
             raise HashingError("Cannot hash empty content")
 
         # Check repository for collisions if available
-        current_hash = super().hash_content(content)
+        current_hash = await super().hash_content(content)
         if self._card_repository:
             existing_card = await self._card_repository.get(current_hash)
             if existing_card and existing_card.content != content:
