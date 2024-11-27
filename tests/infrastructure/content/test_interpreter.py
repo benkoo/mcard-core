@@ -193,3 +193,21 @@ def test_zero_byte_content():
     content = b''
     with pytest.raises(ValidationError, match="Empty content"):
         interpreter.validate_content(content)
+
+def test_get_default_extension():
+    """Test default file extension retrieval based on MIME type."""
+    interpreter = ContentTypeInterpreter()
+    # Test cases for known MIME types
+    assert interpreter.get_default_extension('application/pdf') == 'pdf'
+    assert interpreter.get_default_extension('text/plain') == 'txt'
+    assert interpreter.get_default_extension('image/png') == 'png'
+    assert interpreter.get_default_extension('image/jpeg') == 'jpg'
+    assert interpreter.get_default_extension('video/quicktime') == 'mov'
+    assert interpreter.get_default_extension('application/x-tex') == 'tex'
+    assert interpreter.get_default_extension('application/3d-obj') == 'obj'
+    assert interpreter.get_default_extension('image/svg+xml') == 'svg'
+    assert interpreter.get_default_extension('text/x-mermaid') == 'mmd'
+    assert interpreter.get_default_extension('image/vnd.dxf') == 'dxf'
+    assert interpreter.get_default_extension('image/vnd.djvu') == 'djv'
+    # Test case for an unknown MIME type
+    assert interpreter.get_default_extension('unknown/type') == ''

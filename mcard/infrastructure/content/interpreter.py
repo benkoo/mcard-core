@@ -347,3 +347,24 @@ class ContentTypeInterpreter:
             extension = extension[1:]
         
         return extension or ''
+
+    @staticmethod
+    def get_default_extension(mime_type: str) -> str:
+        """
+        Return the default file extension for a given MIME type.
+        """
+        mime_to_extension = {
+            'application/pdf': 'pdf',
+            'text/plain': 'txt',
+            'image/png': 'png',
+            'image/jpeg': 'jpg',
+            'video/quicktime': 'mov',
+            'application/x-tex': 'tex',
+            'application/3d-obj': 'obj',
+            'image/svg+xml': 'svg',
+            'text/x-mermaid': 'mmd',
+            'image/vnd.djvu': 'djv',
+            'image/vnd.dxf': 'dxf',
+            # Add more mappings as needed
+        }
+        return mime_to_extension.get(mime_type, '')
