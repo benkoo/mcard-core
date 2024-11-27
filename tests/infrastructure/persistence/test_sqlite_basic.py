@@ -19,66 +19,56 @@ def db_path():
         pass  # File might be locked or already deleted
 
 @pytest.fixture
-async def repository(db_path):
-    """Fixture for SQLite repository."""
+def repository(db_path):
+    """Fixture for SQLite repository using synchronous sqlite3."""
     return SQLiteCardRepository(db_path)
 
-@pytest.mark.asyncio
-async def test_save_and_get_card(repository):
+def test_save_and_get_card(repository):
     """Test saving and retrieving a card."""
-    repo = await repository
-    async with repo as repo:
-        content = "Test content"
-        card = MCard(content=content)
-        await repo.save(card)
-        retrieved_card = await repo.get(card._hash)
-        assert retrieved_card.content == content
+    repo = repository
+    content = "Test content"
+    card = MCard(content=content)
+    repo.save(card)
+    retrieved_card = repo.get(card.hash)
+    assert retrieved_card.content == content
 
-@pytest.mark.asyncio
-async def test_get_nonexistent_card(repository):
+def test_get_nonexistent_card(repository):
     """Test retrieving a non-existent card."""
-    repo = await repository
-    async with repo as repo:
-        with pytest.raises(StorageError):
-            await repo.get("nonexistent-id")
+    repo = repository
+    with pytest.raises(StorageError, match="Failed to retrieve card: Card with hash nonexistent_hash not found."):
+        repo.get("nonexistent_hash")
 
-@pytest.mark.asyncio
-async def test_save_large_content(repository):
+def test_save_large_content(repository):
     """Test saving content larger than max size."""
-    repo = await repository
-    async with repo as repo:
-        large_content = "x" * (repo.max_content_size + 1)
-        card = MCard(content=large_content)
-        with pytest.raises(StorageError):
-            await repo.save(card)
+    repo = repository
+    content = "x" * (repo.max_content_size + 1)
+    card = MCard(content=content)
+    with pytest.raises(ValidationError, match=f"Content size exceeds maximum limit of {repo.max_content_size} bytes"):
+        repo.save(card)
 
-@pytest.mark.asyncio
-async def test_get_all_cards(repository):
+def test_get_all_cards(repository):
     """Test retrieving all cards."""
-    repo = await repository
-    async with repo as repo:
-        card1 = MCard(content="Card 1")
-        card2 = MCard(content="Card 2")
-        await repo.save(card1)
-        await repo.save(card2)
-        all_cards = await repo.get_all()
-        assert len(all_cards) == 2
+    repo = repository
+    card1 = MCard(content="Content 1")
+    card2 = MCard(content="Content 2")
+    repo.save(card1)
+    repo.save(card2)
+    cards = repo.get_all()
+    assert len(cards) == 2
+    assert cards[0].content == "Content 2"
+    assert cards[1].content == "Content 1"
 
-@pytest.mark.asyncio
-async def test_delete_card(repository):
+def test_delete_card(repository):
     """Test deleting a card."""
-    repo = await repository
-    async with repo as repo:
-        card = MCard(content="To be deleted")
-        await repo.save(card)
-        await repo.delete(card._hash)
-        with pytest.raises(StorageError):
-            await repo.get(card._hash)
+    repo = repository
+    card = MCard(content="To be deleted")
+    repo.save(card)
+    repo.delete(card.hash)
+    with pytest.raises(StorageError, match=f"Failed to retrieve card: Card with hash {card.hash} not found."):
+        repo.get(card.hash)
 
-@pytest.mark.asyncio
-async def test_delete_nonexistent_card(repository):
+def test_delete_nonexistent_card(repository):
     """Test deleting a non-existent card."""
-    repo = await repository
-    async with repo as repo:
-        with pytest.raises(StorageError):
-            await repo.delete("non_existent_hash")
+    repo = repository
+    with pytest.raises(StorageError, match="Failed to delete card: Card with hash nonexistent_hash not found."):
+        repo.delete("nonexistent_hash")

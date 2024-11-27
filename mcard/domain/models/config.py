@@ -28,3 +28,4 @@ class AppSettings(BaseModel):
     """Application settings."""
     database: DatabaseSettings
     hashing: HashingSettings = Field(default_factory=HashingSettings)
+    mcard_api_key: str = Field(description="API key for accessing the application")

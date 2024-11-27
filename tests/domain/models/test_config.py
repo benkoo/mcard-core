@@ -41,7 +41,7 @@ def test_hashing_settings_custom():
 
 def test_app_settings_defaults():
     """Test AppSettings with default values."""
-    settings = AppSettings(database=DatabaseSettings(db_path="test.db"))
+    settings = AppSettings(database=DatabaseSettings(db_path="test.db"), mcard_api_key="test_api_key")
     assert settings.database.db_path == "test.db"
     assert settings.hashing.algorithm == "sha256"
 
@@ -52,7 +52,8 @@ def test_app_settings_custom():
             db_path="custom.db",
             pool_size=15
         ),
-        hashing=HashingSettings(algorithm="sha512")
+        hashing=HashingSettings(algorithm="sha512"),
+        mcard_api_key="custom_api_key"
     )
     assert settings.database.db_path == "custom.db"
     assert settings.database.pool_size == 15

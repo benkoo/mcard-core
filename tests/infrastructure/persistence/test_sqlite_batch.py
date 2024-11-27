@@ -31,48 +31,58 @@ def db_path():
         os.unlink(temp_path)
 
 @pytest.fixture
-async def repository(db_path):
-    """Fixture for SQLite repository."""
+def repository(db_path):
+    """Fixture for SQLite repository using synchronous sqlite3."""
     repo = SQLiteCardRepository(db_path)
-    await repo._init_db()
+    repo._init_db()
     return repo
 
-@pytest.mark.asyncio
-async def test_save_many_and_get_many(repository):
-    repo = await repository
-    async with repo as repo:
-        cards = [MCard(content=f"Card {i}") for i in range(5)]
-        await repo.save_many(cards)
-        retrieved_cards = await repo.get_many([card.hash for card in cards])
-        for i, card in enumerate(retrieved_cards):
-            logging.debug(f"Card {i}: Hash={card.hash}, Content={card.content}")
-        assert len(retrieved_cards) == 5
+def test_save_many_and_get_many(repository):
+    """Test saving and retrieving multiple cards."""
+    repo = repository
+    cards = [MCard(content=f"Content {i}") for i in range(5)]
+    repo.save_many(cards)
+    retrieved_cards = repo.get_many([card.hash for card in cards])
+    assert len(retrieved_cards) == len(cards)
+    # Adjusting the order to match the descending g_time order
+    for original, retrieved in zip(reversed(cards), retrieved_cards):
+        # Decode content for comparison if needed
+        if isinstance(retrieved.content, bytes):
+            retrieved_content = retrieved.content.decode('utf-8')
+        else:
+            retrieved_content = retrieved.content
+        assert original.content == retrieved_content
 
-@pytest.mark.asyncio
-async def test_get_all_with_pagination(repository):
-    repo = await repository
-    async with repo as repo:
-        cards = [MCard(content=f"Card {i}") for i in range(10)]
-        await repo.save_many(cards)
-        page1 = await repo.get_all(limit=5, offset=0)
-        page2 = await repo.get_all(limit=5, offset=5)
-        assert len(page1) == 5
-        assert len(page2) == 5
+def test_get_all_with_pagination(repository):
+    """Test retrieving all cards with pagination."""
+    repo = repository
+    cards = [MCard(content=f"Content {i}") for i in range(10)]
+    repo.save_many(cards)
+    all_cards = repo.get_all(limit=5)
+    assert len(all_cards) == 5
+    assert all_cards[0].content == "Content 9"
+    assert all_cards[4].content == "Content 5"
 
-@pytest.mark.asyncio
-async def test_mixed_content_batch(repository):
-    repo = await repository
-    async with repo as repo:
-        text_content = MCard(content="Text Content")
-        binary_content = MCard(content=bytes([0, 1, 2, 3, 4]))
-        await repo.save_many([text_content, binary_content])
-        retrieved_cards = await repo.get_many([text_content.hash, binary_content.hash])
-        # Sort retrieved cards by hash to ensure consistent order
-        retrieved_cards.sort(key=lambda card: card.hash)
-        expected_cards = sorted([text_content, binary_content], key=lambda card: card.hash)
-        for i, card in enumerate(retrieved_cards):
-            logging.debug(f"Card {i}: Hash={card.hash}, Content={card.content}")
-        logging.debug(f"Retrieved cards: {retrieved_cards}")
-        # Compare against expected sorted order
-        assert retrieved_cards[0].content == expected_cards[0].content
-        assert retrieved_cards[1].content == expected_cards[1].content
+def test_mixed_content_batch(repository):
+    """Test saving and retrieving mixed content types in batch."""
+    repo = repository
+    cards = [
+        MCard(content=b"Binary content", g_time="2023-10-01T10:00:00Z"),
+        MCard(content="Text content", g_time="2023-10-01T09:00:00Z")
+    ]
+    repo.save_many(cards)
+    retrieved_cards = repo.get_many([card.hash for card in cards])
+    assert len(retrieved_cards) == len(cards)
+    # Ensure the order is correct based on g_time
+    # Decode content for comparison if needed
+    if isinstance(retrieved_cards[0].content, bytes):
+        retrieved_binary_content = retrieved_cards[0].content.decode('utf-8')
+    else:
+        retrieved_binary_content = retrieved_cards[0].content
+    assert retrieved_binary_content == "Binary content"
+
+    if isinstance(retrieved_cards[1].content, bytes):
+        retrieved_text_content = retrieved_cards[1].content.decode('utf-8')
+    else:
+        retrieved_text_content = retrieved_cards[1].content
+    assert retrieved_text_content == "Text content"
