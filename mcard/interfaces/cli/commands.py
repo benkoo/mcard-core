@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 import click
 from ...domain.models.card import MCard
-from ...infrastructure.repository import get_repository
+from mcard.infrastructure.persistence.schema_initializer import get_repository
 
 @click.group()
 def cli():

@@ -4,7 +4,7 @@ import os
 import tempfile
 import logging
 import time
-from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository
+from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository, SchemaInitializer
 from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import StorageError
 
@@ -31,7 +31,9 @@ def db_path():
 @pytest.fixture
 def repository(db_path):
     """Fixture for SQLite repository."""
-    return SQLiteCardRepository(db_path)
+    repo = SQLiteCardRepository(db_path)
+    SchemaInitializer.initialize_schema(repo.connection)
+    return repo
 
 def test_concurrent_operations(repository):
     start_time = time.time()
@@ -88,6 +90,7 @@ def test_transaction_isolation(repository):
 def test_concurrent_transactions(db_path):
     start_time = time.time()
     repo = SQLiteCardRepository(db_path)
+    SchemaInitializer.initialize_schema(repo.connection)
     card1 = MCard(content="Concurrent Transaction 1")
     card2 = MCard(content="Concurrent Transaction 2")
     repo.save(card1)

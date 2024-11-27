@@ -2,7 +2,7 @@
 import pytest
 import os
 import tempfile
-from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository
+from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository, SchemaInitializer
 from mcard.domain.models.card import MCard
 import logging
 
@@ -34,7 +34,7 @@ def db_path():
 def repository(db_path):
     """Fixture for SQLite repository using synchronous sqlite3."""
     repo = SQLiteCardRepository(db_path)
-    repo._init_db()
+    SchemaInitializer.initialize_schema(repo.connection)
     return repo
 
 def test_save_many_and_get_many(repository):

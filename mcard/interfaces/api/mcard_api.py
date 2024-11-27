@@ -9,7 +9,7 @@ import logging
 from mcard.domain.models.config import AppSettings, DatabaseSettings, HashingSettings
 from mcard.domain.models.card import MCard
 from mcard.domain.models.protocols import CardRepository
-from mcard.infrastructure.repository import get_repository
+from mcard.infrastructure.persistence.schema_initializer import get_repository
 from mcard.domain.services.hashing import get_hashing_service
 
 # Load application settings from environment

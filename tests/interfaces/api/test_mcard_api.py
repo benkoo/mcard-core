@@ -33,7 +33,7 @@ def mock_get_repository():
 
 @pytest.fixture(autouse=True)
 def setup_repo(monkeypatch):
-    monkeypatch.setattr('mcard.infrastructure.repository.get_repository', mock_get_repository)
+    monkeypatch.setattr('mcard.infrastructure.persistence.schema_initializer.get_repository', mock_get_repository)
     monkeypatch.setattr('mcard.interfaces.api.mcard_api.get_repository', lambda: shared_repo)
 
 @pytest_asyncio.fixture

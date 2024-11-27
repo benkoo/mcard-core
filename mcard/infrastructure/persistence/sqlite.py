@@ -9,6 +9,7 @@ from dateutil import parser
 from ...domain.models.card import MCard
 from ...domain.models.exceptions import StorageError, ValidationError
 from ...domain.services.hashing import get_hashing_service
+from .schema_initializer import SchemaInitializer, initialize_schema
 import time
 
 class SQLiteCardRepository:
@@ -20,20 +21,11 @@ class SQLiteCardRepository:
         self.max_content_size = 10 * 1024 * 1024  # 10MB
         self.connection = sqlite3.connect(self.db_path)
         self._init_db()
+        SchemaInitializer.initialize_schema(self.connection)
 
     def _init_db(self):
-        """Initialize the database and create tables if they don't exist."""
-        logging.debug("Initializing database schema.")
-        self.connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cards (
-                hash TEXT PRIMARY KEY,
-                content BLOB NOT NULL,
-                g_time TEXT NOT NULL
-            )
-            """
-        )
-        logging.debug("Database schema initialized.")
+        """Initialize the database schema."""
+        initialize_schema(self.connection)
 
     def _validate_content_size(self, content: Union[bytes, str]) -> None:
         """Validate content size."""
@@ -71,7 +63,7 @@ class SQLiteCardRepository:
             card_g_time = datetime.fromisoformat(card_g_time.isoformat())
 
             self.connection.execute(
-                "INSERT OR REPLACE INTO cards (hash, content, g_time) VALUES (?, ?, ?)",
+                "INSERT OR REPLACE INTO card (hash, content, g_time) VALUES (?, ?, ?)",
                 (card.hash, sqlite3.Binary(encoded_content), card_g_time.isoformat())
             )
             self.connection.commit()
@@ -84,7 +76,7 @@ class SQLiteCardRepository:
         """Retrieve a card from the database by its hash."""
         try:
             cursor = self.connection.execute(
-                "SELECT hash, content, g_time FROM cards WHERE hash = ?",
+                "SELECT hash, content, g_time FROM card WHERE hash = ?",
                 (card_hash,)
             )
             row = cursor.fetchone()
@@ -164,7 +156,7 @@ class SQLiteCardRepository:
         logging.debug(f"Encoding and hashing completed in {encoding_duration:.2f} seconds.")
 
         self.connection.executemany(
-            "INSERT OR REPLACE INTO cards (hash, content, g_time) VALUES (?, ?, ?)",
+            "INSERT OR REPLACE INTO card (hash, content, g_time) VALUES (?, ?, ?)",
             values
         )
         self.connection.commit()
@@ -187,7 +179,7 @@ class SQLiteCardRepository:
         try:
             placeholders = ','.join('?' * len(hash_strs))
             cursor = self.connection.execute(
-                f"SELECT * FROM cards WHERE hash IN ({placeholders}) ORDER BY g_time DESC",
+                f"SELECT * FROM card WHERE hash IN ({placeholders}) ORDER BY g_time DESC",
                 hash_strs
             )
             rows = cursor.fetchall()
@@ -226,7 +218,7 @@ class SQLiteCardRepository:
             logging.debug("Starting get_all operation.")
             query_start_time = time.time()
 
-            query = "SELECT * FROM cards ORDER BY g_time DESC"
+            query = "SELECT * FROM card ORDER BY g_time DESC"
             params = []
 
             if limit is not None:
@@ -269,13 +261,13 @@ class SQLiteCardRepository:
         """Delete a card by its hash."""
         try:
             cursor = self.connection.execute(
-                "SELECT 1 FROM cards WHERE hash = ?",
+                "SELECT 1 FROM card WHERE hash = ?",
                 (hash_str,)
             )
             if cursor.fetchone() is None:
                 raise StorageError(f"Card with hash {hash_str} not found.")
             self.connection.execute(
-                "DELETE FROM cards WHERE hash = ?",
+                "DELETE FROM card WHERE hash = ?",
                 (hash_str,)
             )
             self.connection.commit()
@@ -290,7 +282,7 @@ class SQLiteCardRepository:
         try:
             placeholders = ','.join('?' * len(hash_strs))
             self.connection.execute(
-                f"DELETE FROM cards WHERE hash IN ({placeholders})",
+                f"DELETE FROM card WHERE hash IN ({placeholders})",
                 hash_strs
             )
             self.connection.commit()

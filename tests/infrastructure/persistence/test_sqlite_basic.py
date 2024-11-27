@@ -1,7 +1,7 @@
 """Tests for basic operations in SQLite card repository."""
 import pytest
 from datetime import datetime, timezone
-from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository
+from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository, SchemaInitializer
 from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import StorageError, ValidationError
 import tempfile
@@ -21,7 +21,9 @@ def db_path():
 @pytest.fixture
 def repository(db_path):
     """Fixture for SQLite repository using synchronous sqlite3."""
-    return SQLiteCardRepository(db_path)
+    repo = SQLiteCardRepository(db_path)
+    SchemaInitializer.initialize_schema(repo.connection)
+    return repo
 
 def test_save_and_get_card(repository):
     """Test saving and retrieving a card."""

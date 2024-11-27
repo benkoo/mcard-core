@@ -2,7 +2,7 @@
 import pytest
 import os
 import tempfile
-from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository
+from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository, SchemaInitializer
 from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import StorageError
 import logging
@@ -35,6 +35,13 @@ def repository():
     repo._init_db()
     return repo
 
+@pytest.fixture
+def db_repository(db_path):
+    """Fixture for SQLite repository using temporary database."""
+    repo = SQLiteCardRepository(db_path)
+    SchemaInitializer.initialize_schema(repo.connection)
+    return repo
+
 def test_connection_pool_limit(repository):
     logging.debug("Starting test_connection_pool_limit")
     repo = repository
@@ -65,10 +72,9 @@ def test_connection_error_recovery(repository):
     logging.debug("Card saved successfully")
     logging.debug("Exiting test_connection_error_recovery")
 
-def test_connection_pool_management(db_path):
+def test_connection_pool_management(db_repository):
     logging.debug("Starting test_connection_pool_management")
-    repo = SQLiteCardRepository(db_path)
-    repo._init_db()  # Ensure schema initialization
+    repo = db_repository
     try:
         logging.debug("Creating tasks for test_connection_pool_management")
         tasks = [repo.get_all for _ in range(10)]

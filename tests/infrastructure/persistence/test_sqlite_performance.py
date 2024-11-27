@@ -1,6 +1,6 @@
 """Performance tests for SQLite card repository."""
 import pytest
-from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository
+from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository, SchemaInitializer
 from mcard.domain.models.card import MCard
 import time
 import os
@@ -21,7 +21,7 @@ def db_path():
 def repository(db_path):
     """Fixture for SQLite repository."""
     repo = SQLiteCardRepository(db_path)
-    repo._init_db()
+    SchemaInitializer.initialize_schema(repo.connection)
     yield repo
     # Ensure database connection is closed after tests
     repo.connection.close()
