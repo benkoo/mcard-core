@@ -12,7 +12,7 @@ from ...domain.services.hashing import get_hashing_service
 from .schema_initializer import SchemaInitializer, initialize_schema
 import time
 
-class SQLiteCardRepository:
+class SQLiteRepository:
     """SQLite implementation of the card repository using synchronous sqlite3."""
 
     def __init__(self, db_path: str):
@@ -124,17 +124,14 @@ class SQLiteCardRepository:
             self._validate_content_size(content)
 
             # Encode content as bytes for hashing and storage
-            if isinstance(content, str):
-                encoded_content = content.encode('utf-8')
-            else:
-                encoded_content = content
-            
+            encoded_content = self._encode_content(content)
+
             # Compute hash if needed
             if card.hash == "temp_hash":
                 hashing_service = get_hashing_service()
                 computed_hash = hashing_service.hash_content_sync(encoded_content)
                 card = MCard(content=card.content, hash=computed_hash, g_time=card.g_time)
-            
+
             # Convert g_time to a datetime object if it's a string
             if isinstance(card.g_time, str):
                 card_g_time = parser.parse(card.g_time)

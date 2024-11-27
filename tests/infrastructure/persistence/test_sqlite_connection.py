@@ -2,7 +2,7 @@
 import pytest
 import os
 import tempfile
-from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository, SchemaInitializer
+from mcard.infrastructure.persistence.sqlite import SQLiteRepository, SchemaInitializer
 from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import StorageError
 import logging
@@ -30,7 +30,7 @@ def db_path():
 @pytest.fixture
 def repository():
     """Fixture for SQLite repository using in-memory database."""
-    repo = SQLiteCardRepository(":memory:")
+    repo = SQLiteRepository(":memory:")
     logging.debug("Initializing in-memory database schema before tests")
     repo._init_db()
     return repo
@@ -38,7 +38,7 @@ def repository():
 @pytest.fixture
 def db_repository(db_path):
     """Fixture for SQLite repository using temporary database."""
-    repo = SQLiteCardRepository(db_path)
+    repo = SQLiteRepository(db_path)
     SchemaInitializer.initialize_schema(repo.connection)
     return repo
 

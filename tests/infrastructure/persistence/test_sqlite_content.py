@@ -2,7 +2,7 @@
 import pytest
 import os
 import tempfile
-from mcard.infrastructure.persistence.sqlite import SQLiteCardRepository, SchemaInitializer
+from mcard.infrastructure.persistence.sqlite import SQLiteRepository, SchemaInitializer
 from mcard.domain.models.card import MCard
 import logging
 
@@ -33,7 +33,7 @@ def db_path():
 @pytest.fixture
 def repository(db_path):
     """Fixture for SQLite repository."""
-    repo = SQLiteCardRepository(db_path)
+    repo = SQLiteRepository(db_path)
     SchemaInitializer.initialize_schema(repo.connection)
     return repo
 
@@ -46,7 +46,7 @@ def test_binary_content(repository):
     assert retrieved_card.content == binary_content
 
 def test_large_content_handling(db_path):
-    repo = SQLiteCardRepository(db_path)
+    repo = SQLiteRepository(db_path)
     SchemaInitializer.initialize_schema(repo.connection)
     logging.debug("Testing large content handling")
     large_content = "x" * (10 * 1024 * 1024)  # 10MB
@@ -56,7 +56,7 @@ def test_large_content_handling(db_path):
     assert retrieved_card.content == large_content
 
 def test_binary_and_text_content(db_path):
-    repo = SQLiteCardRepository(db_path)
+    repo = SQLiteRepository(db_path)
     SchemaInitializer.initialize_schema(repo.connection)
     logging.debug("Testing binary and text content handling")
     binary_content = bytes([0, 1, 2, 3, 4])

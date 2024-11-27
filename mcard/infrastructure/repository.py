@@ -10,13 +10,13 @@ from mcard.infrastructure.persistence.schema_utils import initialize_schema
 from ..domain.models.card import MCard
 from ..domain.models.protocols import CardRepository
 
-class SQLiteInMemoryRepository(CardRepository):
-    def __init__(self):
-        self.connection = sqlite3.connect(':memory:')
+class SQLiteRepository(CardRepository):
+    def __init__(self, db_path: str):
+        self.connection = sqlite3.connect(db_path)
         initialize_schema(self.connection)
 
     async def save(self, card: MCard) -> None:
-        """Save a card to the SQLite in-memory database."""
+        """Save a card to the SQLite database."""
         logging.debug(f"Saving card with hash: {card.hash}")
         logging.debug(f"Repository state before saving: {[MCard(content=bytes(row[1]), hash=row[0], g_time=row[2]) for row in self.connection.execute('SELECT hash, content, g_time FROM card').fetchall()]}")
         with self.connection as conn:

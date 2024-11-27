@@ -9,7 +9,7 @@ HashAlgorithm = Literal["sha256", "sha512", "sha1", "md5", "custom"]
 
 class DatabaseSettings(BaseModel):
     """Database configuration."""
-    db_path: str = Field(description="Path to the database file")
+    db_path: str = Field(default=':memory:', description="Path to the database file")
     data_source: Optional[str] = Field(None, description="Optional data source identifier")
     pool_size: int = Field(default=5, description="Connection pool size")
     timeout: float = Field(default=30.0, description="Database operation timeout in seconds")

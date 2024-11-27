@@ -3,6 +3,7 @@ Tests for content type detection and validation service.
 """
 import pytest
 from mcard.infrastructure.content.interpreter import ContentTypeInterpreter
+from mcard.infrastructure.persistence.sqlite import SQLiteRepository
 from mcard.domain.models.exceptions import ValidationError
 
 @pytest.fixture

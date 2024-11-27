@@ -22,7 +22,7 @@ ENV_FILE = PROJECT_ROOT / ".env"
 print(f"Loading environment from: {ENV_FILE} (exists: {ENV_FILE.exists()})")
 load_dotenv(ENV_FILE, override=True)
 
-from mcard import SQLiteCardRepository, AppSettings, DatabaseSettings, MCard
+from mcard import SQLiteCardRepo, AppSettings, DatabaseSettings, MCard
 from mcard.domain.models.config import HashingSettings, HashAlgorithm
 from mcard.domain.services.hashing import CollisionAwareHashingService, set_hashing_service
 
@@ -57,7 +57,7 @@ async def load_cards(cards_dir: Path, db_path: str) -> None:
             )
         )
         
-        repo = SQLiteCardRepository(
+        repo = SQLiteCardRepo(
             db_path=settings.database.db_path,
             pool_size=settings.database.pool_size
         )
