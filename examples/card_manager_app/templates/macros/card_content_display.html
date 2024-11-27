@@ -3,6 +3,14 @@
     .content-display {
         margin: 10px 0;
         width: 100%;
+        overflow: hidden;
+    }
+    
+    .g_time {
+        font-size: 0.75rem;
+        color: #6B7280;
+        margin-bottom: 8px;
+        font-family: monospace;
     }
     
     .text-display {
@@ -13,11 +21,9 @@
         border-radius: 4px;
         font-family: monospace;
         resize: none;
-        min-height: 100px;
+        line-height: 1.4;
         {% if preview_mode %}
-            max-height: 150px;
-        {% elif view_mode == 'list' %}
-            max-height: 200px;
+            height: {{ '100px' if view_mode == 'list' else '150px' }};
         {% else %}
             min-height: 300px;
         {% endif %}
@@ -30,20 +36,26 @@
         border-radius: 4px;
     }
     
-    .card-image {
+    .image-container {
         width: 100%;
-        height: auto;
-        object-fit: contain;
-        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
         {% if preview_mode %}
-            max-height: 150px;
-        {% elif view_mode == 'list' %}
-            max-height: 200px;
-        {% elif view_mode == 'grid' %}
-            max-height: 250px;
+            height: {{ '120px' if view_mode == 'list' else '180px' }};
         {% else %}
             max-height: 600px;
         {% endif %}
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    .card-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
     }
     
     .pdf-viewer {
@@ -51,11 +63,7 @@
         border: 1px solid #ced4da;
         border-radius: 4px;
         {% if preview_mode %}
-            height: 200px;
-        {% elif view_mode == 'list' %}
-            height: 300px;
-        {% elif view_mode == 'grid' %}
-            height: 400px;
+            height: {{ '150px' if view_mode == 'list' else '200px' }};
         {% else %}
             height: 800px;
         {% endif %}
@@ -79,21 +87,45 @@
             display: none;
         {% endif %}
     }
+    
+    .text-preview {
+        font-size: 0.875rem;
+        line-height: 1.4;
+        max-height: {{ '100px' if view_mode == 'list' else '150px' }};
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .text-preview::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 30px;
+        background: linear-gradient(transparent, #f8f9fa);
+    }
 </style>
 
 <div class="content-display">
+    {% if card.g_time %}
+    <div class="g_time">g_time: {{ card.g_time }}</div>
+    {% endif %}
+    
     {% if card.content_type == 'binary' %}
         {% if card.is_image %}
-            <img src="data:image/jpeg;base64,{{ card.content }}" alt="Card Image" class="card-image">
+            <div class="image-container">
+                <img src="data:image/jpeg;base64,{{ card.content }}" alt="Card Image" class="card-image">
+            </div>
         {% elif card.is_pdf %}
             <embed src="data:application/pdf;base64,{{ card.content }}" 
                    type="application/pdf"
                    class="pdf-viewer">
         {% else %}
             <div class="binary-preview">
-                <p>Binary content {% if preview_mode %}(preview){% endif %}:</p>
+                <p class="text-sm text-gray-600 mb-2">Binary content {% if preview_mode %}(preview){% endif %}</p>
                 {% if card.hex_preview %}
-                    <pre class="text-xs overflow-x-auto">{{ card.hex_preview }}</pre>
+                    <pre class="text-xs overflow-x-auto bg-gray-100 p-2 rounded">{{ card.hex_preview }}</pre>
                 {% endif %}
                 <a href="data:application/octet-stream;base64,{{ card.content }}" 
                    download="{{ card.filename if card.filename else 'download' }}"
@@ -104,7 +136,14 @@
         {% endif %}
     {% elif card.is_text %}
         <div class="text-content">
-            <textarea class="text-display" readonly>{% if preview_mode %}{{ (card.text_content if card.text_content else card.content)[:500] }}{% if card.content|length > 500 %}...{% endif %}{% else %}{{ card.text_content if card.text_content else card.content }}{% endif %}</textarea>
+            {% if preview_mode %}
+                <div class="text-preview">
+                    {{ (card.text_content if card.text_content else card.content)[:500] }}
+                    {% if card.content|length > 500 %}...{% endif %}
+                </div>
+            {% else %}
+                <textarea class="text-display" readonly>{{ card.text_content if card.text_content else card.content }}</textarea>
+            {% endif %}
         </div>
     {% endif %}
 </div>
