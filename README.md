@@ -98,6 +98,17 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - Efficient in-memory sorting
 - Real-time collection refresh capability
 
+## Repository Management
+
+To ensure consistent data persistence and avoid errors, it is crucial that the repository operates as a single instance throughout the application lifecycle. This is particularly important during testing or any runtime operations. If multiple instances are created, it can lead to separate data pools, causing confusion and potential errors in data retrieval and manipulation.
+
+### Key Points:
+- **Singleton Repository**: The repository should be instantiated as a singleton to maintain a single source of truth for all operations.
+- **Data Consistency**: A single repository instance ensures that all data operations are consistent and reflect the current state of the database.
+- **Avoiding Confusion**: Multiple instances can lead to fragmented data pools, making it difficult to track and manage data effectively.
+
+Ensure that your application or testing setup maintains a single repository instance to leverage the full benefits of MCard's robust data management capabilities.
+
 ## Dependencies
 
 The project relies on several key dependencies:
