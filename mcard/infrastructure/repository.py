@@ -95,11 +95,11 @@ class SQLiteRepository(CardRepository):
         """Retrieve cards with optional time range and pagination."""
         return await self.get_by_time_range(start_time=start_time, end_time=end_time, limit=limit, offset=offset)
 
-    async def delete(self, card: MCard) -> None:
+    async def delete(self, card_hash: str) -> None:
         """Delete a card from the repository."""
-        if await self.get(card.hash):
+        if await self.get(card_hash):
             with self.connection as conn:
-                conn.execute('DELETE FROM card WHERE hash = ?', (card.hash,))
+                conn.execute('DELETE FROM card WHERE hash = ?', (card_hash,))
 
     async def delete_many(self, hash_strs: List[str]) -> None:
         """Delete multiple cards from the repository."""

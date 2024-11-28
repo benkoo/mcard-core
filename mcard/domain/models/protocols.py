@@ -1,13 +1,16 @@
 """
 Core domain protocols for MCard.
 """
+from __future__ import annotations
 from typing import Protocol, Optional, Any, Union, List, runtime_checkable
 from datetime import datetime
+
+from .card import MCard
 
 @runtime_checkable
 class HashingService(Protocol):
     """Abstract hashing service."""
-    def hash_content(self, content: bytes) -> str:
+    async def hash_content(self, content: bytes) -> str:
         """Hash the given content."""
         ...
 
@@ -18,24 +21,45 @@ class HashingService(Protocol):
 @runtime_checkable
 class CardRepository(Protocol):
     """Abstract card repository."""
-    async def save(self, card: 'MCard') -> None:
+    async def save(self, card: MCard) -> None:
         """Save a card to the repository."""
         ...
 
-    async def save_many(self, cards: list['MCard']) -> None:
+    async def save_many(self, cards: list[MCard]) -> None:
         """Save multiple cards to the repository."""
         ...
 
-    async def get(self, hash_str: str) -> Optional['MCard']:
+    async def get(self, hash_str: str) -> Optional[MCard]:
         """Retrieve a card by its hash."""
         ...
 
-    async def get_many(self, hash_strs: list[str]) -> list['MCard']:
+    async def get_many(self, hash_strs: list[str]) -> list[MCard]:
         """Retrieve multiple cards by their hashes."""
         ...
 
-    async def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> list['MCard']:
+    async def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> list[MCard]:
         """Retrieve all cards with optional pagination."""
+        ...
+
+    async def list(
+        self,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None
+    ) -> list[MCard]:
+        """
+        List cards with optional time range and pagination.
+        
+        Args:
+            start_time: Start of time range (inclusive). If None, no lower bound.
+            end_time: End of time range (inclusive). If None, no upper bound.
+            limit: Maximum number of records to return
+            offset: Number of records to skip
+            
+        Returns:
+            List of cards matching the criteria, ordered by g_time DESC
+        """
         ...
 
     async def get_by_time_range(
@@ -44,7 +68,7 @@ class CardRepository(Protocol):
         end_time: Optional[datetime] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> list['MCard']:
+    ) -> list[MCard]:
         """
         Retrieve cards within a time range.
         
@@ -64,7 +88,7 @@ class CardRepository(Protocol):
         time: datetime,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> list['MCard']:
+    ) -> list[MCard]:
         """
         Retrieve cards created before the specified time.
         
@@ -83,7 +107,7 @@ class CardRepository(Protocol):
         time: datetime,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> list['MCard']:
+    ) -> list[MCard]:
         """
         Retrieve cards created after the specified time.
         

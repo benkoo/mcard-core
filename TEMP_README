@@ -1,0 +1,261 @@
+# MonadicCards
+
+A modern, composable card management application built with Astro's Island Architecture. This application demonstrates how to build highly maintainable and modular web applications by leveraging Astro's partial hydration patterns and shadcn/ui's component system.
+
+## Overview
+MonadicCards is a modern web application built with Astro and React that provides a user-friendly interface for managing MCard data. It leverages Astro's partial hydration and island architecture for optimal performance while maintaining a rich, interactive user experience. The app integrates directly with the MCard API for backend operations.
+
+## Architecture Overview
+
+MonadicCards strictly adheres to Astro's Island Architecture pattern, which enables:
+
+- **Isolated Functionality**: Each interactive component is an independent "island" of functionality, reducing coupling between system components
+- **Selective Hydration**: Only interactive components load JavaScript, keeping the base application lightweight
+- **Maximum Composability**: Components can be easily composed, reused, and refactored without affecting other parts of the system
+- **Progressive Enhancement**: Core functionality works without JavaScript, with enhanced features loaded as needed
+
+This architectural approach, combined with shadcn/ui's modular component system, creates a highly maintainable and extensible application where features can be added, removed, or modified with minimal impact on other parts of the system.
+
+## Features
+
+### Card Management
+- Create new cards with text or binary content
+- View cards in a responsive grid layout
+- Delete existing cards
+- Detailed view of individual cards
+- Support for various content types (text, images, PDFs, binary)
+- Automatic content type detection
+- Download functionality for binary content
+
+### UI/UX Features
+- Responsive grid layout with dynamic columns
+- Rate-limited search with debouncing (prevents excessive API calls while typing)
+- Modern, accessible interface built with shadcn/ui components
+- Interactive drag-and-drop file upload
+- Content preview with format-specific rendering
+- Toast notifications using shadcn/ui Toast
+- Progressive enhancement with partial hydration
+- Optimistic UI updates
+- Dark mode support with system preference detection
+
+## Application Structure
+
+### Routes (Astro Pages)
+- **Home** (`/`): Main page with paginated card catalog
+- **Card Catalog** (`/catalog`): Alternative view of all cards
+- **New Card** (`/new`): Interface for card creation
+- **Card Detail** (`/card/[hash]`): Detailed view of a specific card
+
+### Components
+1. **Layout Components**
+   - `Layout.astro`: Base layout with navigation and structure
+   - `NavBar.astro`: Navigation component with responsive design
+   - `ThemeProvider.tsx`: shadcn/ui theme provider with dark mode support
+
+2. **Card Display Components**
+   - `CardContainer.tsx`: Main container with search and display controls
+     - Search bar with debounced input using shadcn/ui Command
+     - Grid column adjustment with shadcn/ui Select
+     - Items per page selector with shadcn/ui Select
+   - `CardGrid.tsx`: Self-contained card grid component
+     - Card grid layout with dynamic columns
+     - Integrated pagination controls
+     - Individual card display and actions
+   - `CardDetail.tsx`: Detailed card view
+   - `CardContent.tsx`: Content rendering component
+
+3. **Utility Components**
+   - `Pagination.tsx`: Reusable pagination component built with shadcn/ui
+     - Page navigation controls using Button components
+     - Items per page integration with Select component
+     - Support for additional URL parameters
+   - `SearchBar.tsx`: Debounced search input using Command component
+   - `GridControls.tsx`: Column and display options using Select
+   - `Dialog.tsx`: Reusable dialog component for confirmations
+   - `Toast.tsx`: Notification system using shadcn/ui Toast
+
+4. **Input Components**
+   - `CardForm.tsx`: Card creation form with tabs using shadcn/ui Tabs
+   - `FileUpload.tsx`: Drag-and-drop file upload with progress indicator
+   - `TextInput.tsx`: Text content input with markdown support
+
+### Component Organization
+The application follows a modular component structure based on Astro's Island Architecture:
+
+1. **Static Islands**: Server-rendered, non-interactive components
+   - Base layout and navigation
+   - Static content displays
+   - SEO elements
+
+2. **Interactive Islands**: Client-hydrated React components
+   - Card management interface
+   - Search and filtering
+   - Form inputs and validation
+   - Real-time updates
+
+3. **Hybrid Components**: Selective hydration based on user interaction
+   - Card previews (static by default, interactive on hover)
+   - Lazy-loaded dialogs
+   - Conditional feature enhancements
+
+This isolation of functionality enables:
+- Independent testing and deployment of features
+- Granular performance optimization
+- Easy feature toggling and A/B testing
+- Simplified maintenance and debugging
+
+### API Integration
+The application communicates with the MCard API using the following endpoints:
+- **GET** `/api/cards`: Retrieve all cards
+- **GET** `/api/cards/[hash]`: Get specific card
+- **POST** `/api/cards`: Create new card
+- **DELETE** `/api/cards/[hash]`: Delete card
+- **GET** `/api/search`: Search cards with pagination
+
+### Directory Structure
+```
+monadic-cards/
+├── src/
+│   ├── pages/
+│   │   ├── index.astro
+│   │   ├── catalog.astro
+│   │   ├── new.astro
+│   │   └── card/
+│   │       └── [hash].astro
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── Layout.astro
+│   │   │   └── NavBar.astro
+│   │   ├── cards/
+│   │   │   ├── CardContainer.tsx
+│   │   │   ├── CardGrid.tsx
+│   │   │   ├── CardDetail.tsx
+│   │   │   └── CardContent.tsx
+│   │   ├── ui/
+│   │   │   ├── Pagination.tsx
+│   │   │   ├── SearchBar.tsx
+│   │   │   └── GridControls.tsx
+│   │   └── forms/
+│   │       ├── CardForm.tsx
+│   │       ├── FileUpload.tsx
+│   │       └── TextInput.tsx
+│   ├── lib/
+│   │   ├── api.ts
+│   │   ├── types.ts
+│   │   └── utils.ts
+│   └── styles/
+│       └── global.css
+├── public/
+├── package.json
+├── tsconfig.json
+├── astro.config.mjs
+└── tailwind.config.cjs
+```
+
+## Development Philosophy
+
+### Composability First
+MonadicCards is built with composability as a core principle:
+
+1. **Modular Architecture**
+   - Each feature is self-contained and independently deployable
+   - Clear boundaries between static and interactive components
+   - Explicit dependencies and minimal coupling
+
+2. **State Management**
+   - Local state contained within islands
+   - Shared state managed through explicit interfaces
+   - Clear data flow between components
+
+3. **Feature Integration**
+   - Features can be added or removed without system-wide changes
+   - Plug-and-play component architecture
+   - Standardized communication patterns between islands
+
+4. **Performance Optimization**
+   - Granular control over JavaScript hydration
+   - Component-level code splitting
+   - Optimal resource loading strategies
+
+## Technical Stack
+
+### Frontend
+- **Astro**: Static site generation and partial hydration
+- **React**: Interactive UI components
+- **shadcn/ui**: Accessible component library and design system
+- **Radix UI**: Low-level UI primitives (via shadcn/ui)
+- **Tailwind CSS**: Styling and responsive design
+- **React Query**: Data fetching and caching
+- **TypeScript**: Type safety and developer experience
+
+## Features in Detail
+
+### Partial Hydration
+MonadicCards uses Astro's partial hydration to optimize performance:
+- Static content is rendered at build time
+- Interactive components are hydrated only when needed
+- Search and pagination are client-side interactive
+- Card content uses progressive enhancement
+
+### State Management
+- React Query for server state
+- URL-based routing and state persistence
+- Optimistic updates for better UX
+- Proper error boundary handling
+
+### Performance Optimizations
+- Image optimization with Astro's built-in tools
+- Lazy loading of off-screen content
+- Debounced search to minimize API calls
+- Efficient pagination with cursor-based implementation
+
+## Configuration
+The application uses environment variables for configuration:
+```env
+PUBLIC_MCARD_API_URL=http://localhost:8000
+PUBLIC_MCARD_API_KEY=your_api_key
+```
+
+## Development
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Initialize shadcn/ui:
+   ```bash
+   npx shadcn-ui init
+   ```
+
+3. Add required components:
+   ```bash
+   npx shadcn-ui add button
+   npx shadcn-ui add select
+   npx shadcn-ui add command
+   npx shadcn-ui add dialog
+   npx shadcn-ui add toast
+   npx shadcn-ui add tabs
+   ```
+
+4. Start development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Build for production:
+   ```bash
+   npm run build
+   ```
+
+## Testing
+- Unit tests with Vitest
+- Component tests with Testing Library
+- End-to-end tests with Playwright
+- API integration tests
+
+## Deployment
+The application can be deployed to any static hosting service:
+1. Build the application
+2. Deploy the `dist` directory
+3. Configure environment variables
+4. Set up API proxy if needed

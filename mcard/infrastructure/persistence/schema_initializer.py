@@ -3,7 +3,7 @@ import sqlite3
 import os
 from mcard.infrastructure.persistence.schema_utils import initialize_schema
 from mcard.domain.models.protocols import CardRepository
-from mcard.infrastructure.repository import SQLiteRepository
+from mcard.infrastructure.persistence.sqlite import SQLiteRepository
 from mcard.domain.models.config import AppSettings, DatabaseSettings
 
 class SchemaInitializer:

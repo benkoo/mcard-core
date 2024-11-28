@@ -1,11 +1,14 @@
-"""Tests for concurrency and transaction handling in SQLite card repository."""
+"""Tests for concurrency in SQLite card repository."""
 import pytest
-import os
-import tempfile
+import asyncio
 import logging
-import time
-from mcard.infrastructure.persistence.sqlite import SQLiteRepository, SchemaInitializer
+from datetime import datetime, timezone
+from mcard.infrastructure.persistence.sqlite import SQLiteRepository
+from mcard.infrastructure.persistence.schema_initializer import SchemaInitializer
 from mcard.domain.models.card import MCard
+import tempfile
+import os
+import time
 from mcard.domain.models.exceptions import StorageError
 
 # Configure logging
@@ -35,66 +38,91 @@ def repository(db_path):
     SchemaInitializer.initialize_schema(repo.connection)
     return repo
 
-def test_concurrent_operations(repository):
-    start_time = time.time()
+@pytest.mark.asyncio
+async def test_concurrent_operations(repository):
+    """Test concurrent operations on the repository."""
     repo = repository
-    card1 = MCard(content="Card 1")
-    card2 = MCard(content="Card 2")
-    repo.save(card1)
-    repo.save(card2)
-    all_cards = repo.get_all()
-    assert len(all_cards) == 2
+    start_time = time.time()
+
+    # Create multiple cards concurrently
+    cards = [MCard(content=f"Content {i}") for i in range(10)]
+    tasks = [repo.save(card) for card in cards]
+    await asyncio.gather(*tasks)
+
+    # Verify all cards were saved
+    saved_cards = await repo.get_all()
+    assert len(saved_cards) == len(cards)
+
+    # Test concurrent reads
+    tasks = [repo.get(card.hash) for card in cards]
+    retrieved_cards = await asyncio.gather(*tasks)
+    assert len(retrieved_cards) == len(cards)
+
     logging.debug(f"test_concurrent_operations took {time.time() - start_time:.2f} seconds")
 
-def test_transaction_rollback(repository):
-    start_time = time.time()
+@pytest.mark.asyncio
+async def test_transaction_rollback(repository):
+    """Test transaction rollback on error."""
     repo = repository
-    card = MCard(content="Rollback Test")
-    repo.save(card)
-    try:
-        repo.save(card)
-        raise Exception("Trigger rollback")
-    except Exception:
-        pass
-    retrieved_card = repo.get(card.hash)
-    assert retrieved_card.content == "Rollback Test"
+    start_time = time.time()
+
+    # Create a card
+    card = MCard(content="Test content")
+    await repo.save(card)
+
+    # Try to save an invalid card
+    invalid_card = MCard(content="x" * (repo.max_content_size + 1))
+    with pytest.raises(Exception):
+        await repo.save(invalid_card)
+
+    # Verify the first card is still there
+    saved_card = await repo.get(card.hash)
+    assert saved_card.content == "Test content"
+
     logging.debug(f"test_transaction_rollback took {time.time() - start_time:.2f} seconds")
 
-def test_nested_transactions(repository):
-    logging.debug("Starting test_nested_transactions")
-    try:
-        repo = repository
-        card = MCard(content="Nested Transaction Test")
-        repo.save(card)
-        repo.delete(card.hash)
-        card = MCard(content="Updated Content")
-        repo.save(card)
-        retrieved_card = repo.get(card.hash)
-        assert retrieved_card.content == "Updated Content"
-    except Exception as e:
-        logging.error(f"test_nested_transactions failed: {str(e)}")
+@pytest.mark.asyncio
+async def test_nested_transactions(repository):
+    """Test nested transactions."""
+    repo = repository
+    card = MCard(content="Test content")
+    await repo.save(card)
+    await repo.delete(card.hash)
+    with pytest.raises(StorageError):
+        await repo.get(card.hash)
 
-def test_transaction_isolation(repository):
-    logging.debug("Starting test_transaction_isolation")
-    try:
-        repo = repository
-        card1 = MCard(content="Isolation Test 1")
-        repo.save(card1)
-        card2 = MCard(content="Isolation Test 2")
-        repo.save(card2)
-        all_cards = repo.get_all()
-        assert len(all_cards) == 2
-    except Exception as e:
-        logging.error(f"test_transaction_isolation failed: {str(e)}")
-
-def test_concurrent_transactions(db_path):
-    start_time = time.time()
-    repo = SQLiteRepository(db_path)
-    SchemaInitializer.initialize_schema(repo.connection)
-    card1 = MCard(content="Concurrent Transaction 1")
-    card2 = MCard(content="Concurrent Transaction 2")
-    repo.save(card1)
-    repo.save(card2)
-    all_cards = repo.get_all()
+@pytest.mark.asyncio
+async def test_transaction_isolation(repository):
+    """Test transaction isolation."""
+    repo = repository
+    card1 = MCard(content="Isolation Test 1")
+    card2 = MCard(content="Isolation Test 2")
+    await repo.save(card1)
+    await repo.save(card2)
+    all_cards = await repo.get_all()
     assert len(all_cards) == 2
+
+@pytest.mark.asyncio
+async def test_concurrent_transactions(db_path):
+    """Test concurrent transactions."""
+    start_time = time.time()
+    repo1 = SQLiteRepository(db_path)
+    repo2 = SQLiteRepository(db_path)
+
+    # Create cards in both repositories
+    card1 = MCard(content="Content from repo1")
+    card2 = MCard(content="Content from repo2")
+
+    await asyncio.gather(
+        repo1.save(card1),
+        repo2.save(card2)
+    )
+
+    # Verify both cards are accessible from both repositories
+    saved_cards1 = await repo1.get_all()
+    saved_cards2 = await repo2.get_all()
+
+    assert len(saved_cards1) == 2
+    assert len(saved_cards2) == 2
+
     logging.debug(f"test_concurrent_transactions took {time.time() - start_time:.2f} seconds")

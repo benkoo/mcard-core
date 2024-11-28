@@ -109,6 +109,25 @@ To ensure consistent data persistence and avoid errors, it is crucial that the r
 
 Ensure that your application or testing setup maintains a single repository instance to leverage the full benefits of MCard's robust data management capabilities.
 
+## API Response Codes
+
+The API uses standard HTTP response codes to indicate the success or failure of requests:
+
+### Success Codes
+- **201 Created**: Successfully created a new card
+- **204 No Content**: Successfully deleted a card
+- **200 OK**: Successfully retrieved card(s)
+
+### Client Error Codes
+- **400 Bad Request**: Invalid request parameters or content
+- **401 Unauthorized**: Missing or invalid API key
+- **404 Not Found**: Requested card does not exist
+
+### Server Error Codes
+- **500 Internal Server Error**: Unexpected server-side error
+
+All error responses include a detail message to help diagnose the issue.
+
 ## Dependencies
 
 The project relies on several key dependencies:
@@ -144,10 +163,96 @@ To set up the project, follow these steps:
 
 ## Testing
 
-To run the tests, ensure that your `PYTHONPATH` is set correctly. You can run all tests using:
+The MCard Core library includes a comprehensive test suite organized into several key areas:
+
+### Test Structure
+
+```
+tests/
+├── application/          # Application service layer tests
+├── domain/              # Domain model and service tests
+│   ├── models/          # Core model tests (MCard, exceptions, etc.)
+│   └── services/        # Domain service tests (hashing, time)
+├── infrastructure/      # Infrastructure layer tests
+│   ├── content/         # Content type detection tests
+│   └── persistence/     # SQLite persistence tests
+└── interfaces/          # Interface layer tests
+    └── cli/            # CLI interface tests
+```
+
+### Key Test Areas
+
+1. **Domain Model Tests**
+   - MCard creation with various content types
+   - Hash generation and validation
+   - Time-based operations and ordering
+   - Exception handling and validation
+   - Configuration management
+
+2. **Persistence Layer Tests**
+   - Basic CRUD operations
+   - Transaction management and isolation
+   - Concurrent operations handling
+   - Batch operations and pagination
+   - Content type handling (binary/text)
+   - Connection pool management
+   - Performance benchmarking
+   - Storage error propagation
+   - Race condition prevention
+
+3. **Content Handling Tests**
+   - Binary vs text content detection
+   - MIME type detection
+   - XML and JSON validation
+   - Content size validation
+
+4. **Service Layer Tests**
+   - Card service operations
+   - Collision-aware hashing
+   - Custom hash function support
+   - Time service operations
+
+5. **API Interface Tests**
+   - HTTP status code validation (201 for creation, 204 for deletion)
+   - Error response handling (404 for not found, 500 for server errors)
+   - Content filtering with case-insensitive matching
+   - API key authentication
+   - Request validation
+   - Response format verification
+
+6. **CLI Interface Tests**
+   - Command execution
+   - Error handling
+   - Input validation
+
+### Test Features
+
+- **Automated Fixtures**: Uses pytest fixtures for database setup/teardown
+- **Comprehensive Coverage**: Over 140 test cases covering all major components
+- **Concurrent Testing**: Validates thread-safety and transaction isolation
+- **Error Simulation**: Tests error handling and recovery mechanisms
+- **Performance Metrics**: Includes benchmarks for key operations
+
+### Running Tests
+
+To run the test suite:
 
 ```bash
-pytest
+pytest tests/
+```
+
+For verbose output with logging:
+
+```bash
+pytest -v tests/ --log-cli-level=DEBUG
+```
+
+To run specific test categories:
+
+```bash
+pytest tests/domain/          # Run domain tests only
+pytest tests/infrastructure/  # Run infrastructure tests only
+pytest tests/interfaces/      # Run interface tests only
 ```
 
 ## Project Structure
@@ -319,73 +424,84 @@ cards = collection.get_cards_in_timerange(
 )
 ```
 
-### Configuration
+## Configuration Management and Environment Variables
 
-MCard can be configured through environment variables:
+MCard Core supports flexible configuration through environment variables, allowing dynamic runtime configuration of key system parameters.
 
-```bash
-# Hashing settings
-export MCARD_HASH_ALGORITHM="sha256"  # Default hashing algorithm (md5, sha1, sha256, sha512)
-export MCARD_COLLISION_AWARE="true"   # Enable collision-aware hashing
+### Supported Configuration Parameters
 
-# Time settings
-export MCARD_TIMEZONE="America/New_York"  # Default timezone for timestamps
-export MCARD_TIME_FORMAT="%Y-%m-%d %H:%M:%S %Z"  # Time format for display
-export MCARD_DATE_FORMAT="%Y-%m-%d"  # Date format for display
-export MCARD_USE_UTC=false  # Whether to use UTC for internal storage
+| Environment Variable         | Description                                | Default Value       | Example                |
+|------------------------------|--------------------------------------------|--------------------|------------------------|
+| `MCARD_API_KEY`              | API authentication key                     | `default_mcard_api_key` | `test_custom_api_key_12345` |
+| `MCARD_MANAGER_DB_PATH`      | Path to the SQLite database file           | `MCardManagerStore.db` | `test_custom_database.db` |
+| `MCARD_MANAGER_DATA_SOURCE`  | Database backend type                      | `sqlite`           | `sqlite`               |
+| `MCARD_MANAGER_POOL_SIZE`    | Connection pool size                       | `5`                | `3`                   |
+| `MCARD_MANAGER_TIMEOUT`      | Database connection timeout (seconds)      | `30.0`             | `15.0`                |
+| `MCARD_MANAGER_HASH_ALGORITHM` | Cryptographic hash algorithm             | `sha256`           | `sha512`              |
 
-# Database settings
-export MCARD_DB_PATH="cards.db"  # SQLite database path
-export MCARD_POOL_SIZE=5  # Connection pool size
-```
+### Dynamic Configuration Loading
 
-### Thread Safety
+MCard Core implements a dynamic configuration loading mechanism that allows runtime configuration updates through environment variables. Key features include:
 
-MCard is designed to be thread-safe and can be safely used in multi-threaded or async environments:
+- Real-time environment variable parsing
+- Flexible configuration reloading
+- Secure default values
+- Comprehensive type conversion
+
+#### Example Configuration
 
 ```python
-from mcard import SQLiteCardRepository, MCard
-
-# Thread-safe connection pooling
-storage = SQLiteCardRepository("cards.db", pool_size=5)
-
-# Connections are automatically managed
-async def worker():
-    async with storage.transaction():
-        card = MCard(content="Thread-safe content")
-        await storage.save(card)
-
-# Clean up when done
-await storage.close()
+# Load configuration dynamically
+app_settings = AppSettings(
+    database=DatabaseSettings(
+        db_path=os.getenv('MCARD_MANAGER_DB_PATH', 'default_database.db'),
+        data_source=os.getenv('MCARD_MANAGER_DATA_SOURCE'),
+        pool_size=int(os.getenv('MCARD_MANAGER_POOL_SIZE', 5)),
+        timeout=float(os.getenv('MCARD_MANAGER_TIMEOUT', 30.0))
+    ),
+    mcard_api_key=os.getenv('MCARD_API_KEY', 'default_test_key')
+)
 ```
 
-## Development
+### Configuration Testing
 
-1. Clone the repository:
-```bash
-git clone https://github.com/benkoo/mcard-core.git
-cd mcard-core
+We provide comprehensive test scripts to validate configuration loading and environment variable handling:
+
+- `test_mcard_config_env.py`: Verifies dynamic configuration loading
+  - Tests API key configuration
+  - Validates database path settings
+  - Checks environment variable propagation
+  - Ensures API functionality with custom configurations
+
+### Best Practices
+
+1. Use environment variables for sensitive configuration
+2. Provide sensible default values
+3. Validate and sanitize configuration inputs
+4. Use secure methods for storing sensitive information
+
+### Security Considerations
+
+- Never hardcode sensitive credentials
+- Use environment-specific configuration files
+- Implement proper access controls
+- Validate and sanitize all configuration inputs
+
+## Debugging and Logging
+
+Enable detailed logging to troubleshoot configuration issues:
+
+```python
+import logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 ```
 
-2. Create a virtual environment:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-```
+## Contribution
 
-3. Install development dependencies:
-```bash
-pip install -e ".[dev]"
-```
-
-4. Run tests:
-```bash
-pytest
-```
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+We welcome contributions to improve our configuration management system. Please submit issues or pull requests with suggestions for enhancement.
 
 ## License
 

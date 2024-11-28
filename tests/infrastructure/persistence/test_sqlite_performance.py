@@ -1,10 +1,12 @@
-"""Performance tests for SQLite card repository."""
+"""Tests for performance in SQLite card repository."""
 import pytest
-from mcard.infrastructure.persistence.sqlite import SQLiteRepository, SchemaInitializer
+from mcard.infrastructure.persistence.sqlite import SQLiteRepository
+from mcard.infrastructure.persistence.schema_initializer import SchemaInitializer
 from mcard.domain.models.card import MCard
 import time
 import os
 import tempfile
+import asyncio
 import logging
 
 @pytest.fixture
@@ -26,19 +28,21 @@ def repository(db_path):
     # Ensure database connection is closed after tests
     repo.connection.close()
 
-def test_write_performance(repository):
+@pytest.mark.asyncio
+async def test_write_performance(repository):
     repo = repository
     start_time = time.time()
     cards = [MCard(content=f"Card {i}") for i in range(100)]
-    repo.save_many(cards)  # Call save_many synchronously
+    await repo.save_many(cards)  # Call save_many asynchronously
     end_time = time.time()
     logging.debug(f"Write performance test completed in {end_time - start_time} seconds.")
 
-def test_read_performance(repository):
+@pytest.mark.asyncio
+async def test_read_performance(repository):
     repo = repository
     cards = [MCard(content=f"Card {i}") for i in range(100)]
-    repo.save_many(cards)  # Call save_many synchronously
+    await repo.save_many(cards)  # Call save_many asynchronously
     start_time = time.time()
-    retrieved_cards = repo.get_all()
+    retrieved_cards = await repo.get_all()
     end_time = time.time()
     logging.debug(f"Read performance test completed in {end_time - start_time} seconds.")

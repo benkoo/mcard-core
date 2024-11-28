@@ -3,6 +3,7 @@ Hashing service implementation.
 """
 import hashlib
 import importlib
+import asyncio
 from typing import Optional, Dict
 
 from ..models.config import HashingSettings
@@ -37,7 +38,7 @@ class DefaultHashingService:
         
         return getattr(hashlib, self._settings.algorithm)
 
-    def hash_content_sync(self, content: bytes) -> str:
+    def _hash_content_sync(self, content: bytes) -> str:
         """Hash the given content synchronously."""
         if not content:
             raise HashingError("Cannot hash empty content")
@@ -58,7 +59,13 @@ class DefaultHashingService:
 
     async def hash_content(self, content: bytes) -> str:
         """Hash the given content."""
-        return self.hash_content_sync(content)
+        if not content:
+            raise HashingError("Cannot hash empty content")
+        
+        # Run hashing in a thread pool since it's CPU-bound
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, self._hash_content_sync, content)
+        return result
 
     def validate_hash(self, hash_str: str) -> bool:
         """Validate a hash string."""
@@ -74,11 +81,12 @@ class DefaultHashingService:
                 all(c in '0123456789abcdef' for c in hash_str.lower())
             )
 
-    def verify_hash(self, content: bytes, hash_str: str) -> bool:
+    async def verify_hash(self, content: bytes, hash_str: str) -> bool:
         """Verify that content matches a hash."""
         if not self.validate_hash(hash_str):
             return False
-        return self.hash_content_sync(content) == hash_str
+        computed_hash = await self.hash_content(content)
+        return computed_hash == hash_str
 
     def get_hash_length(self) -> int:
         """Get the expected length of hash strings."""
@@ -128,16 +136,16 @@ class CollisionAwareHashingService(DefaultHashingService):
             self._settings.algorithm = self.ALGORITHM_STRENGTH[self._current_algorithm_index]
             self._hash_func = self._get_hash_function()
 
-    def _handle_collision(self, content1: bytes, content2: bytes):
+    async def _handle_collision(self, content1: bytes, content2: bytes):
         """Handle hash collision by upgrading to a stronger algorithm."""
         # Store collision in cache
-        current_hash = super().hash_content_sync(content1)
+        current_hash = await self.hash_content(content1)
         self._collision_cache[current_hash] = (content1, content2)
         
         # Upgrade to stronger algorithm
         self._upgrade_algorithm()
 
-    def store_collision(self, content1: bytes, content2: bytes, algorithm: str):
+    async def store_collision(self, content1: bytes, content2: bytes, algorithm: str):
         """Store a known collision case."""
         if algorithm not in self.ALGORITHM_STRENGTH:
             raise HashingError(f"Unsupported algorithm for collision tracking: {algorithm}")
@@ -152,7 +160,7 @@ class CollisionAwareHashingService(DefaultHashingService):
             raise HashingError(f"Invalid algorithm: {algorithm}")
 
         # Store in collision cache
-        current_hash = super().hash_content_sync(content1)
+        current_hash = await self.hash_content(content1)
         self._collision_cache[current_hash] = (content1, content2)
 
     async def hash_content(self, content: bytes) -> str:
@@ -165,14 +173,14 @@ class CollisionAwareHashingService(DefaultHashingService):
         if self._card_repository:
             existing_card = await self._card_repository.get(current_hash)
             if existing_card and existing_card.content != content:
-                self._handle_collision(content, existing_card.content)
+                await self._handle_collision(content, existing_card.content)
                 return await self.hash_content(content)  # Retry with upgraded algorithm
 
         # Check collision cache
         if current_hash in self._collision_cache:
             stored_content1, stored_content2 = self._collision_cache[current_hash]
             if content != stored_content1 and content != stored_content2:
-                self._handle_collision(content, stored_content1)
+                await self._handle_collision(content, stored_content1)
                 return await self.hash_content(content)  # Retry with upgraded algorithm
 
         return current_hash

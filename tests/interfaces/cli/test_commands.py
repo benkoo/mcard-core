@@ -13,7 +13,7 @@ from mcard.interfaces.cli.commands import cli
 # Test data
 TEST_CONTENT = "Test content"
 TEST_HASH = "test_hash_123"
-TEST_TIME = datetime.now(timezone.utc)
+TEST_TIME = datetime.now(timezone.utc).isoformat()
 TEST_CARD = MCard(content=TEST_CONTENT, hash=TEST_HASH, g_time=TEST_TIME)
 
 @pytest.fixture
@@ -56,7 +56,7 @@ def test_get_command_success(runner, mock_get_repo):
     assert result.exit_code == 0
     assert TEST_HASH in result.output
     assert TEST_CONTENT in result.output
-    assert str(TEST_TIME) in result.output
+    assert TEST_TIME in result.output
     
     mock_get_repo.get.assert_called_once_with(TEST_HASH)
 
@@ -78,7 +78,7 @@ def test_list_command_no_filters(runner, mock_get_repo):
     assert result.exit_code == 0
     assert TEST_HASH in result.output
     assert TEST_CONTENT in result.output
-    assert str(TEST_TIME) in result.output
+    assert TEST_TIME in result.output
     
     mock_get_repo.get_all.assert_called_once_with(None, None)
 

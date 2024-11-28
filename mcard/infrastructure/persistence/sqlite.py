@@ -1,79 +1,58 @@
-"""
-SQLite implementation of the card repository.
-"""
+"""SQLite repository implementation."""
 import sqlite3
 import logging
-from typing import Optional, List, Union
 from datetime import datetime, timezone
-from dateutil import parser
+from typing import List, Optional
+import threading
+
 from ...domain.models.card import MCard
 from ...domain.models.exceptions import StorageError, ValidationError
-from ...domain.services.hashing import get_hashing_service
-from .schema_initializer import SchemaInitializer, initialize_schema
-import time
+from ...domain.models.protocols import CardRepository
 
-class SQLiteRepository:
-    """SQLite implementation of the card repository using synchronous sqlite3."""
+class SQLiteRepository(CardRepository):
+    """SQLite-based repository implementation."""
 
-    def __init__(self, db_path: str):
-        """Initialize the repository."""
-        self.db_path = db_path
-        self.max_content_size = 10 * 1024 * 1024  # 10MB
-        self.connection = sqlite3.connect(self.db_path)
+    def __init__(self, db_path: str, max_content_size: int = 100 * 1024 * 1024):  # 100MB default
+        """Initialize the repository with a database path."""
+        self._db_path = db_path
+        self._local = threading.local()
+        self._max_content_size = max_content_size
         self._init_db()
-        SchemaInitializer.initialize_schema(self.connection)
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         """Initialize the database schema."""
-        initialize_schema(self.connection)
+        self._ensure_table()
 
-    def _validate_content_size(self, content: Union[bytes, str]) -> None:
-        """Validate content size."""
-        size = len(content.encode('utf-8') if isinstance(content, str) else content)
-        if size > self.max_content_size:
-            raise ValidationError(f"Content size exceeds maximum limit of {self.max_content_size} bytes")
+    @property
+    def connection(self) -> sqlite3.Connection:
+        """Get thread-local database connection."""
+        if not hasattr(self._local, "connection"):
+            self._local.connection = sqlite3.connect(self._db_path)
+            self._local.connection.row_factory = sqlite3.Row
+            self._local.connection.execute("PRAGMA foreign_keys = ON")
+        return self._local.connection
 
-    def _encode_content(self, content: Union[bytes, str]) -> bytes:
-        """Encode content as bytes."""
-        return content.encode('utf-8') if isinstance(content, str) else content
+    @property
+    def max_content_size(self) -> int:
+        """Get maximum allowed content size."""
+        return self._max_content_size
 
-    def save(self, card: MCard) -> None:
-        """Save a card to the database."""
+    def _ensure_table(self) -> None:
+        """Ensure the required table exists."""
         try:
-            content = card.content
-            self._validate_content_size(content)
-
-            # Encode content as bytes for hashing and storage
-            encoded_content = self._encode_content(content)
-
-            # Compute hash if needed
-            if card.hash == "temp_hash":
-                hashing_service = get_hashing_service()
-                computed_hash = hashing_service.hash_content_sync(encoded_content)
-                card = MCard(content=card.content, hash=computed_hash, g_time=card.g_time)
-
-            # Convert g_time to a datetime object if it's a string
-            if isinstance(card.g_time, str):
-                card_g_time = parser.parse(card.g_time)
-            else:
-                card_g_time = card.g_time
-
-            # Remove timezone or convert to UTC if necessary
-            card_g_time = card_g_time.replace(tzinfo=None)
-            card_g_time = datetime.fromisoformat(card_g_time.isoformat())
-
-            self.connection.execute(
-                "INSERT OR REPLACE INTO card (hash, content, g_time) VALUES (?, ?, ?)",
-                (card.hash, sqlite3.Binary(encoded_content), card_g_time.isoformat())
-            )
-            self.connection.commit()
-        except ValidationError:
-            raise
+            with self.connection as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS card (
+                        hash TEXT PRIMARY KEY,
+                        content BLOB NOT NULL,
+                        g_time TEXT NOT NULL
+                    )
+                """)
         except Exception as e:
-            raise StorageError(f"Failed to save card: {str(e)}")
+            raise StorageError(f"Failed to create table: {str(e)}")
 
-    def get(self, card_hash: str) -> Optional[MCard]:
-        """Retrieve a card from the database by its hash."""
+    async def get(self, card_hash: str) -> Optional[MCard]:
+        """Retrieve a card by its hash."""
         try:
             cursor = self.connection.execute(
                 "SELECT hash, content, g_time FROM card WHERE hash = ?",
@@ -83,7 +62,7 @@ class SQLiteRepository:
             if row is None:
                 raise StorageError(f"Card with hash {card_hash} not found.")
 
-            content = bytes(row[1])  # Access content by index
+            content = bytes(row['content'])
             # Attempt to decode as UTF-8 if it looks like text
             if not any(b for b in content if b < 32 and b not in (9, 10, 13)):
                 try:
@@ -91,197 +70,153 @@ class SQLiteRepository:
                 except UnicodeDecodeError:
                     pass  # Keep as bytes if we can't decode
 
-            # Parse timestamp
-            g_time = datetime.fromisoformat(row[2])
-            if g_time.tzinfo is None:
-                g_time = g_time.replace(tzinfo=timezone.utc)
-            else:
-                g_time = g_time.astimezone(timezone.utc)
-
             return MCard(
                 content=content,
-                hash=row[0],  # Access hash by index
-                g_time=g_time
+                hash=row['hash'],
+                g_time=row['g_time']
             )
         except Exception as e:
             raise StorageError(f"Failed to retrieve card: {str(e)}")
 
-    def save_many(self, cards: List[MCard]) -> None:
-        """Save multiple cards at once."""
-        if not cards:
-            return
-
-        # Log the start of the batch save operation
-        logging.debug(f"Starting batch save for {len(cards)} cards.")
-        
-        # Log the time taken for encoding and hashing
-        encoding_start_time = time.time()
-        
-        new_cards = []
-        values = []
-        for card in cards:
-            content = card.content
-            self._validate_content_size(content)
-
-            # Encode content as bytes for hashing and storage
-            encoded_content = self._encode_content(content)
-
-            # Compute hash if needed
-            if card.hash == "temp_hash":
-                hashing_service = get_hashing_service()
-                computed_hash = hashing_service.hash_content_sync(encoded_content)
-                card = MCard(content=card.content, hash=computed_hash, g_time=card.g_time)
-
-            # Convert g_time to a datetime object if it's a string
-            if isinstance(card.g_time, str):
-                card_g_time = parser.parse(card.g_time)
-            else:
-                card_g_time = card.g_time
-
-            # Remove timezone or convert to UTC if necessary
-            card_g_time = card_g_time.replace(tzinfo=None)
-            card_g_time = datetime.fromisoformat(card_g_time.isoformat())
-
-            new_cards.append(card)
-            values.append((
-                card.hash,
-                sqlite3.Binary(encoded_content),
-                card_g_time.isoformat()
-            ))
-
-        encoding_duration = time.time() - encoding_start_time
-        logging.debug(f"Encoding and hashing completed in {encoding_duration:.2f} seconds.")
-
-        self.connection.executemany(
-            "INSERT OR REPLACE INTO card (hash, content, g_time) VALUES (?, ?, ?)",
-            values
-        )
-        self.connection.commit()
-        
-        # Log the end of the batch save operation
-        logging.debug("Batch save operation completed.")
-        
-        # Update the input list with new cards that have computed hashes
-        cards.clear()
-        cards.extend(new_cards)
-
-    def get_many(self, hash_strs: List[str]) -> List[MCard]:
-        """Retrieve multiple cards by their hashes."""
-        if not hash_strs:
-            return []
-
-        if not all(isinstance(h, str) for h in hash_strs):
-            raise StorageError("All hashes must be strings")
-
+    async def save(self, card: MCard) -> None:
+        """Save a card to the database."""
         try:
-            placeholders = ','.join('?' * len(hash_strs))
-            cursor = self.connection.execute(
-                f"SELECT * FROM card WHERE hash IN ({placeholders}) ORDER BY g_time DESC",
-                hash_strs
-            )
-            rows = cursor.fetchall()
+            # Convert content to bytes if it's a string
+            content = card.content.encode() if isinstance(card.content, str) else card.content
+            
+            if len(content) > self.max_content_size:
+                raise ValidationError(f"Content size exceeds maximum limit of {self.max_content_size} bytes")
+            
+            with self.connection as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO card (hash, content, g_time) VALUES (?, ?, ?)",
+                    (card.hash, content, str(card.g_time))
+                )
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to save card: {str(e)}")
 
+    async def save_many(self, cards: List[MCard]) -> None:
+        """Save multiple cards at once."""
+        try:
+            values = []
+            for card in cards:
+                content = card.content.encode() if isinstance(card.content, str) else card.content
+                if len(content) > self.max_content_size:
+                    raise ValidationError(f"Content size exceeds maximum limit of {self.max_content_size} bytes")
+                values.append((card.hash, content, str(card.g_time)))
+
+            with self.connection as conn:
+                conn.execute("BEGIN TRANSACTION")
+                try:
+                    conn.executemany(
+                        "INSERT OR REPLACE INTO card (hash, content, g_time) VALUES (?, ?, ?)",
+                        values
+                    )
+                    conn.execute("COMMIT")
+                except Exception as e:
+                    conn.execute("ROLLBACK")
+                    raise StorageError(f"Failed to save cards: {str(e)}")
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to save cards: {str(e)}")
+
+    async def get_many(self, hashes: List[str]) -> List[MCard]:
+        """Retrieve multiple cards by their hashes."""
+        try:
             cards = []
-            for row in rows:
-                content = row[1]  # Access content by index
-                # Log content type
-                logging.debug(f"Retrieved content type: {type(content)}")
-                # Decode content if it's stored as bytes and can be decoded
-                if isinstance(content, bytes):
+            placeholders = ','.join('?' * len(hashes))
+            cursor = self.connection.execute(
+                f"SELECT hash, content, g_time FROM card WHERE hash IN ({placeholders}) ORDER BY g_time DESC",
+                hashes
+            )
+            for row in cursor:
+                content = bytes(row['content'])
+                if not any(b for b in content if b < 32 and b not in (9, 10, 13)):
                     try:
                         content = content.decode('utf-8')
                     except UnicodeDecodeError:
-                        pass  # Keep as bytes if we can't decode
-
-                # Parse timestamp and ensure UTC
-                g_time = datetime.fromisoformat(row[2])
-                if g_time.tzinfo is None:
-                    g_time = g_time.replace(tzinfo=timezone.utc)
-                else:
-                    g_time = g_time.astimezone(timezone.utc)
-
+                        pass
                 cards.append(MCard(
                     content=content,
-                    hash=row[0],  # Access hash by index
-                    g_time=g_time
+                    hash=row['hash'],
+                    g_time=row['g_time']
                 ))
             return cards
         except Exception as e:
             raise StorageError(f"Failed to retrieve cards: {str(e)}")
 
-    def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
-        """Retrieve all cards with pagination support."""
+    async def delete(self, card_hash: str) -> None:
+        """Delete a card from the database."""
         try:
-            logging.debug("Starting get_all operation.")
-            query_start_time = time.time()
+            with self.connection as conn:
+                cursor = conn.execute(
+                    "DELETE FROM card WHERE hash = ?",
+                    (card_hash,)
+                )
+                if cursor.rowcount == 0:
+                    raise StorageError(f"Card with hash {card_hash} not found.")
+        except StorageError as e:
+            raise StorageError(f"Failed to delete card: {str(e)}")
+        except Exception as e:
+            raise StorageError(f"Failed to delete card: {str(e)}")
 
-            query = "SELECT * FROM card ORDER BY g_time DESC"
+    async def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
+        """Retrieve all cards with optional pagination."""
+        try:
+            query = "SELECT hash, content, g_time FROM card ORDER BY g_time DESC"
             params = []
-
+            
             if limit is not None:
                 query += " LIMIT ?"
                 params.append(limit)
                 if offset is not None:
                     query += " OFFSET ?"
                     params.append(offset)
-
-            cards = []
+            
             cursor = self.connection.execute(query, params)
-            for row in cursor.fetchall():
-                content = bytes(row[1])
+            cards = []
+            for row in cursor:
+                content = bytes(row['content'])
                 if not any(b for b in content if b < 32 and b not in (9, 10, 13)):
                     try:
                         content = content.decode('utf-8')
                     except UnicodeDecodeError:
                         pass
-
-                g_time = datetime.fromisoformat(row[2])
-                if g_time.tzinfo is None:
-                    g_time = g_time.replace(tzinfo=timezone.utc)
-                else:
-                    g_time = g_time.astimezone(timezone.utc)
-
                 cards.append(MCard(
                     content=content,
-                    hash=row[0],
-                    g_time=g_time
+                    hash=row['hash'],
+                    g_time=row['g_time']
                 ))
-
-            query_duration = time.time() - query_start_time
-            logging.debug(f"Query execution completed in {query_duration:.2f} seconds.")
-            logging.debug("get_all operation completed.")
             return cards
         except Exception as e:
             raise StorageError(f"Failed to retrieve cards: {str(e)}")
 
-    def delete(self, hash_str: str) -> None:
-        """Delete a card by its hash."""
+    async def remove(self, hash_str: str) -> None:
+        """Remove a card by its hash."""
         try:
-            cursor = self.connection.execute(
-                "SELECT 1 FROM card WHERE hash = ?",
-                (hash_str,)
-            )
-            if cursor.fetchone() is None:
-                raise StorageError(f"Card with hash {hash_str} not found.")
-            self.connection.execute(
-                "DELETE FROM card WHERE hash = ?",
-                (hash_str,)
-            )
-            self.connection.commit()
+            with self.connection as conn:
+                cursor = conn.execute("DELETE FROM card WHERE hash = ?", (hash_str,))
+                if cursor.rowcount == 0:
+                    raise StorageError(f"Card with hash {hash_str} not found")
         except Exception as e:
-            raise StorageError(f"Failed to delete card: {str(e)}")
+            raise StorageError(f"Failed to remove card: {e}")
 
-    def delete_many(self, hash_strs: List[str]) -> None:
-        """Delete multiple cards by their hashes."""
-        if not hash_strs:
-            return
+    async def close_connection(self) -> None:
+        """Close the database connection."""
+        if hasattr(self._local, "connection"):
+            try:
+                self._local.connection.close()
+                delattr(self._local, "connection")
+            except Exception as e:
+                logging.error(f"Error closing database connection: {e}")
 
-        try:
-            placeholders = ','.join('?' * len(hash_strs))
-            self.connection.execute(
-                f"DELETE FROM card WHERE hash IN ({placeholders})",
-                hash_strs
-            )
-            self.connection.commit()
-        except Exception as e:
-            raise StorageError(f"Failed to delete cards: {str(e)}")
+    def __del__(self):
+        """Clean up database connections."""
+        if hasattr(self._local, "connection"):
+            try:
+                self._local.connection.close()
+            except Exception:
+                pass  # Ignore cleanup errors

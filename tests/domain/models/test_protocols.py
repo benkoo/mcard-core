@@ -11,10 +11,10 @@ from mcard.domain.models.card import MCard
 
 class MockHashingService:
     """Mock implementation of HashingService protocol."""
-    def hash_content(self, content: bytes) -> str:
+    async def hash_content(self, content: bytes) -> str:
         return "mock_hash"
 
-    def validate_hash(self, hash_str: str) -> bool:
+    async def validate_hash(self, hash_str: str) -> bool:
         return hash_str == "mock_hash"
 
 class MockCardRepository:
@@ -25,18 +25,36 @@ class MockCardRepository:
     async def save(self, card: MCard) -> None:
         self.cards[card.hash] = card
 
-    async def save_many(self, cards: list[MCard]) -> None:
+    async def save_many(self, cards: List[MCard]) -> None:
         for card in cards:
             self.cards[card.hash] = card
 
     async def get(self, hash_str: str) -> Optional[MCard]:
         return self.cards.get(hash_str)
 
-    async def get_many(self, hash_strs: list[str]) -> list[MCard]:
+    async def get_many(self, hash_strs: List[str]) -> List[MCard]:
         return [self.cards[h] for h in hash_strs if h in self.cards]
 
-    async def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> list[MCard]:
+    async def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
         cards = list(self.cards.values())
+        if offset:
+            cards = cards[offset:]
+        if limit:
+            cards = cards[:limit]
+        return cards
+
+    async def list(
+        self,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None
+    ) -> List[MCard]:
+        cards = list(self.cards.values())
+        if start_time:
+            cards = [c for c in cards if c.g_time >= start_time]
+        if end_time:
+            cards = [c for c in cards if c.g_time <= end_time]
         if offset:
             cards = cards[offset:]
         if limit:
@@ -49,7 +67,7 @@ class MockCardRepository:
         end_time: Optional[datetime] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> list[MCard]:
+    ) -> List[MCard]:
         cards = list(self.cards.values())
         if start_time:
             cards = [c for c in cards if c.g_time >= start_time]
@@ -66,7 +84,7 @@ class MockCardRepository:
         time: datetime,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> list[MCard]:
+    ) -> List[MCard]:
         cards = [c for c in self.cards.values() if c.g_time < time]
         if offset:
             cards = cards[offset:]
@@ -79,7 +97,7 @@ class MockCardRepository:
         time: datetime,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> list[MCard]:
+    ) -> List[MCard]:
         cards = [c for c in self.cards.values() if c.g_time > time]
         if offset:
             cards = cards[offset:]
@@ -91,7 +109,7 @@ class MockCardRepository:
         if hash_str in self.cards:
             del self.cards[hash_str]
 
-    async def delete_many(self, hash_strs: list[str]) -> None:
+    async def delete_many(self, hash_strs: List[str]) -> None:
         """Delete multiple cards by their hashes."""
         for hash_str in hash_strs:
             if hash_str in self.cards:
@@ -118,10 +136,10 @@ class MockCardRepository:
 
 class MockContentTypeService:
     """Mock implementation of ContentTypeService protocol."""
-    def detect_type(self, content: Union[str, bytes]) -> str:
+    async def detect_type(self, content: Union[str, bytes]) -> str:
         return "text/plain"
 
-    def validate_content(self, content: Any) -> bool:
+    async def validate_content(self, content: Any) -> bool:
         return True
 
 @pytest.mark.asyncio
@@ -134,9 +152,9 @@ async def test_hashing_service_protocol():
     
     # Test functionality
     content = b"test content"
-    hash_str = service.hash_content(content)
+    hash_str = await service.hash_content(content)
     assert isinstance(hash_str, str)
-    assert service.validate_hash(hash_str)
+    assert await service.validate_hash(hash_str)
 
 @pytest.mark.asyncio
 async def test_card_repository_protocol():
@@ -192,7 +210,8 @@ async def test_card_repository_protocol():
     assert deleted_count == 2
     assert await repo.get("hash1") is None
 
-def test_content_type_service_protocol():
+@pytest.mark.asyncio
+async def test_content_type_service_protocol():
     """Test that ContentTypeService protocol can be implemented."""
     service = MockContentTypeService()
     
@@ -200,7 +219,6 @@ def test_content_type_service_protocol():
     assert isinstance(service, ContentTypeService)
     
     # Test functionality
-    content = b"test content"
-    mime_type = service.detect_type(content)
-    assert isinstance(mime_type, str)
-    assert service.validate_content(content)
+    content = "test content"
+    assert await service.detect_type(content) == "text/plain"
+    assert await service.validate_content(content) is True
