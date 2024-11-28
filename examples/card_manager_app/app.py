@@ -156,12 +156,12 @@ def index():
     try:
         # Get pagination and grid parameters from request
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
         grid_rows = request.args.get('grid_rows', 3, type=int)
         grid_cols = request.args.get('grid_cols', 3, type=int)
         
         # Validate and cap parameters
-        per_page = min(max(per_page, 10), 50)  # Between 10 and 50
+        per_page = min(max(per_page, 5), 50)  # Between 5 and 50
         grid_rows = min(max(grid_rows, 2), 5)  # Between 2 and 5
         grid_cols = min(max(grid_cols, 2), 5)  # Between 2 and 5
         
@@ -198,7 +198,7 @@ def index():
         flash(f'Error fetching cards: {str(e)}', 'error')
         return render_template('card_catalog_page.html',
                              cards=[],
-                             pagination={'page': 1, 'total_pages': 1, 'per_page': 10},
+                             pagination={'page': 1, 'total_pages': 1, 'per_page': 5},
                              grid_rows=3,
                              grid_cols=3)
 
@@ -208,18 +208,17 @@ def card_catalog():
     try:
         # Get pagination parameters from request
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
         grid_rows = request.args.get('grid_rows', 3, type=int)
         grid_cols = request.args.get('grid_cols', 3, type=int)
         
         # Validate and cap parameters
-        per_page = min(max(per_page, 10), 50)  # Between 10 and 50
+        per_page = min(max(per_page, 5), 50)  # Between 5 and 50
         grid_rows = min(max(grid_rows, 2), 5)  # Between 2 and 5
         grid_cols = min(max(grid_cols, 2), 5)  # Between 2 and 5
         
         # Fetch all cards
-        headers = {'x-api-key': MCARD_API_KEY}
-        response = requests.get(f"{API_BASE_URL}/cards/", headers=headers)
+        response = requests.get(f"{API_BASE_URL}/cards/", headers=HEADERS)
         response.raise_for_status()
         all_cards = response.json()
         
@@ -250,7 +249,7 @@ def card_catalog():
         flash(f'Error fetching cards: {str(e)}', 'error')
         return render_template('card_catalog_page.html',
                              cards=[],
-                             pagination={'page': 1, 'total_pages': 1, 'per_page': 10},
+                             pagination={'page': 1, 'total_pages': 1, 'per_page': 5},
                              grid_rows=3,
                              grid_cols=3)
 
@@ -368,6 +367,85 @@ def new_card():
             return redirect(url_for('new_card'))
     
     return render_template('new_card_page.html')
+
+@app.route('/search')
+def search_cards():
+    """Search cards and return filtered results."""
+    try:
+        # Get search query and pagination parameters
+        query = request.args.get('q', '').strip().lower()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
+        grid_cols = request.args.get('grid_cols', 3, type=int)
+        
+        # Fetch all cards
+        response = requests.get(f"{API_BASE_URL}/cards/", headers=HEADERS)
+        response.raise_for_status()
+        all_cards = response.json()
+        
+        # Filter cards if query is not empty
+        if query:
+            filtered_cards = []
+            for card in all_cards:
+                # Search in card content
+                content = card.get('content', '')
+                if isinstance(content, dict):
+                    content = str(content)
+                elif isinstance(content, bytes):
+                    content = content.decode('utf-8', errors='ignore')
+                
+                # Also search in hash, content type, and g_time
+                g_time = str(card.get('g_time', ''))
+                card_hash = card.get('hash', '')
+                content_type = card.get('content_type', '')
+                
+                searchable_text = f"{content} {card_hash} {content_type} {g_time}".lower()
+                
+                if query in searchable_text:
+                    filtered_cards.append(card)
+        else:
+            filtered_cards = all_cards
+        
+        # Format card contents
+        for card in filtered_cards:
+            card = format_card_content(card)
+
+        # Calculate pagination
+        total_cards = len(filtered_cards)
+        total_pages = (total_cards + per_page - 1) // per_page
+        page = min(max(page, 1), total_pages) if total_pages > 0 else 1
+        
+        start_idx = (page - 1) * per_page
+        end_idx = min(start_idx + per_page, total_cards)
+        paginated_cards = filtered_cards[start_idx:end_idx]
+        
+        # Prepare pagination data
+        pagination = {
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+            'total_cards': total_cards,
+            'has_prev': page > 1,
+            'has_next': page < total_pages,
+        }
+        
+        # Render only the card list template
+        html = render_template('card_list.html',
+                             cards=paginated_cards,
+                             pagination=pagination,
+                             grid_cols=grid_cols)
+        
+        return jsonify({
+            'html': html,
+            'count': total_cards
+        })
+        
+    except Exception as e:
+        logging.error(f"Search error: {str(e)}")
+        return jsonify({
+            'error': 'Search failed',
+            'message': str(e)
+        }), 500
 
 @app.errorhandler(404)
 def not_found_error(error):

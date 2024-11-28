@@ -21,6 +21,8 @@ The Card Manager App is a web application that provides a user-friendly interfac
 - Interactive drag-and-drop file upload
 - Content preview with format-specific rendering
 - Flash messages for operation feedback
+- Rate-limited search with debouncing (prevents excessive API calls while typing)
+- Dynamic grid column adjustment
 
 ## Application Structure
 
@@ -30,6 +32,7 @@ The Card Manager App is a web application that provides a user-friendly interfac
 - **New Card** (`/new_card`): Interface for card creation
 - **Card Detail** (`/card/<hash>`): Detailed view of a specific card
 - **Card Operations** (`/cards/<hash>`): RESTful endpoint for card operations (DELETE)
+- **Search** (`/search`): AJAX endpoint for card search with pagination
 
 ### Components
 1. **Base Components**
@@ -37,12 +40,45 @@ The Card Manager App is a web application that provides a user-friendly interfac
    - `nav_bar.html`: Navigation component with responsive design
 
 2. **Card Display Components**
-   - `multi_card_container.html`: Grid/list view of multiple cards
+   - `multi_card_container.html`: Main container with search and display controls
+     - Search bar with debounced input
+     - Grid column adjustment
+     - Items per page selector
+   - `card_list.html`: Self-contained card grid component
+     - Card grid layout with dynamic columns
+     - Integrated pagination controls
+     - Individual card display and actions
    - `single_card_container.html`: Detailed card view
    - `card_content_display.html`: Content rendering macro
 
-3. **Input Components**
+3. **Utility Components**
+   - `pagination.html`: Reusable pagination macro
+     - Page navigation controls
+     - Items per page integration
+     - Support for additional URL parameters
+
+4. **Input Components**
    - `content_submission_container.html`: Card creation form with tabs for text/binary input
+
+### Component Organization
+The application follows a modular component structure:
+
+1. **Container-Content Pattern**
+   - `multi_card_container.html` acts as a layout container
+   - Handles search and display controls
+   - Delegates card rendering to `card_list.html`
+
+2. **Self-Contained Card List**
+   - `card_list.html` is a complete component
+   - Manages its own pagination
+   - Handles card grid layout and individual card rendering
+   - Can be reused in different contexts
+
+3. **Search Integration**
+   - Search functionality is implemented in the container
+   - Uses debouncing to prevent excessive API calls
+   - Maintains pagination state during search
+   - Updates only the card list content when searching
 
 ### Backend Integration
 The application communicates with the MCard API using the following endpoints:
@@ -50,6 +86,7 @@ The application communicates with the MCard API using the following endpoints:
 - **GET** `/cards/<hash>`: Get specific card
 - **POST** `/cards/`: Create new card
 - **DELETE** `/cards/<hash>`: Delete card
+- **GET** `/search`: Search cards with pagination
 
 ### Directory Structure
 ```
@@ -66,27 +103,32 @@ card_manager_app/
     ├── new_card_page.html        # Card creation
     ├── single_card_page.html     # Card detail view
     ├── content_submission_container.html  # Card creation form
-    ├── multi_card_container.html         # Grid/list view
+    ├── multi_card_container.html         # Main container with controls
+    ├── card_list.html                    # Card grid with pagination
     ├── single_card_container.html        # Detail view
     └── macros/
+        ├── pagination.html               # Pagination component
         └── card_content_display.html     # Content rendering
+```
 
 ## Recent Updates
-1. **RESTful API Alignment**
-   - Updated card deletion to use proper DELETE method
-   - Changed URL patterns to follow REST conventions
-   - Improved error handling and response formats
+
+1. **Component Reorganization**
+   - Separated card list from container for better reusability
+   - Integrated pagination directly into card list component
+   - Improved search bar implementation with debouncing
+   - Enhanced grid column controls
 
 2. **Pagination Improvements**
-   - Added pagination support to all card list views
-   - Implemented configurable items per page
-   - Added page navigation controls
+   - Moved pagination controls into card list component
+   - Improved pagination state management during search
+   - Added support for maintaining state across operations
 
 3. **UI Enhancements**
-   - Added grid/list view switching
-   - Improved content type detection and display
-   - Enhanced navigation with proper routing
-   - Added flash messages for better user feedback
+   - Improved search responsiveness with debouncing
+   - Enhanced grid column controls
+   - Better error handling and user feedback
+   - Cleaner component separation and styling
 
 ## Technologies Used
 - **Flask**: Web framework for routing and templating
@@ -99,15 +141,3 @@ card_manager_app/
 The application uses environment variables for configuration:
 - `FLASK_SECRET_KEY`: Session security
 - `MCARD_API_KEY`: API authentication
-- `API_BASE_URL`: MCard API endpoint
-
-## Development Setup
-1. Install dependencies: `pip install -r requirements.txt`
-2. Set up environment variables in `.env`
-3. Run the application: `./start.sh`
-
-## Error Handling
-- Comprehensive error handling for API communication
-- User-friendly error messages
-- Graceful fallbacks for missing data
-- Proper HTTP status codes

@@ -1,0 +1,117 @@
+{
+  "extensionDiagnostics": {
+    "url": "vscode-webview://0uo0a9ncif8234s2lnbiq313hk026ff3tk8uv3jsstmqrv3qq2kl/index.html?id=d4e4ec7b-65e0-4dd5-9b58-8dde59c36f1c&origin=2a642c81-a025-4e1e-b8a2-9876a18e0f0f&swVersion=4&extensionId=codeium.windsurf&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView",
+    "connection": {
+      "status": "DISCONNECTED",
+      "error": {}
+    },
+    "error": {
+      "name": "ConnectError",
+      "message": "[unavailable] unavailable: 503 Service Temporarily Unavailable",
+      "stack": [
+        "ConnectError: [unavailable] unavailable: 503 Service Temporarily Unavailable",
+        "    at dr (https://file+.vscode-resource.vscode-cdn.net/Applications/Windsurf.app/Contents/Resources/app/extensions/windsurf/out/media/chat.js:2:5357721)",
+        "    at next (https://file+.vscode-resource.vscode-cdn.net/Applications/Windsurf.app/Contents/Resources/app/extensions/windsurf/out/media/chat.js:2:5363215)",
+        "    at async Object.unary (https://file+.vscode-resource.vscode-cdn.net/Applications/Windsurf.app/Contents/Resources/app/extensions/windsurf/out/media/chat.js:2:5362386)",
+        "    at async Object.getUserStatus (https://file+.vscode-resource.vscode-cdn.net/Applications/Windsurf.app/Contents/Resources/app/extensions/windsurf/out/media/chat.js:2:5352858)",
+        "    at async Promise.all (index 0)",
+        "    at async https://file+.vscode-resource.vscode-cdn.net/Applications/Windsurf.app/Contents/Resources/app/extensions/windsurf/out/media/chat.js:2:5975863"
+      ]
+    },
+    "isChatEnabled": true,
+    "handshake": {},
+    "params": {
+      "ideTelemetryEnabled": true,
+      "ready": true,
+      "defaultView": "cascade",
+      "apiKey": "a9f51aa8-7ad7-40f8-86bf-daa9ff1372a0",
+      "extensionName": "windsurf",
+      "extensionVersion": "1.26.3",
+      "ideName": "windsurf",
+      "ideVersion": "Windsurf 1.94.0",
+      "locale": "en",
+      "hasDevExtension": false,
+      "appName": "windsurf",
+      "hasEnterpriseExtension": false,
+      "hasIndexService": false,
+      "diffViewEnabled": true,
+      "openFilePointerEnabled": true,
+      "insertAtCursorEnabled": true,
+      "cascadeInitId": ""
+    },
+    "data": {
+      "numMessages": 0
+    },
+    "bridge": {
+      "bridgeType": "null"
+    },
+    "health": {
+      "checkStatus": null,
+      "error": {
+        "name": "TypeError",
+        "message": "Cannot read properties of undefined (reading 'replace')"
+      }
+    }
+  },
+  "extensionPanelLogs": [
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.546 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.547 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.547 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.547 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.547 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.547 [react-tooltip] Element with id 'react-tooltip-core-styles' already exists. Call `removeStyle()` first",
+    "[WARN] 2024-11-20 12:10:26.547 [react-tooltip] Element with id 'react-tooltip-base-styles' already exists. Call `removeStyle()` first"
+  ],
+  "languageServerDiagnostics": {
+    "logs": [
+      "I1120 12:10:20.639483 20340 main.go:566] Setting GOMAXPROCS to 10\n",
+      "I1120 12:10:20.639534 20340 main.go:776] Starting language server process with pid 20340\n",
+      "I1120 12:10:20.639550 20340 server.go:199] Language server will attempt to listen on host 127.0.0.1\n",
+      "I1120 12:10:20.639626 20340 server.go:206] Language server listening on random port at 59609\n",
+      "I1120 12:10:20.639643 20340 unleash.go:94] Initializing Unleash\n",
+      "I1120 12:10:22.183132 20340 unleash.go:114] Successfully initialized Unleash\n",
+      "I1120 12:10:22.183180 20340 server.go:267] Created extension server client at port 59606\n",
+      "E1120 12:10:22.218389 20340 client_manager.go:275] Metadata is nil when trying to refresh user JWT\n",
+      "I1120 12:10:22.218747 20340 server.go:490] Successfully created API server client\n",
+      "I1120 12:10:22.243319 20340 server.go:505] Successfully initialized tokenizer\n",
+      "W1120 12:10:22.341782 20340 interceptor.go:101] request metadata is nil\n",
+      "W1120 12:10:22.341815 20340 interceptor.go:101] request metadata is nil\n",
+      "W1120 12:10:22.341842 20340 interceptor.go:101] request metadata is nil\n",
+      "W1120 12:10:22.341783 20340 interceptor.go:101] request metadata is nil\n",
+      "W1120 12:10:22.341808 20340 interceptor.go:101] request metadata is nil\n",
+      "W1120 12:10:22.341783 20340 interceptor.go:101] request metadata is nil\n",
+      "I1120 12:10:22.978294 20340 server.go:668] Local search is enabled, will index local files.\n",
+      "I1120 12:10:22.978320 20340 server.go:672] Using 2 indexer workers\n",
+      "I1120 12:10:22.987604 20340 sqlite_faiss_db_client.go:64] Successfully created embedding search database in 9ms\n",
+      "I1120 12:10:22.987781 20340 indexer.go:213] Using 10 embed workers\n",
+      "I1120 12:10:22.987815 20340 search_provider.go:274] Successfully created and started indexer\n",
+      "I1120 12:10:22.987830 20340 search_provider.go:304] Successfully created embedding search provider\n",
+      "I1120 12:10:23.376858 20340 server.go:759] Successfully created completion provider\n",
+      "I1120 12:10:23.382127 20340 server.go:323] LSP listening on random port at 59641\n",
+      "I1120 12:10:23.400268 20340 utils.go:227] Analyzing workspace files for /Users/bkoo/Documents/Development/AIProjects/GeneratedCodeBase/CubicalLogicModel\n",
+      "I1120 12:10:23.403752 20340 utils.go:281] Done analyzing workspace files for /Users/bkoo/Documents/Development/AIProjects/GeneratedCodeBase/CubicalLogicModel\n",
+      "I1120 12:10:23.413902 20340 lazy_model.go:31] Successfully created embedding store\n",
+      "E1120 12:10:23.677653 20340 api_server_client.go:309] GetUnleashContextFields error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:24.122124 20340 api_server_client.go:297] GetConfig error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:24.159177 20340 api_server_client.go:220] Ping error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:25.608924 20340 api_server_client.go:297] GetConfig error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:26.207312 20340 api_server_client.go:251] GetUserStatus error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:26.945743 20340 api_server_client.go:251] GetUserStatus error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:27.542594 20340 api_server_client.go:297] GetConfig error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:27.849663 20340 api_server_client.go:251] GetUserStatus error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:28.986800 20340 api_server_client.go:297] GetConfig error: 503 Service Temporarily Unavailable\n",
+      "E1120 12:10:30.421813 20340 api_server_client.go:297] GetConfig error: 503 Service Temporarily Unavailable\n"
+    ]
+  }
+}

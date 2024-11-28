@@ -6,12 +6,18 @@
             <div class="card-body">
                 <h5 class="card-title">Card Details</h5>
                 <p><strong>Hash:</strong> {{ card.hash }}</p>
-                <p><strong>Content Type:</strong> {{ card.content_type }}</p>
+                <p><strong>Content Type:</strong> {{ card.content_type }}{% if card.is_image %} (Image){% endif %}</p>
                 <p><strong>Size:</strong> {{ card.content|length }} bytes</p>
 
                 <div class="content-preview">
-                    <h6>Content Preview:</h6>
+                    <h6>Content:</h6>
                     {{ render_card_content(card, preview_mode=false, view_mode='detail') }}
+                    {% if card.content_type == 'text' %}
+                    <div class="text-content mt-4">
+                        <h6>Full Text:</h6>
+                        <pre class="text-content-full">{{ card.content }}</pre>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="btn-group" role="group">
@@ -49,6 +55,18 @@
     .content-preview h6 {
         color: #495057;
         margin-bottom: 10px;
+    }
+
+    .text-content-full {
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        margin-top: 0.5rem;
     }
 </style>
 

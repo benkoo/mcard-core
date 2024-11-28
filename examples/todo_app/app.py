@@ -98,6 +98,7 @@ def index():
     return render_template('index.html', todos=todos)
 
 @app.route('/api/cards', methods=['POST'])
+@app.route('/add_card', methods=['POST'])  # Add this route as well
 def add_card():
     """Generic route to add any type of card to MCard storage."""
     try:
@@ -151,6 +152,19 @@ def add_card():
             print(f"Content type: {content_type}")
             print(f"Content size: {len(content)} bytes")
             
+            # Detect content type from file content if not properly set
+            if content_type == 'application/octet-stream':
+                if content.startswith(b'\x89PNG\r\n\x1a\n'):
+                    content_type = 'image/png'
+                elif content.startswith(b'\xff\xd8\xff'):
+                    content_type = 'image/jpeg'
+                elif content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
+                    content_type = 'image/gif'
+                elif content.startswith(b'RIFF') and content[8:12] == b'WEBP':
+                    content_type = 'image/webp'
+                elif content.startswith(b'%PDF'):
+                    content_type = 'application/pdf'
+            
             # Check for duplicates
             duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
             if duplicate_check["found"]:
@@ -159,8 +173,9 @@ def add_card():
                     "hash": duplicate_check["hash"]
                 }), 409
             
-            # Store binary content directly
+            # Store binary content with content type
             card = MCard(content=content)
+            card.content_type = content_type  # Store the content type
             storage.save(card)
             storage.conn.commit()
             
@@ -210,7 +225,6 @@ def add_card():
             card = MCard(content=content)
             storage.save(card)
             storage.conn.commit()
-            
             return redirect(url_for('view_card', content_hash=card.content_hash))
 
         # Handle JSON and text data
@@ -620,21 +634,26 @@ def view_card(content_hash):
 
         # For binary content, detect type directly
         if isinstance(card.content, bytes):
-            if card.content.startswith(b'\x89PNG\r\n\x1a\n'):
-                content_type = 'image/png'
-            elif card.content.startswith(b'\xff\xd8\xff'):
-                content_type = 'image/jpeg'
-            elif card.content.startswith(b'GIF87a') or card.content.startswith(b'GIF89a'):
-                content_type = 'image/gif'
-            elif card.content.startswith(b'RIFF') and card.content[8:12] == b'WEBP':
-                content_type = 'image/webp'
+            # First check if we have a stored content type
+            content_type = getattr(card, 'content_type', None)
+            
+            # If no stored content type, try to detect from content
+            if not content_type or content_type == 'application/octet-stream':
+                if card.content.startswith(b'\x89PNG\r\n\x1a\n'):
+                    content_type = 'image/png'
+                elif card.content.startswith(b'\xff\xd8\xff'):
+                    content_type = 'image/jpeg'
+                elif card.content.startswith(b'GIF87a') or card.content.startswith(b'GIF89a'):
+                    content_type = 'image/gif'
+                elif card.content.startswith(b'RIFF') and card.content[8:12] == b'WEBP':
+                    content_type = 'image/webp'
             
             return render_template('view_card.html',
                                 content_hash=card.content_hash,
                                 time_claimed=card.time_claimed,
-                                content={"size": len(card.content)},
-                                is_binary=True,
-                                content_type=content_type)
+                                content=None,  # Don't send binary content to template
+                                is_binary=True,  # Mark as binary
+                                content_type=content_type)  # Pass content type
         
         # If not binary, treat as plain text
         return render_template('view_card.html',
@@ -661,11 +680,12 @@ def get_binary_content(content_hash):
             return "Content not found", 404
 
         content = card.content
-        content_type = 'application/octet-stream'
+        # First check if we have a stored content type
+        content_type = getattr(card, 'content_type', 'application/octet-stream')
         filename = None
 
-        if isinstance(content, bytes):
-            # Try to detect content type from the first few bytes
+        # If no stored content type or it's generic, try to detect from content
+        if content_type == 'application/octet-stream' and isinstance(content, bytes):
             if content.startswith(b'\x89PNG\r\n\x1a\n'):
                 content_type = 'image/png'
                 filename = 'image.png'
@@ -686,7 +706,10 @@ def get_binary_content(content_hash):
                 'Content-Disposition': f'attachment; filename="{filename or "file"}"'
             }
         else:
-            headers = {'Content-Type': content_type}
+            headers = {
+                'Content-Type': content_type,
+                'Cache-Control': 'no-transform'  # Prevent proxy transformation
+            }
 
         print(f"Serving content with type: {content_type}, size: {len(content)} bytes")
         return Response(content, headers=headers)
