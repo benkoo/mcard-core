@@ -1,0 +1,3 @@
+"""
+FastAPI interface for MCard.
+"""

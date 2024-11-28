@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to Card Manager{% endblock %}
+
+{% block content %}
+<div class="welcome-container">
+    <h1>Welcome to Card Manager</h1>
+    <p class="welcome-text">Manage your MCards with ease. Create, view, and organize your cards all in one place.</p>
+    
+    <div class="action-cards">
+        <a href="{{ url_for('card_catalog') }}" class="action-card">
+            <h2>Browse Cards</h2>
+            <p>View and manage your existing cards</p>
+        </a>
+        <a href="{{ url_for('new_card') }}" class="action-card">
+            <h2>Create New Card</h2>
+            <p>Add a new card to your collection</p>
+        </a>
+    </div>
+</div>
+
+<style>
+    .welcome-container {
+        max-width: 800px;
+        margin: 40px auto;
+        text-align: center;
+    }
+    .welcome-container h1 {
+        font-size: 36px;
+        color: #333;
+        margin-bottom: 20px;
+    }
+    .welcome-text {
+        font-size: 18px;
+        color: #666;
+        margin-bottom: 40px;
+    }
+    .action-cards {
+        display: flex;
+        gap: 30px;
+        justify-content: center;
+        margin-top: 40px;
+    }
+    .action-card {
+        background: white;
+        border-radius: 8px;
+        padding: 30px;
+        text-decoration: none;
+        color: inherit;
+        flex: 1;
+        max-width: 300px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .action-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    .action-card h2 {
+        color: #4CAF50;
+        margin-bottom: 10px;
+    }
+    .action-card p {
+        color: #666;
+    }
+</style>
+{% endblock %}

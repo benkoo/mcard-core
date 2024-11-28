@@ -1,0 +1,281 @@
+{% block content_submission %}
+<div class="content-submission">
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab('text')">Text</button>
+            <button class="tab-btn" onclick="switchTab('binary')">Binary</button>
+        </div>
+
+        <!-- Text Input Tab -->
+        <div id="text-tab" class="tab-content active">
+            <form method="POST" action="{{ url_for('new_card') }}">
+                <input type="hidden" name="content_type" value="text">
+                <div class="form-group">
+                    <label for="content">Text Content:</label>
+                    <textarea name="content" id="content" rows="10" class="form-control" placeholder="Enter your text content here...">{{ content if content else '' }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Card</button>
+            </form>
+        </div>
+
+        <!-- Binary Upload Tab -->
+        <div id="binary-tab" class="tab-content">
+            <form method="POST" action="{{ url_for('new_card') }}" enctype="multipart/form-data" 
+                  id="binary-form" class="binary-upload">
+                <input type="hidden" name="content_type" value="binary">
+                
+                <div class="drop-zone" id="drop-zone">
+                    <div class="drop-zone-prompt">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag and drop a file here</p>
+                        <p>or</p>
+                        <label for="file-input" class="btn btn-outline-primary">Choose File</label>
+                    </div>
+                    <input type="file" id="file-input" name="file" class="file-input" hidden>
+                </div>
+                
+                <div class="selected-file" id="selected-file" style="display: none;">
+                    <p>Selected file: <span id="file-name"></span></p>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearFileSelection()">Clear</button>
+                </div>
+                
+                <button type="submit" class="btn btn-primary mt-3">Upload and Create Card</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .content-submission {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .tab-container {
+        width: 100%;
+    }
+
+    .tab-buttons {
+        display: flex;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    .tab-btn {
+        padding: 10px 20px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 16px;
+        color: #6c757d;
+        position: relative;
+    }
+
+    .tab-btn.active {
+        color: #007bff;
+    }
+
+    .tab-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: #007bff;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 16px;
+    }
+
+    .drop-zone {
+        width: 100%;
+        min-height: 200px;
+        border: 2px dashed #ced4da;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: border-color 0.3s ease;
+    }
+
+    .drop-zone:hover {
+        border-color: #007bff;
+    }
+
+    .drop-zone.dragover {
+        border-color: #28a745;
+        background: rgba(40, 167, 69, 0.1);
+    }
+
+    .drop-zone-prompt {
+        text-align: center;
+        color: #6c757d;
+    }
+
+    .drop-zone-prompt i {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+
+    .selected-file {
+        margin-top: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background: #007bff;
+        color: white;
+        border: none;
+    }
+
+    .btn-primary:hover {
+        background: #0056b3;
+    }
+
+    .btn-outline-primary {
+        background: none;
+        border: 1px solid #007bff;
+        color: #007bff;
+    }
+
+    .btn-outline-primary:hover {
+        background: #007bff;
+        color: white;
+    }
+
+    .btn-outline-danger {
+        background: none;
+        border: 1px solid #dc3545;
+        color: #dc3545;
+    }
+
+    .btn-outline-danger:hover {
+        background: #dc3545;
+        color: white;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const selectedFile = document.getElementById('selected-file');
+    const fileName = document.getElementById('file-name');
+
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    // Highlight drop zone when dragging over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    // Handle dropped files
+    dropZone.addEventListener('drop', handleDrop, false);
+    
+    // Handle file input change
+    fileInput.addEventListener('change', handleFileSelect, false);
+    
+    // Handle click on drop zone
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+});
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function highlight(e) {
+    document.getElementById('drop-zone').classList.add('dragover');
+}
+
+function unhighlight(e) {
+    document.getElementById('drop-zone').classList.remove('dragover');
+}
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    handleFiles(files);
+}
+
+function handleFileSelect(e) {
+    const files = e.target.files;
+    handleFiles(files);
+}
+
+function handleFiles(files) {
+    if (files.length > 0) {
+        const file = files[0];
+        document.getElementById('file-input').files = files;
+        document.getElementById('file-name').textContent = file.name;
+        document.getElementById('selected-file').style.display = 'flex';
+        document.getElementById('drop-zone').style.border = '2px solid #28a745';
+    }
+}
+
+function clearFileSelection() {
+    document.getElementById('file-input').value = '';
+    document.getElementById('selected-file').style.display = 'none';
+    document.getElementById('drop-zone').style.border = '2px dashed #ced4da';
+}
+
+function switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`.tab-btn[onclick="switchTab('${tabName}')"]`).classList.add('active');
+
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById(`${tabName}-tab`).classList.add('active');
+}
+</script>
+{% endblock %}

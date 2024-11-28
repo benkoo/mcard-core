@@ -1,0 +1,193 @@
+{% from "macros/card_content_display.html" import render_card_content with context %}
+
+<div class="space-y-6" id="mainContainer">
+    <!-- Top controls section -->
+    <div class="bg-white rounded-lg shadow-sm p-4" id="controlsPanel">
+        <!-- Search bar -->
+        <div class="w-full mb-4">
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search by hash, time, or content..." 
+                    class="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                    oninput="handleSearch(this.value)"
+                >
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <!-- Grid column control -->
+            <div class="flex items-center space-x-2">
+                <label for="gridCols" class="text-sm text-gray-600">Columns:</label>
+                <select id="gridCols" onchange="updateGridSize()" class="border rounded px-3 py-1.5 text-sm bg-white">
+                    {% for n in [1, 2, 3, 4, 5] %}
+                    <option value="{{ n }}" {% if grid_cols == n %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Items per page selector -->
+            <div class="flex items-center space-x-2">
+                <span class="text-sm text-gray-600">Items per page:</span>
+                <select onchange="updatePerPage(this.value)" class="border rounded px-3 py-1.5 text-sm bg-white">
+                    {% for n in [5, 7, 10, 20, 50] %}
+                    <option value="{{ n }}" {% if pagination.per_page == n %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards section -->
+    <div id="cardsSection">
+        {% include "card_list.html" %}
+    </div>
+</div>
+
+<style>
+    .content-preview {
+        max-height: 200px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+    }
+
+    .content-preview::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .content-preview::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .content-preview::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 163, 175, 0.5);
+        border-radius: 3px;
+    }
+
+    .content-preview pre {
+        @apply text-sm font-mono;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .content-preview img {
+        @apply max-h-32 mx-auto object-contain;
+    }
+
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+</style>
+
+<script>
+    // Debounce function to limit API calls
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Handle search with debouncing
+    const handleSearch = debounce(async (searchTerm) => {
+        // Only search if empty or at least 2 characters
+        if (searchTerm.length === 0 || searchTerm.length >= 2) {
+            try {
+                const gridCols = document.getElementById('gridCols').value;
+                const urlParams = new URLSearchParams(window.location.search);
+                const page = urlParams.get('page') || 1;
+                const perPage = urlParams.get('per_page') || 5;
+                
+                const response = await fetch(`/search?q=${encodeURIComponent(searchTerm)}&grid_cols=${gridCols}&page=${page}&per_page=${perPage}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Search request failed');
+                }
+
+                const data = await response.json();
+                
+                // Update only the cards section
+                const cardsSection = document.getElementById('cardsSection');
+                cardsSection.innerHTML = data.html;
+                
+                // Re-initialize grid size
+                updateGridSize();
+                
+            } catch (error) {
+                console.error('Search error:', error);
+                showFlash('Error performing search', 'error');
+            }
+        }
+    }, 300);
+
+    function updateGridSize() {
+        const cols = document.getElementById('gridCols').value;
+        const container = document.querySelector('.cards-container');
+        if (container) {
+            container.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+        }
+    }
+
+    function updatePerPage(perPage) {
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.set('per_page', perPage);
+        window.location.search = searchParams.toString();
+    }
+
+    function deleteCard(hash, event) {
+        if (confirm('Are you sure you want to delete this card?')) {
+            fetch(`/cards/${hash}`, {
+                method: 'DELETE',
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Delete failed');
+                const card = event.target.closest('.transform');
+                card.remove();
+                showFlash('Card deleted successfully', 'success');
+            })
+            .catch(error => {
+                console.error('Delete error:', error);
+                showFlash('Error deleting card', 'error');
+            });
+        }
+    }
+
+    function showFlash(message, type = 'info') {
+        const flash = document.createElement('div');
+        flash.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white ${
+            type === 'error' ? 'bg-red-500' : 'bg-green-500'
+        } transition-opacity duration-300`;
+        flash.textContent = message;
+        document.body.appendChild(flash);
+        
+        setTimeout(() => {
+            flash.style.opacity = '0';
+            setTimeout(() => flash.remove(), 300);
+        }, 2700);
+    }
+
+    // Initialize grid size on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        updateGridSize();
+    });
+</script>

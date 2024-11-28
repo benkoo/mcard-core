@@ -37,22 +37,52 @@
                         <label class="block text-gray-700 text-sm font-bold mb-2" for="textContent">Text Content</label>
                         <textarea name="content" id="textContent" rows="10" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter your text content here..."></textarea>
                     </div>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                        Create Text Card
-                    </button>
-                </form>
-
-                <!-- File Upload Form -->
-                <form id="fileForm" action="{{ url_for('add_card') }}" method="post" enctype="multipart/form-data" class="mb-6 hidden" onsubmit="return handleSubmit(event)">                    <input type="hidden" name="content_type" value="application/octet-stream">
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="fileContent">File Upload</label>
-                        <input type="file" name="file" id="fileContent" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                        <p class="text-sm text-gray-600 mt-1">Supported file types: Images (PNG, JPEG, GIF), Documents (PDF, TXT), and more.</p>
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                            Create Text Card
+                        </button>
                     </div>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                        Upload File
-                    </button>
                 </form>
+<!-- File Upload Form -->
+<form id="fileForm" action="{{ url_for('add_card') }}" method="post" enctype="multipart/form-data" class="mb-6 hidden" onsubmit="return handleSubmit(event)">
+    <input type="hidden" name="content_type" value="application/octet-stream">
+    <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2" for="fileContent">File Upload</label>
+        
+        <!-- Drag and drop zone -->
+        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors duration-200 mb-4">
+            <div class="space-y-2">
+                <div class="flex items-center justify-center">
+                    <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                </div>
+                <div class="text-gray-600">
+                    <span class="font-medium">Drag and drop files here</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="selectedFileName" class="text-sm text-gray-500 mb-2 hidden"></div>
+        <p class="text-sm text-gray-600 mb-4">Supported file types: Images (PNG, JPEG, GIF, WebP), Documents (PDF, TXT), and more.</p>
+        
+        <!-- Hidden file input -->
+        <input type="file" name="file" id="fileContent" class="hidden" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain">
+        
+        <!-- Buttons container outside drag zone -->
+        <div class="flex justify-between items-center">
+            <button type="button" 
+                    class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                    onclick="document.getElementById('fileContent').click()">
+                Choose File
+            </button>
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Upload and Create Card
+            </button>
+        </div>
+    </div>
+</form>
+                
             </div>
         </div>
     </div>
@@ -141,6 +171,70 @@
 
             return false;
         }
+    </script>
+
+    <script>
+        // File upload handling
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileContent');
+            const selectedFileName = document.getElementById('selectedFileName');
+
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            // Highlight drop zone when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            // Handle dropped files
+            dropZone.addEventListener('drop', handleDrop, false);
+            
+            // Handle file input change
+            fileInput.addEventListener('change', handleFileSelect, false);
+
+            function preventDefaults (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            function highlight(e) {
+                dropZone.classList.add('border-blue-500');
+                dropZone.classList.add('bg-blue-50');
+            }
+
+            function unhighlight(e) {
+                dropZone.classList.remove('border-blue-500');
+                dropZone.classList.remove('bg-blue-50');
+            }
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+
+            function handleFileSelect(e) {
+                const files = e.target.files;
+                handleFiles(files);
+            }
+
+            function handleFiles(files) {
+                if (files.length > 0) {
+                    const file = files[0];
+                    selectedFileName.textContent = `Selected: ${file.name}`;
+                    selectedFileName.classList.remove('hidden');
+                }
+            }
+        });
     </script>
 </body>
 </html>

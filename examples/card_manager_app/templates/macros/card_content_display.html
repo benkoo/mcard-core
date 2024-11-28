@@ -1,0 +1,153 @@
+{% macro render_card_content(card, preview_mode=false, view_mode='grid') %}
+<style>
+    .content-display {
+        margin: 10px 0;
+        width: 100%;
+        overflow: hidden;
+    }
+    
+    .g_time {
+        font-size: 0.65rem;
+        color: #6B7280;
+        margin-bottom: 4px;
+        font-family: monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .text-display {
+        width: 100%;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-family: monospace;
+        resize: none;
+        line-height: 1.4;
+        {% if preview_mode %}
+            height: {{ '100px' if view_mode == 'list' else '150px' }};
+        {% else %}
+            min-height: 300px;
+        {% endif %}
+    }
+    
+    .binary-preview {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+    
+    .image-container {
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+        {% if preview_mode %}
+            height: {{ '120px' if view_mode == 'list' else '180px' }};
+        {% else %}
+            max-height: 600px;
+        {% endif %}
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    .card-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+    
+    .pdf-viewer {
+        width: 100%;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        {% if preview_mode %}
+            height: {{ '150px' if view_mode == 'list' else '200px' }};
+        {% else %}
+            height: 800px;
+        {% endif %}
+    }
+
+    .text-content {
+        position: relative;
+        width: 100%;
+    }
+
+    .text-content::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 40px;
+        background: linear-gradient(transparent, #f8f9fa);
+        pointer-events: none;
+        {% if not preview_mode %}
+            display: none;
+        {% endif %}
+    }
+    
+    .text-preview {
+        font-size: 0.875rem;
+        line-height: 1.4;
+        max-height: {{ '100px' if view_mode == 'list' else '150px' }};
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .text-preview::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 30px;
+        background: linear-gradient(transparent, #f8f9fa);
+    }
+</style>
+
+<div class="content-display">
+    {% if card.g_time %}
+    <div class="g_time">g_time: {{ card.g_time }}</div>
+    {% endif %}
+    
+    {% if card.content_type == 'binary' %}
+        {% if card.is_image %}
+            <div class="image-container">
+                <img src="data:image/jpeg;base64,{{ card.content }}" alt="Card Image" class="card-image">
+            </div>
+        {% elif card.is_pdf %}
+            <embed src="data:application/pdf;base64,{{ card.content }}" 
+                   type="application/pdf"
+                   class="pdf-viewer">
+        {% else %}
+            <div class="binary-preview">
+                <p class="text-sm text-gray-600 mb-2">Binary content {% if preview_mode %}(preview){% endif %}</p>
+                {% if card.hex_preview %}
+                    <pre class="text-xs overflow-x-auto bg-gray-100 p-2 rounded">{{ card.hex_preview }}</pre>
+                {% endif %}
+                <a href="data:application/octet-stream;base64,{{ card.content }}" 
+                   download="{{ card.filename if card.filename else 'download' }}"
+                   class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors mt-2">
+                    Download Binary Content
+                </a>
+            </div>
+        {% endif %}
+    {% elif card.is_text %}
+        <div class="text-content">
+            {% if preview_mode %}
+                <div class="text-preview">
+                    {{ (card.text_content if card.text_content else card.content)[:500] }}
+                    {% if card.content|length > 500 %}...{% endif %}
+                </div>
+            {% else %}
+                <textarea class="text-display" readonly>{{ card.text_content if card.text_content else card.content }}</textarea>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}

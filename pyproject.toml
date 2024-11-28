@@ -10,6 +10,8 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::UserWarning",
 ]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
 
 [project]
 name = "mcard-core"
@@ -32,6 +34,19 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11"
+]
+
+[project.scripts]
+mcard = "mcard.interfaces.cli.commands:cli"
+
+[project.optional-dependencies]
+api = ["fastapi>=0.100.0", "uvicorn>=0.23.0"]
+cli = ["click>=8.1.0"]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+    "pytest-cov>=4.1.0"
 ]
 
 [tool.setuptools]

@@ -5,18 +5,37 @@ A Python library implementing an algebraically closed data structure for content
 ## Core Concepts
 
 MCard implements an algebraically closed system where:
-1. Every MCard is uniquely identified by its content hash (SHA-256)
-2. Every MCard has an associated claim time (timezone-aware timestamp)
+1. Every MCard is uniquely identified by its content hash (configurable, defaulting to SHA-256)
+2. Every MCard has an associated claim time (timezone-aware timestamp with microsecond precision)
 3. The database maintains these invariants automatically
 4. Content integrity is guaranteed through immutable hashes
 5. Temporal ordering is preserved at microsecond precision
 
 This design provides several key guarantees:
 - **Content Integrity**: The content hash serves as both identifier and verification mechanism
-- **Temporal Ordering**: All cards have a precise temporal order based on `time_claimed`
+- **Temporal Signature**: All cards are associated with a timestamp: `g_time`
 - **Precedence Verification**: The claim time enables determination of content presentation order
 - **Algebraic Closure**: Any operation on MCards produces results that maintain these properties
 - **Type Safety**: Built on Pydantic with strict validation and type checking
+
+Each MCard has three fundamental properties:
+- `content`: The actual data being stored (string or bytes)
+- `hash`: A cryptographic hash of the content, using SHA-256 by default (configurable to other algorithms)
+- `g_time`: A timezone-aware timestamp with microsecond precision, representing the global time when the card was claimed
+
+The `hash` is calculated using SHA-256 by default but can be configured to use different cryptographic hash functions through the `HashingSettings`. This flexibility allows you to choose the hash algorithm that best suits your security and performance requirements.
+
+The `g_time` (global time) is a crucial concept in MCard that ensures consistent temporal ordering across different timezones and systems. It represents the moment when a card is claimed in the global timeline, with microsecond precision (e.g., "2024-01-24 15:30:45.123456+00:00"), making it possible to establish clear and precise precedence relationships between cards regardless of where they were created.
+
+## MCard Data Structure
+
+The `MCard` class is a simple data structure designed to encapsulate content-addressable data. It consists of three tightly coupled fields:
+
+- `content`: The actual content of the MCard, which can be a string or bytes.
+- `hash`: A SHA-256 hash of the content, computed at initialization. The hash computation is configurable and extensible, allowing for different cryptographic hash functions to be used as needed.
+- `g_time`: The timestamp when the hash was computed, recorded with local timezone information and microsecond precision, stored as a string.
+
+The `MCard` class is designed to operate independently of third-party libraries, utilizing Python's built-in `hashlib` for hashing and `datetime` for time handling.
 
 ## Theoretical Foundation
 
@@ -33,7 +52,7 @@ This aligns with Lambda Calculus's three fundamental abstractions:
 3. **Eta Abstraction**: Function equivalence
    - In MCard: Different paths yielding equivalent results
 
-Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose programming system. However, it does so with a stronger theoretical foundation that enables:
+Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose programming system. However, it does so with a stronger theoretical bend that enables:
 - Formal verification of transformations
 - Guaranteed composition properties
 - Traceable data lineage
@@ -43,16 +62,34 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 
 ### Core MCard Attributes
 - `content`: The actual content data (supports strings, bytes, and arbitrary types)
-- `content_hash`: An immutable SHA-256 hash, automatically calculated (64-character hex string)
-- `time_claimed`: A timezone-aware timestamp with microsecond precision
+- `hash`: A cryptographic hash of the content, using SHA-256 by default (configurable to other algorithms)
+- `g_time`: A timezone-aware timestamp with microsecond precision
+
+### Hash Collision Protection
+- Comprehensive test suite for detecting and handling hash collisions
+- Automated switching to stronger hashing algorithms when potential collisions are detected
+- Configurable hash algorithm selection through `HashingSettings`
+- Built-in safeguards to maintain data integrity
+- Collision-aware hashing service with progressive algorithm strengthening (MD5 → SHA1 → SHA256 → SHA512)
+- Async support for repository-based collision detection
 
 ### Storage Features
-- SQLite-based persistent storage
-- Binary content support
-- Batch operations for efficient bulk processing
-- Transaction management with automatic rollback
-- Timezone preservation across operations
+- SQLite-based persistent storage with connection pooling
+- Binary content support with automatic text/binary detection
+- Efficient batch operations for saving, retrieving, and deleting
+- Transaction management with nested transaction support using SQLite savepoints
+- Automatic rollback on errors
 - Thread-safe connection management
+- Time-based query support with timezone awareness
+- Pagination for large result sets
+
+### Time Management
+- Configurable timezone support
+- UTC and local time handling
+- Custom time and date formats
+- Time range operations
+- Timezone conversion utilities
+- Time comparison and validation functions
 
 ### Collection Management
 - Automatic temporal ordering
@@ -61,43 +98,105 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - Efficient in-memory sorting
 - Real-time collection refresh capability
 
+## Repository Management
+
+To ensure consistent data persistence and avoid errors, it is crucial that the repository operates as a single instance throughout the application lifecycle. This is particularly important during testing or any runtime operations. If multiple instances are created, it can lead to separate data pools, causing confusion and potential errors in data retrieval and manipulation.
+
+### Key Points:
+- **Singleton Repository**: The repository should be instantiated as a singleton to maintain a single source of truth for all operations.
+- **Data Consistency**: A single repository instance ensures that all data operations are consistent and reflect the current state of the database.
+- **Avoiding Confusion**: Multiple instances can lead to fragmented data pools, making it difficult to track and manage data effectively.
+
+Ensure that your application or testing setup maintains a single repository instance to leverage the full benefits of MCard's robust data management capabilities.
+
+## Dependencies
+
+The project relies on several key dependencies:
+- `python-dateutil`
+- `SQLAlchemy`
+- `pydantic`
+- `aiosqlite`
+- `pytest` and `pytest-asyncio` for testing
+
 ## Installation
 
+To set up the project, follow these steps:
+
+1. Create a virtual environment:
+   ```bash
+   python -m venv .venv
+   ```
+
+2. Activate the virtual environment:
+   - On macOS and Linux:
+     ```bash
+     source .venv/bin/activate
+     ```
+   - On Windows:
+     ```bash
+     .venv\Scripts\activate
+     ```
+
+3. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Testing
+
+To run the tests, ensure that your `PYTHONPATH` is set correctly. You can run all tests using:
+
 ```bash
-pip install mcard-core
+pytest
 ```
 
-## Requirements
+## Project Structure
 
-- Python 3.8+
-- pydantic >= 2.0.0
+- `mcard/`: Contains the core library code.
+- `tests/`: Includes all test cases.
+- `examples/`: Provides example scripts demonstrating library usage.
+
+## Recent Changes
+
+- Updated the handling of the `g_time` field in the `CardResponse` model.
+- Modified the `create_card`, `get_card`, and `list_cards` functions to ensure the correct handling of `g_time` as a string.
 
 ## Usage
 
 ### Basic Usage
 
 ```python
-from mcard import MCard
+from mcard import MCard, get_now_with_located_zone
+from mcard import HashingSettings, CollisionAwareHashingService
 
-# Create an MCard - content_hash and time_claimed are automatically set
-card = MCard(content="Hello World")
+# Create a card with default SHA-256 hashing
+card = MCard(content="Hello, World!")
+print(f"Hash (SHA-256): {card.hash}")
+print(f"Global Time: {card.g_time}")  # e.g., 2024-01-24 15:30:45.123456+00:00
 
-# Access card properties
-print(card.content)         # "Hello World"
-print(card.content_hash)    # SHA-256 hash (64-character hex string)
-print(card.time_claimed)    # Timezone-aware timestamp
+# Use collision-aware hashing with automatic algorithm strengthening
+settings = HashingSettings(algorithm="md5")  # Starts with MD5
+service = CollisionAwareHashingService(settings)
+card = MCard(content="Hello, World!", hashing_service=service)
+print(f"Initial Hash (MD5): {card.hash}")
 
-# Content verification is automatic
-card.content = "New content"  # Hash is automatically updated
+# If a collision is detected, it automatically upgrades to stronger algorithms
+collision_content = "Different content with same MD5"
+card2 = MCard(content=collision_content, hashing_service=service)
+print(f"New Hash (Stronger Algorithm): {card2.hash}")
+
+# Create a card with explicit global time
+now = get_now_with_located_zone()  # Microsecond precision timestamp
+card = MCard(content="Hello, World!", g_time=now)
 ```
 
 ### Storage and Collections
 
 ```python
-from mcard import MCardStorage, MCardCollection
+from mcard import SQLiteCardRepository, MCardCollection
 
 # Initialize storage with SQLite backend
-storage = MCardStorage("cards.db")
+storage = SQLiteCardRepository("cards.db")
 
 # Create a collection
 collection = MCardCollection(storage)
@@ -109,22 +208,77 @@ card2 = MCard(content="Second card")
 collection.add_card(card1)
 collection.add_card(card2)
 
-# Retrieve cards (always sorted by time_claimed)
+# Retrieve cards (always sorted by g_time)
 all_cards = collection.get_all_cards()
-card = collection.get_card_by_hash(card1.content_hash)
+card = collection.get_card_by_hash(card1.hash)
+```
+
+### Time Management
+
+```python
+from mcard import TimeService, TimeSettings
+from datetime import datetime, timedelta
+
+# Initialize time service with custom settings
+settings = TimeSettings(
+    timezone="America/New_York",
+    time_format="%Y-%m-%d %H:%M:%S %Z",
+    use_utc=False
+)
+time_service = TimeService(settings)
+
+# Get current time in configured timezone
+now = time_service.get_current_time()
+
+# Create and validate time ranges
+start = now - timedelta(days=1)
+end = now
+time_range = time_service.create_time_range(start=start, end=end)
+
+# Format times according to settings
+formatted = time_service.format_time(now)
+
+# Convert between timezones
+utc_time = time_service.convert_timezone(now, "UTC")
 ```
 
 ### Advanced Features
 
-#### Binary Content
+#### Transaction Management
 ```python
-# Store binary data
-binary_card = MCard(content=b"Binary data")
-storage.save(binary_card)
+from mcard import SQLiteCardRepository
 
-# Content type is preserved
-retrieved = storage.get(binary_card.content_hash)
-assert isinstance(retrieved.content, bytes)
+# Create repository with connection pooling
+storage = SQLiteCardRepository("cards.db", pool_size=5)
+
+# Basic transaction
+async with storage.transaction():
+    await storage.save(card1)
+    await storage.save(card2)  # If this fails, card1 is also rolled back
+
+# Nested transactions with independent rollback
+async with storage.transaction():  # Outer transaction
+    await storage.save(card1)
+    
+    try:
+        async with storage.transaction():  # Inner transaction using savepoint
+            await storage.save(card2)
+            raise ValueError("Something went wrong")
+    except ValueError:
+        pass  # Inner transaction rolls back to savepoint, card2 not saved
+    
+    await storage.save(card3)  # Still works, card1 and card3 are saved
+
+# Thread-safe parallel transactions
+async def task1():
+    async with storage.transaction():
+        await storage.save(card1)
+
+async def task2():
+    async with storage.transaction():
+        await storage.save(card2)
+
+await asyncio.gather(task1(), task2())  # Safe parallel execution
 ```
 
 #### Batch Operations
@@ -132,9 +286,17 @@ assert isinstance(retrieved.content, bytes)
 # Create multiple cards
 cards = [MCard(content=f"Card {i}") for i in range(100)]
 
-# Efficient batch save
-saved, skipped = storage.save_many(cards)
+# Efficient batch save with transaction
+with storage.transaction():
+    saved, skipped = storage.save_many(cards)
 print(f"Saved: {saved}, Skipped: {skipped}")
+
+# Batch retrieve
+hashes = [card.hash for card in cards]
+retrieved = storage.get_many(hashes)
+
+# Batch delete
+deleted = storage.delete_many(hashes)
 ```
 
 #### Time Range Queries
@@ -145,53 +307,63 @@ from datetime import datetime, timedelta
 start_time = datetime.now() - timedelta(hours=1)
 end_time = datetime.now()
 recent_cards = collection.get_cards_in_timerange(start_time, end_time)
+
+# Get cards with pagination
+page_size = 10
+page_number = 1
+cards = collection.get_cards_in_timerange(
+    start_time,
+    end_time,
+    limit=page_size,
+    offset=(page_number - 1) * page_size
+)
+```
+
+### Configuration
+
+MCard can be configured through environment variables:
+
+```bash
+# Hashing settings
+export MCARD_HASH_ALGORITHM="sha256"  # Default hashing algorithm (md5, sha1, sha256, sha512)
+export MCARD_COLLISION_AWARE="true"   # Enable collision-aware hashing
+
+# Time settings
+export MCARD_TIMEZONE="America/New_York"  # Default timezone for timestamps
+export MCARD_TIME_FORMAT="%Y-%m-%d %H:%M:%S %Z"  # Time format for display
+export MCARD_DATE_FORMAT="%Y-%m-%d"  # Date format for display
+export MCARD_USE_UTC=false  # Whether to use UTC for internal storage
+
+# Database settings
+export MCARD_DB_PATH="cards.db"  # SQLite database path
+export MCARD_POOL_SIZE=5  # Connection pool size
 ```
 
 ### Thread Safety
 
-When using MCard in a web application or multi-threaded environment:
+MCard is designed to be thread-safe and can be safely used in multi-threaded or async environments:
 
 ```python
-from flask import Flask, g
-from mcard import MCardStorage, MCardCollection
+from mcard import SQLiteCardRepository, MCard
 
-app = Flask(__name__)
-DB_PATH = "cards.db"
+# Thread-safe connection pooling
+storage = SQLiteCardRepository("cards.db", pool_size=5)
 
-def get_storage():
-    if 'storage' not in g:
-        g.storage = MCardStorage(DB_PATH)
-    return g.storage
+# Connections are automatically managed
+async def worker():
+    async with storage.transaction():
+        card = MCard(content="Thread-safe content")
+        await storage.save(card)
 
-def get_collection():
-    if 'collection' not in g:
-        g.collection = MCardCollection(get_storage())
-    return g.collection
-
-@app.teardown_appcontext
-def teardown_db(exception):
-    storage = g.pop('storage', None)
-    if storage is not None:
-        storage.conn.close()
+# Clean up when done
+await storage.close()
 ```
-
-## Examples
-
-### Todo Application
-A complete example of using MCard in a web application can be found in the `examples/todo_app` directory. This example demonstrates:
-- Thread-safe database operations
-- Proper transaction management
-- Content-addressable storage for todo items
-- Integration with Flask's application context
-- Best practices for error handling and logging
-
-See the [Todo App README](examples/todo_app/README.md) for more details.
 
 ## Development
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/mcard-core.git
+git clone https://github.com/benkoo/mcard-core.git
 cd mcard-core
 ```
 
@@ -203,7 +375,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 3. Install development dependencies:
 ```bash
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 4. Run tests:
@@ -211,53 +383,10 @@ pip install -r requirements.txt
 pytest
 ```
 
-## Project Structure
+## Contributing
 
-```
-mcard-core/
-├── mcard/              # Core library implementation
-│   ├── core.py        # MCard class definition (Pydantic model)
-│   ├── storage.py     # SQLite storage implementation
-│   └── collection.py  # Collection management with temporal ordering
-├── examples/          # Example applications
-│   └── todo_app/     # Complete Todo application example
-├── tests/            # Test suite
-└── scripts/          # Utility scripts
-```
-
-## Best Practices
-
-1. **Thread Safety**
-   - Use thread-local storage in multi-threaded environments
-   - Properly manage database connections
-   - Use appropriate transaction management
-   - Take advantage of the copy-on-read pattern
-
-2. **Error Handling**
-   - Always use try/except blocks for database operations
-   - Implement proper transaction rollback on errors
-   - Include comprehensive error logging
-   - Verify content hashes after retrieval
-
-3. **Data Integrity**
-   - Let MCard handle content hash generation
-   - Maintain proper temporal ordering
-   - Use transaction-based updates
-   - Preserve timezone information
-
-4. **Performance**
-   - Use batch operations for multiple cards
-   - Close database connections when done
-   - Use time range queries for large collections
-   - Implement proper connection pooling
-   - Take advantage of in-memory sorting
-
-5. **Content Management**
-   - Use appropriate content types (string, bytes, etc.)
-   - Verify content integrity after operations
-   - Handle binary content appropriately
-   - Maintain timezone awareness
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
