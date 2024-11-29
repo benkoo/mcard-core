@@ -537,7 +537,7 @@ MCard Core supports flexible configuration through environment variables, allowi
 ### Supported Configuration Parameters
 
 | Environment Variable         | Description                                | Default Value       | Example                |
-|------------------------------|--------------------------------------------|--------------------|------------------------|
+|------------------------------|--------------------------------------------|---------------------|------------------------|
 | `MCARD_API_KEY`              | API authentication key                     | `default_mcard_api_key` | `test_custom_api_key_12345` |
 | `MCARD_MANAGER_DB_PATH`      | Path to the SQLite database file           | `MCardManagerStore.db` | `test_custom_database.db` |
 | `MCARD_MANAGER_DATA_SOURCE`  | Database backend type                      | `sqlite`           | `sqlite`               |

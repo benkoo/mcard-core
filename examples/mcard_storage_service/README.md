@@ -1,153 +1,71 @@
-# MCard Storage Service
+# MCard Interactive Demo
 
-A standalone storage service implementation using MCard Core, FastAPI, and uvicorn. This service provides a RESTful API for storing and retrieving content-addressable data using the MCard data structure.
+A demonstration CLI tool for the MCard content-addressable storage system. This interactive demo showcases the core capabilities of MCard, allowing users to create, retrieve, list, and search content-addressable cards.
 
 ## Features
 
-- RESTful API for MCard operations
-- Configurable through environment variables
-- Built on FastAPI and uvicorn for high performance
-- Uses MCard Core's robust storage and hashing capabilities
-- Supports concurrent operations
-- Includes health check endpoint
-- Comprehensive error handling
+- Interactive CLI interface
+- Content-addressable storage using MCard
+- Automatic content type detection
+- Basic search functionality
+- SQLite-based storage (in-memory or file-based)
 
 ## Prerequisites
 
-- Python 3.12+
+- Python 3.x
 - MCard Core library
-- uvicorn
-- python-dotenv
-- fastapi
 
-## Configuration
+## Usage
 
-Create a `.env` file with the following variables:
-
-```env
-# Server Configuration
-MCARD_SERVICE_HOST=0.0.0.0
-MCARD_SERVICE_PORT=8000
-MCARD_SERVICE_WORKERS=4
-MCARD_SERVICE_LOG_LEVEL=info
-
-# MCard Core Configuration
-MCARD_API_KEY=your_api_key_here
-MCARD_MANAGER_DB_PATH=MCardManagerStore.db
-MCARD_MANAGER_DATA_SOURCE=sqlite
-MCARD_MANAGER_POOL_SIZE=5
-```
-
-## Installation
-
-1. Create a virtual environment:
-   ```bash
-   python -m venv .venv
-   ```
-
-2. Activate the virtual environment:
-   ```bash
-   source .venv/bin/activate  # On Unix/macOS
-   .venv\Scripts\activate     # On Windows
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Running the Service
-
-Start the service using uvicorn:
+Run the interactive demo:
 
 ```bash
-uvicorn mcard_storage_service:app --host 0.0.0.0 --port 8000 --workers 4
+python mcard_interactive_demo.py [--db DB_PATH]
 ```
 
-Or use the provided start script:
+Options:
+- `--db`: Path to SQLite database (defaults to in-memory database if not provided)
 
-```bash
-./start_service.sh
-```
+## Available Commands
 
-## API Endpoints
+1. **Create a new card**
+   - Enter content for the card
+   - Optionally specify content type
+   - Returns the content hash of the created card
 
-### Health Check
-- `GET /health`
-  - Returns service health status
-  - No authentication required
+2. **Retrieve a card by hash**
+   - Look up a card using its content hash
+   - Displays card metadata and analysis
 
-### Card Operations
-- `POST /cards/`
-  - Create a new card
-  - Requires API key
-  - Returns 201 on success
+3. **List recent cards**
+   - Shows recently created cards
+   - Displays hash and creation time
 
-- `GET /cards/{hash}`
-  - Retrieve a card by hash
-  - Requires API key
-  - Returns 200 on success, 404 if not found
-
-- `GET /cards/`
-  - List cards with optional filtering
-  - Requires API key
-  - Supports pagination and content filtering
-
-- `DELETE /cards/{hash}`
-  - Delete a card
-  - Requires API key
-  - Returns 204 on success
-
-## Error Handling
-
-The service follows standard HTTP status codes:
-- 200: Success
-- 201: Created
-- 204: No Content (successful deletion)
-- 400: Bad Request
-- 401: Unauthorized
-- 404: Not Found
-- 500: Internal Server Error
+4. **Search cards**
+   - Search through card contents
+   - Shows matching cards with preview
 
 ## Implementation Details
 
-This service is built on top of MCard Core's robust infrastructure:
+The demo uses the following core MCard components:
+- `MCardStore` for persistence
+- `ContentTypeInterpreter` for content analysis
+- `MCard` data structure for content storage
 
-- Uses `mcard_api.py` for core API functionality
-- Leverages `config.py` for configuration management
-- Implements additional health monitoring
-- Adds service-specific logging
-- Includes graceful shutdown handling
+## Example Usage
 
-## Monitoring
+```python
+# Initialize the CLI
+cli = MCardInteractiveCLI(db_path="cards.db")
 
-The service provides basic monitoring through:
-- Health check endpoint
-- Structured logging
-- Error tracking
-- Basic metrics (requests, response times)
+# Create a card
+card = await cli.create_card("Hello, World!", "text/plain")
 
-## Security
+# Retrieve a card
+retrieved_card = await cli.get_card(card.hash)
 
-- API key authentication required for all card operations
-- TLS support through uvicorn (when configured)
-- Input validation and sanitization
-- Rate limiting (configurable)
-
-## Development
-
-To run in development mode with auto-reload:
-
-```bash
-uvicorn mcard_storage_service:app --reload --host 0.0.0.0 --port 8000
-```
-
-## Testing
-
-Run the test suite:
-
-```bash
-pytest tests/
+# Search cards
+results = await cli.search_cards("Hello")
 ```
 
 ## License

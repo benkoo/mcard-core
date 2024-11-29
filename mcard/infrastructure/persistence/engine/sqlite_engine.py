@@ -76,7 +76,7 @@ class SQLiteStore(CardStore):
             
             # Create table if not exists
             await self._connection.execute("""
-                CREATE TABLE IF NOT EXISTS cards (
+                CREATE TABLE IF NOT EXISTS card (
                     hash TEXT PRIMARY KEY,
                     content BLOB NOT NULL,
                     g_time TEXT NOT NULL
@@ -113,7 +113,7 @@ class SQLiteStore(CardStore):
     async def get_all(self, content: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
         """Get all cards from the database with optional filtering and pagination."""
         await self.initialize()
-        query = 'SELECT hash, content, g_time FROM cards'
+        query = 'SELECT hash, content, g_time FROM card'
         params = []
         
         if content is not None:
@@ -146,7 +146,7 @@ class SQLiteStore(CardStore):
         
         async def _get():
             cursor = await self._connection.execute(
-                "SELECT content, g_time FROM cards WHERE hash = ?",
+                "SELECT content, g_time FROM card WHERE hash = ?",
                 (hash_str,)
             )
             row = await cursor.fetchone()
@@ -165,7 +165,7 @@ class SQLiteStore(CardStore):
             return []
 
         placeholders = ','.join(['?' for _ in hashes])
-        query = f'SELECT hash, content, g_time FROM cards WHERE hash IN ({placeholders})'
+        query = f'SELECT hash, content, g_time FROM card WHERE hash IN ({placeholders})'
         cursor = await self._connection.execute(query, hashes)
         rows = await cursor.fetchall()
 
@@ -190,7 +190,7 @@ class SQLiteStore(CardStore):
         async def _save():
             try:
                 await self._connection.execute(
-                    'INSERT INTO cards (hash, content, g_time) VALUES (?, ?, ?)',
+                    'INSERT INTO card (hash, content, g_time) VALUES (?, ?, ?)',
                     (card.hash, content_bytes, formatted_time)
                 )
                 await self._connection.commit()
@@ -217,7 +217,7 @@ class SQLiteStore(CardStore):
     ) -> List[MCard]:
         """List cards from the store with optional time range and pagination."""
         await self.initialize()
-        query = 'SELECT hash, content, g_time FROM cards WHERE 1=1'
+        query = 'SELECT hash, content, g_time FROM card WHERE 1=1'
         params = []
         
         if start_time:
@@ -280,7 +280,7 @@ class SQLiteStore(CardStore):
         
         async def _delete():
             try:
-                await self._connection.execute('DELETE FROM cards WHERE hash = ?', (hash_str,))
+                await self._connection.execute('DELETE FROM card WHERE hash = ?', (hash_str,))
                 await self._connection.commit()
             except sqlite3.Error as e:
                 raise StorageError(f"Failed to delete card: {str(e)}") from e
@@ -294,7 +294,7 @@ class SQLiteStore(CardStore):
         async def _delete_many():
             try:
                 placeholders = ','.join(['?' for _ in hash_strs])
-                await self._connection.execute(f'DELETE FROM cards WHERE hash IN ({placeholders})', hash_strs)
+                await self._connection.execute(f'DELETE FROM card WHERE hash IN ({placeholders})', hash_strs)
                 await self._connection.commit()
             except sqlite3.Error as e:
                 raise StorageError(f"Failed to delete cards: {str(e)}") from e
@@ -307,7 +307,7 @@ class SQLiteStore(CardStore):
         
         async def _delete_before_time():
             try:
-                await self._connection.execute('DELETE FROM cards WHERE g_time < ?', (time.isoformat(),))
+                await self._connection.execute('DELETE FROM card WHERE g_time < ?', (time.isoformat(),))
                 await self._connection.commit()
                 return await self._connection.total_changes
             except sqlite3.Error as e:
