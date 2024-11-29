@@ -10,6 +10,8 @@ class MCard:
 
     def __init__(self, content: Union[str, bytes], hash: Optional[str] = None, g_time: Optional[str] = None):
         """Initialize MCard."""
+        if content is None:
+            raise ValidationError("Card content cannot be None")
         self._content = content
         self._hash = hash or self._compute_hash()
         self._g_time = self._parse_time(g_time) if g_time else datetime.now(timezone.utc)

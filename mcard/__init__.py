@@ -6,9 +6,10 @@ from .domain.models.card import MCard
 from .domain.dependency.time import get_now_with_located_zone
 from .domain.models.config import AppSettings, HashingSettings
 from .domain.models.repository_config import RepositoryConfig, SQLiteConfig
-from .infrastructure.persistence.engine.sqlite_engine import SQLiteStore
 from .domain.dependency.interpreter import ContentTypeInterpreter
 from .application.card_service import CardService
+from .domain.services.hashing import DefaultHashingService, get_hashing_service, set_hashing_service
+from .infrastructure.persistence.repositories import SQLiteCardRepo
 
 __version__ = "0.2.0"
 __all__ = [
@@ -18,7 +19,10 @@ __all__ = [
     "HashingSettings",
     "RepositoryConfig",
     "SQLiteConfig",
-    "SQLiteStore",
     "ContentTypeInterpreter",
-    "CardService"
+    "CardService",
+    "DefaultHashingService",
+    "get_hashing_service",
+    "set_hashing_service",
+    "SQLiteCardRepo",
 ]

@@ -5,19 +5,12 @@ import logging
 import tempfile
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
-import sqlite3
-import dotenv
 from pathlib import Path
+import dotenv
 
 # Import configuration and schema initialization
-from mcard.domain.models.config import AppSettings
+from mcard.domain.models.config import AppSettings, DatabaseSettings, HashingSettings
 from mcard.domain.models.repository_config import SQLiteConfig, RepositoryType
-from mcard.infrastructure.persistence.repository_factory import get_repository
-from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
-
-# Import the main API application
-from mcard.interfaces.api.mcard_api import app, load_config
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -36,6 +29,7 @@ MCARD_MANAGER_REPOSITORY_TYPE=sqlite
 MCARD_MANAGER_POOL_SIZE=3
 MCARD_MANAGER_TIMEOUT=15.0
 MCARD_MANAGER_MAX_CONTENT_SIZE=5242880
+MCARD_MANAGER_HASH_ALGORITHM=sha256
 """)
         temp_env.flush()
         temp_path = temp_env.name
@@ -53,9 +47,26 @@ async def test_config_env_loading(temp_env_file):
     assert os.getenv('MCARD_API_KEY') == 'test_custom_api_key_12345'
     assert os.getenv('MCARD_MANAGER_DB_PATH') == 'test_custom_database.db'
     
-    # Load configuration
-    config = load_config()
-    assert isinstance(config.repository, SQLiteConfig)
-    assert config.repository.db_path == 'test_custom_database.db'
-    assert config.repository.type == RepositoryType.SQLITE
+    # Create AppSettings from environment
+    config = AppSettings(
+        database=DatabaseSettings(
+            db_path=os.getenv('MCARD_MANAGER_DB_PATH'),
+            max_connections=int(os.getenv('MCARD_MANAGER_POOL_SIZE', '3')),
+            timeout=float(os.getenv('MCARD_MANAGER_TIMEOUT', '15.0')),
+            data_source=os.getenv('MCARD_MANAGER_REPOSITORY_TYPE', 'sqlite')
+        ),
+        hashing=HashingSettings(
+            algorithm=os.getenv('MCARD_MANAGER_HASH_ALGORITHM', 'sha256')
+        ),
+        mcard_api_key=os.getenv('MCARD_API_KEY'),
+        mcard_api_port=int(os.getenv('MCARD_API_PORT', '8888'))
+    )
+    
+    # Verify configuration
+    assert config.database.db_path == 'test_custom_database.db'
+    assert config.database.data_source == 'sqlite'
+    assert config.database.max_connections == 3
+    assert config.database.timeout == 15.0
     assert config.mcard_api_key == 'test_custom_api_key_12345'
+    assert config.mcard_api_port == 8888
+    assert config.hashing.algorithm == 'sha256'

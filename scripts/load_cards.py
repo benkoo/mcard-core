@@ -24,7 +24,7 @@ load_dotenv(ENV_FILE, override=True)
 
 from mcard import SQLiteCardRepo, AppSettings, DatabaseSettings, MCard
 from mcard.domain.models.config import HashingSettings, HashAlgorithm
-from mcard.domain.dependency.hashing import CollisionAwareHashingService, set_hashing_service
+from mcard.domain.services.hashing import CollisionAwareHashingService, set_hashing_service
 
 print(f"MCARD_HASH_ALGORITHM environment variable: {os.environ.get('MCARD_HASH_ALGORITHM')}")
 hash_algo = os.environ.get('MCARD_HASH_ALGORITHM', 'sha256')

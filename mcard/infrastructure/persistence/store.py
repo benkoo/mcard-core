@@ -10,8 +10,9 @@ from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import StorageError
 from mcard.infrastructure.persistence.facade import DatabaseFacade, DatabaseConfig
 from mcard.infrastructure.persistence.engine_config import EngineConfig, EngineType, create_engine_config
-from mcard.domain.dependency.hashing import HashingService
+from mcard.domain.models.protocols import HashingService
 from mcard.infrastructure.config import load_config
+import asyncio
 
 class MCardStore:
     """
@@ -30,75 +31,106 @@ class MCardStore:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
-        """Initialize the store if not already initialized."""
-        if not self._initialized:
-            with self._lock:
-                if not self._initialized:
-                    self._facade = None
-                    self._config = None
-                    self._hashing_service = None
-                    self._initialized = True
-
-    def configure(self, 
-                 engine_type: EngineType = EngineType.SQLITE,
-                 connection_string: Optional[str] = None,
-                 **kwargs) -> None:
+    def __init__(self, config: Optional[DatabaseConfig] = None):
         """
-        Configure the store with specific database settings.
+        Initialize the store with optional configuration.
         
         Args:
-            engine_type: Type of database engine to use (SQLite, PostgreSQL, etc.)
-            connection_string: Connection string or path for the database
-            **kwargs: Additional database-specific configuration options
+            config: Optional configuration object
         """
-        if self._facade is not None:
-            raise RuntimeError("Store is already configured. Call reset() first to reconfigure.")
+        self._config = config or load_config()
+        self._facade: Optional[DatabaseFacade] = None
+        self._hashing_service: Optional[HashingService] = None
+        self._initialized = False
 
-        # Load configuration including hashing settings
-        config = load_config()
+    async def __aenter__(self):
+        """
+        Async context manager entry point.
+        
+        Returns:
+            Initialized store instance
+        """
+        await self.initialize()
+        return self
 
-        # Set default SQLite path if none provided
-        if engine_type == EngineType.SQLITE and not connection_string:
-            connection_string = os.path.expanduser("~/.mcard/storage.db")
-            os.makedirs(os.path.dirname(connection_string), exist_ok=True)
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        Async context manager exit point.
+        
+        Args:
+            exc_type: Exception type
+            exc_val: Exception value
+            exc_tb: Exception traceback
+        """
+        await self.close()
 
-        # Create engine config
-        engine_config = create_engine_config(
-            engine_type=engine_type,
-            connection_string=connection_string,
-            **kwargs
-        )
+    async def initialize(self):
+        """Initialize the store with current configuration."""
+        if not self._initialized:
+            # Configure the store if not already configured
+            if not self._facade:
+                self.configure()
 
-        # Create database config
-        self._config = DatabaseConfig(
-            engine_config=engine_config,
-            pragmas=kwargs.get('pragmas'),
-            pool_size=kwargs.get('pool_size'),
-            timeout=kwargs.get('timeout')
-        )
+            # Initialize the facade
+            self._facade = DatabaseFacade(self._config)
 
-        # Initialize hashing service
-        self._hashing_service = HashingService(config.hashing)
+            # Initialize the hashing service
+            self._hashing_service = HashingService(self._config.hashing)
 
-        # Initialize the facade
-        self._facade = DatabaseFacade(self._config)
+            # Initialize the database schema
+            await self._facade.initialize_schema()
+            self._initialized = True
 
-    async def initialize(self) -> None:
-        """Initialize the database schema and ensure the store is ready for use."""
-        if self._facade is None:
-            self.configure()  # Use defaults if not configured
-        await self._facade.initialize_schema()
+    async def close(self):
+        """Close the store and release resources."""
+        if self._initialized and self._facade:
+            await self._facade.close()
+            self._initialized = False
+
+    async def reset(self):
+        """Reset the store to its initial state."""
+        await self.close()
+        self._config = load_config()
+        self._facade = None
+        self._hashing_service = None
+        self._initialized = False
+
+    def configure(
+        self, 
+        engine_type: Optional[EngineType] = None, 
+        connection_string: Optional[str] = None,
+        max_connections: Optional[int] = None,
+        timeout: Optional[float] = None
+    ):
+        """
+        Configure the store with specific parameters.
+        
+        Args:
+            engine_type: Type of database engine
+            connection_string: Database connection string
+            max_connections: Maximum number of connections
+            timeout: Connection timeout
+        """
+        # Reset configuration
+        self._config = load_config()
+
+        # Override configuration if specific parameters are provided
+        if engine_type:
+            self._config.engine_config = create_engine_config(
+                engine_type=engine_type,
+                connection_string=connection_string or self._config.engine_config.connection_string,
+                max_connections=max_connections or self._config.engine_config.max_connections,
+                timeout=timeout or self._config.engine_config.timeout
+            )
 
     def compute_hash(self, content: bytes) -> str:
-        """Compute hash for content using configured hash algorithm."""
-        if self._hashing_service is None:
-            config = load_config()
-            self._hashing_service = HashingService(config.hashing)
-        return self._hashing_service.hash_content(content)
+        """Compute hash for given content."""
+        return asyncio.run(self._hashing_service.hash_content(content))
 
     async def save(self, card: MCard) -> None:
         """Save a card to the store."""
+        if card is None:
+            raise ValueError("Card cannot be None")
         if not self._facade:
             raise StorageError("Store not configured")
         
@@ -106,17 +138,36 @@ class MCardStore:
             card.hash = self.compute_hash(card.content.encode('utf-8'))
         await self._facade.save_card(card)
 
+    def save_sync(self, card: MCard) -> None:
+        """Save a card synchronously."""
+        import asyncio
+        asyncio.run(self.save(card))
+
     async def get(self, card_id: str) -> Optional[MCard]:
         """Retrieve a card by its ID."""
+        if card_id is None:
+            raise ValueError("Card ID cannot be None")
         if not self._facade:
             raise StorageError("Store not configured")
         return await self._facade.get_card(card_id)
 
+    def get_sync(self, card_id: str) -> Optional[MCard]:
+        """Retrieve a card synchronously."""
+        import asyncio
+        return asyncio.run(self.get(card_id))
+
     async def delete(self, card_id: str) -> None:
         """Delete a card by its ID."""
+        if card_id is None:
+            raise ValueError("Card ID cannot be None")
         if not self._facade:
             raise StorageError("Store not configured")
         await self._facade.delete_card(card_id)
+
+    def delete_sync(self, card_id: str) -> None:
+        """Delete a card synchronously."""
+        import asyncio
+        asyncio.run(self.delete(card_id))
 
     async def list(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
         """List cards with optional pagination."""
@@ -124,14 +175,28 @@ class MCardStore:
             raise StorageError("Store not configured")
         return await self._facade.list_cards(limit=limit, offset=offset)
 
+    def list_sync(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
+        """List cards synchronously."""
+        import asyncio
+        return asyncio.run(self.list(limit=limit, offset=offset))
+
     async def search(self, query: str) -> List[MCard]:
         """Search for cards based on a query."""
+        if query is None:
+            raise ValueError("Query cannot be None")
         if not self._facade:
             raise StorageError("Store not configured")
         return await self._facade.search_cards(query)
 
+    def search_sync(self, query: str) -> List[MCard]:
+        """Search for cards synchronously."""
+        import asyncio
+        return asyncio.run(self.search(query))
+
     async def save_many(self, cards: List[MCard]) -> None:
         """Save multiple cards in a batch."""
+        if cards is None:
+            raise ValueError("Cards cannot be None")
         if not self._facade:
             raise StorageError("Store not configured")
         
@@ -141,18 +206,10 @@ class MCardStore:
                 card.hash = self.compute_hash(card.content.encode('utf-8'))
         await self._facade.save_many_cards(cards)
 
-    async def close(self) -> None:
-        """Close the database connection."""
-        if self._facade:
-            await self._facade.close()
-
-    async def reset(self) -> None:
-        """Reset the store configuration. Useful for testing."""
-        if self._facade:
-            await self._facade.close()
-        self._facade = None
-        self._config = None
-        self._hashing_service = None
+    def save_many_sync(self, cards: List[MCard]) -> None:
+        """Save multiple cards synchronously."""
+        import asyncio
+        asyncio.run(self.save_many(cards))
 
     @property
     def is_configured(self) -> bool:

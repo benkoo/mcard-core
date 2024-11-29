@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 from mcard.domain.models.card import MCard
 from mcard.application.card_service import CardService
 from mcard.domain.models.exceptions import ValidationError
-from mcard.infrastructure.repository import SQLiteRepository
+from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
 
 @pytest.fixture
 def mock_repository():

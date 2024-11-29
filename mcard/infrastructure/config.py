@@ -3,11 +3,11 @@ import os
 from pathlib import Path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, Type
+from typing import Optional, Dict, Any, List, Type, Union, Protocol
 from threading import Lock
 from dotenv import load_dotenv
 from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
-from mcard.domain.dependency.hashing import HashingSettings
+from mcard.domain.services.hashing import HashingSettings
 
 # Load environment variables from .env file
 load_dotenv()
@@ -22,13 +22,16 @@ ENV_HASH_CUSTOM_FUNCTION = "MCARD_HASH_CUSTOM_FUNCTION"
 ENV_HASH_CUSTOM_LENGTH = "MCARD_HASH_CUSTOM_LENGTH"
 ENV_FORCE_DEFAULT_CONFIG = "MCARD_FORCE_DEFAULT_CONFIG"
 
-class ConfigurationSource(ABC):
-    """Abstract base class for configuration sources."""
+class ConfigurationSource(Protocol):
+    """Protocol for configuration sources."""
     
-    @abstractmethod
     def load(self) -> Dict[str, Any]:
-        """Load configuration from the source."""
-        pass
+        """Load configuration."""
+        ...
+
+    def configure_repository(self) -> SQLiteConfig:
+        """Configure repository."""
+        ...
 
 class EnvironmentConfigSource(ConfigurationSource):
     """Configuration source that loads from environment variables."""
@@ -52,54 +55,29 @@ class EnvironmentConfigSource(ConfigurationSource):
         return self._validate_config(config)
         
     def _validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and normalize configuration values."""
+        """
+        Validate and normalize configuration values.
+        
+        Args:
+            config: Configuration dictionary
+        
+        Returns:
+            Validated configuration dictionary
+        """
         validated = {}
         
         # Validate db_path
         db_path = config.get('db_path')
-        if not db_path or not str(db_path).strip():
-            validated['db_path'] = str(get_default_db_path())
-        else:
-            # Keep relative paths as-is
-            db_path = str(db_path).strip()
-            validated['db_path'] = db_path
+        validated['db_path'] = resolve_db_path(db_path)
         
         # Validate max_connections
         max_conn = config.get('max_connections')
-        if max_conn is None:
-            validated['max_connections'] = 5  # Default value
-        else:
-            max_conn_str = str(max_conn)
-            if not max_conn_str or not max_conn_str.strip():
-                raise ValueError("Maximum connections cannot be empty")
-            try:
-                max_conn_int = int(max_conn_str)
-                if max_conn_int <= 0:
-                    raise ValueError(f"Maximum connections must be positive, got {max_conn}")
-                validated['max_connections'] = max_conn_int
-            except ValueError as e:
-                if "invalid literal for int()" in str(e):
-                    raise ValueError(f"Invalid max_connections value: {max_conn}")
-                raise
-
+        validated['max_connections'] = int(max_conn) if max_conn is not None else 10
+        
         # Validate timeout
         timeout = config.get('timeout')
-        if timeout is None:
-            validated['timeout'] = 30.0  # Default value
-        else:
-            timeout_str = str(timeout)
-            if not timeout_str or not timeout_str.strip():
-                raise ValueError("Timeout cannot be empty")
-            try:
-                timeout_float = float(timeout_str)
-                if timeout_float <= 0:
-                    raise ValueError(f"Timeout must be positive, got {timeout}")
-                validated['timeout'] = timeout_float
-            except ValueError as e:
-                if "could not convert string to float" in str(e):
-                    raise ValueError(f"Invalid timeout value: {timeout}")
-                raise
-
+        validated['timeout'] = float(timeout) if timeout is not None else 30.0
+        
         # Validate hash algorithm
         hash_algo = config.get('hash_algorithm')
         if hash_algo is None or not str(hash_algo).strip():
@@ -157,6 +135,15 @@ class EnvironmentConfigSource(ConfigurationSource):
 
         return validated
 
+    def configure_repository(self) -> SQLiteConfig:
+        """Configure SQLite repository from environment."""
+        config = self.load()
+        return SQLiteConfig(
+            db_path=config['db_path'],
+            max_connections=config['max_connections'],
+            timeout=config['timeout']
+        )
+
 class TestConfigSource(ConfigurationSource):
     """Configuration source for test environment."""
     
@@ -190,57 +177,33 @@ class TestConfigSource(ConfigurationSource):
                 config[key] = value
         
         # Validate and return the configuration
-        return self._validate_config(config)
+        return self._validate_config(config, is_test=True)
 
-    def _validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and normalize configuration values."""
+    def _validate_config(self, config: Dict[str, Any], is_test: bool = False) -> Dict[str, Any]:
+        """
+        Validate and normalize configuration values.
+        
+        Args:
+            config: Configuration dictionary
+            is_test: Whether this is a test configuration
+        
+        Returns:
+            Validated configuration dictionary
+        """
         validated = {}
         
-        # Validate db_path
+        # Validate db_path with test flag
         db_path = config.get('db_path')
-        if not db_path or not str(db_path).strip():
-            validated['db_path'] = str(get_test_db_path())  # Use test-specific path as fallback
-        else:
-            # Keep relative paths as-is
-            db_path = str(db_path).strip()
-            validated['db_path'] = db_path
+        validated['db_path'] = resolve_db_path(db_path, is_test)
         
         # Validate max_connections
         max_conn = config.get('max_connections')
-        if max_conn is None:
-            validated['max_connections'] = 5  # Default value
-        else:
-            max_conn_str = str(max_conn)
-            if not max_conn_str or not max_conn_str.strip():
-                raise ValueError("Maximum connections cannot be empty")
-            try:
-                max_conn_int = int(max_conn_str)
-                if max_conn_int <= 0:
-                    raise ValueError(f"Maximum connections must be positive, got {max_conn}")
-                validated['max_connections'] = max_conn_int
-            except ValueError as e:
-                if "invalid literal for int()" in str(e):
-                    raise ValueError(f"Invalid max_connections value: {max_conn}")
-                raise
-
+        validated['max_connections'] = int(max_conn) if max_conn is not None else 10
+        
         # Validate timeout
         timeout = config.get('timeout')
-        if timeout is None:
-            validated['timeout'] = 30.0  # Default value
-        else:
-            timeout_str = str(timeout)
-            if not timeout_str or not timeout_str.strip():
-                raise ValueError("Timeout cannot be empty")
-            try:
-                timeout_float = float(timeout_str)
-                if timeout_float <= 0:
-                    raise ValueError(f"Timeout must be positive, got {timeout}")
-                validated['timeout'] = timeout_float
-            except ValueError as e:
-                if "could not convert string to float" in str(e):
-                    raise ValueError(f"Invalid timeout value: {timeout}")
-                raise
-
+        validated['timeout'] = float(timeout) if timeout is not None else 30.0
+        
         # Validate hash algorithm
         hash_algo = config.get('hash_algorithm')
         if hash_algo is None or not str(hash_algo).strip():
@@ -298,60 +261,115 @@ class TestConfigSource(ConfigurationSource):
 
         return validated
 
+    def configure_repository(self) -> SQLiteConfig:
+        """Configure test SQLite repository."""
+        config = self.load()
+        return SQLiteConfig(
+            db_path=config['db_path'],
+            max_connections=config['max_connections'],
+            timeout=config['timeout']
+        )
+
 class DataEngineConfig:
-    """Configuration for the data engine."""
-    
+    """Configuration management for data engine."""
     _instance = None
-    _initialized = False
-    
+    _lock = Lock()
+
     def __new__(cls):
-        """Create or return singleton instance."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+        """Singleton implementation."""
+        if not cls._instance:
+            with cls._lock:
+                if not cls._instance:
+                    cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         """Initialize configuration."""
         if not hasattr(self, '_initialized'):
             self.repository = None
-            self.hashing = None
-            self._initialized = False
-    
-    @classmethod
-    def get_instance(cls) -> 'DataEngineConfig':
-        """Get singleton instance."""
-        return cls()
-    
+            self.engine_config = None
+            self.pool_size = 10  # Default pool size
+            self.timeout = 30.0  # Default timeout
+            self.engine_options = {'check_same_thread': False}
+            
+            # Add hashing configuration
+            self.hashing = {
+                'algorithm': 'sha256',
+                'length': 64
+            }
+            
+            self._initialized = True
+
     @classmethod
     def reset(cls):
-        """Reset singleton instance for testing."""
-        cls._instance = None
-    
+        """Reset the singleton instance and class-level attributes."""
+        with cls._lock:
+            cls._instance = None
+            # Reinitialize class-level attributes
+            if hasattr(cls, '_initialized'):
+                delattr(cls, '_initialized')
+
     def configure(self, source: ConfigurationSource):
-        """Configure using provided source."""
-        if self._initialized:
-            raise RuntimeError("Configuration is already initialized")
+        """
+        Configure the data engine with a specific source.
         
+        Args:
+            source: Configuration source
+        """
+        # Reset existing configuration
+        self.reset()
+
+        # Load configuration from source
         config = source.load()
+
+        # Set repository configuration
+        self.repository = source.configure_repository()
         
-        # Configure repository
-        self.repository = SQLiteConfig(
-            db_path=config['db_path'],
-            max_connections=config['max_connections'],
-            timeout=config['timeout'],
-            check_same_thread=False
+        # Set engine configuration
+        self.engine_config = create_engine_config(
+            engine_type=EngineType.SQLITE,
+            connection_string=config['db_path'],
+            max_connections=config.get('max_connections', 10),
+            timeout=config.get('timeout', 30.0)
         )
-        
-        # Configure hashing
-        self.hashing = HashingSettings(
-            algorithm=config['hash_algorithm'],
-            custom_module=config.get('hash_custom_module'),
-            custom_function=config.get('hash_custom_function'),
-            custom_hash_length=config.get('hash_custom_length')
-        )
-        
-        self._initialized = True
+
+        # Update additional configuration
+        self.pool_size = config.get('max_connections', 10)
+        self.timeout = config.get('timeout', 30.0)
+        self.engine_options = {
+            'check_same_thread': False,
+            'max_content_size': 10 * 1024 * 1024  # 10 MB default
+        }
+
+        # Update hashing configuration
+        self.hashing = config.get('hashing', {
+            'algorithm': 'sha256',
+            'length': 64
+        })
+
+def create_engine_config(
+    engine_type: EngineType,
+    connection_string: str,
+    max_connections: Optional[int] = None,
+    timeout: Optional[float] = None
+) -> SQLiteConfig:
+    """
+    Create an engine configuration based on parameters.
+    
+    Args:
+        engine_type: Type of database engine
+        connection_string: Database connection string
+        max_connections: Maximum number of connections
+        timeout: Connection timeout
+    
+    Returns:
+        SQLite configuration
+    """
+    return SQLiteConfig(
+        db_path=connection_string,
+        max_connections=max_connections or 10,
+        timeout=timeout or 30.0
+    )
 
 def get_project_root() -> Path:
     """Get the project root directory."""
@@ -359,39 +377,54 @@ def get_project_root() -> Path:
 
 def get_default_db_path() -> Path:
     """Get the default database path."""
-    return Path("data/mcard.db")
+    data_dir = get_project_root() / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir / "mcard.db"
 
 def get_test_db_path() -> Path:
     """Get the test database path."""
-    return Path("data/test_mcard.db")
+    test_data_dir = get_project_root() / "tests" / "data"
+    test_data_dir.mkdir(parents=True, exist_ok=True)
+    return test_data_dir / "test_mcard.db"
 
-def load_config() -> DataEngineConfig:
+def resolve_db_path(db_path: Union[str, Path], is_test: bool = False) -> str:
     """
-    Load configuration based on the environment.
+    Resolve database path with flexible handling.
+    
+    Args:
+        db_path: Input database path
+        is_test: Whether this is a test configuration
     
     Returns:
-        DataEngineConfig: The configured singleton instance
+        Resolved database path as a string
     """
-    config = DataEngineConfig.get_instance()
+    # If no path is provided, use default paths
+    if not db_path or str(db_path).strip() == '':
+        return str(get_test_db_path() if is_test else get_default_db_path())
     
-    # Check if we should force default config
-    force_default = os.getenv(ENV_FORCE_DEFAULT_CONFIG, "").lower() == "true"
+    # Convert to Path
+    path = Path(str(db_path).strip())
     
-    # Check if we're in test mode
-    in_test_mode = not force_default and "PYTEST_CURRENT_TEST" in os.environ
+    # If absolute path, try to make it relative
+    if path.is_absolute():
+        try:
+            return str(path.relative_to(get_project_root()))
+        except ValueError:
+            return str(path)
     
-    # Reset for tests to ensure clean state
-    if in_test_mode:
-        DataEngineConfig.reset()
-        config = DataEngineConfig.get_instance()
-        source = TestConfigSource()
-    # Return existing config if already initialized and not in test mode
-    elif config._initialized:
-        return config
-    # Load from environment for first-time initialization
-    else:
-        source = EnvironmentConfigSource()
+    return str(path)
+
+def load_config(is_test_mode: bool = False) -> DataEngineConfig:
+    """
+    Load configuration for the data engine.
     
-    # Configure and return
-    config.configure(source)
+    Args:
+        is_test_mode: Flag to indicate test mode
+    
+    Returns:
+        Configured DataEngineConfig
+    """
+    config = DataEngineConfig()
+    config.configure(EnvironmentConfigSource() if not is_test_mode else TestConfigSource())
+
     return config

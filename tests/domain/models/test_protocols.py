@@ -6,10 +6,11 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Union, Any
 from unittest.mock import Mock
 
-from mcard.domain.models.protocols import HashingService, CardRepository, ContentTypeService
+from mcard.domain.models.protocols import HashingService, ContentTypeService
 from mcard.domain.models.card import MCard
+from mcard.domain.services.hashing import DefaultHashingService
 
-class MockHashingService:
+class MockHashingService(DefaultHashingService):
     """Mock implementation of HashingService protocol."""
     async def hash_content(self, content: bytes) -> str:
         return "mock_hash"

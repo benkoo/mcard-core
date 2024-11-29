@@ -10,11 +10,15 @@ from .card import MCard
 @runtime_checkable
 class HashingService(Protocol):
     """Abstract hashing service."""
+    def __init__(self, settings: Any):
+        """Initialize the hashing service."""
+        pass
+
     async def hash_content(self, content: bytes) -> str:
         """Hash the given content."""
         ...
 
-    def validate_hash(self, hash_str: str) -> bool:
+    async def validate_hash(self, hash_str: str) -> bool:
         """Validate a hash string."""
         ...
 
@@ -162,4 +166,31 @@ class ContentTypeService(Protocol):
 
     def validate_content(self, content: Any) -> bool:
         """Validate the content."""
+        ...
+
+@runtime_checkable
+class CardRepository(Protocol):
+    """Protocol for card repository operations."""
+    async def save(self, card: MCard) -> None:
+        """Save a card to the repository."""
+        ...
+
+    async def get(self, card_id: str) -> Optional[MCard]:
+        """Retrieve a card by its ID."""
+        ...
+
+    async def delete(self, card_id: str) -> None:
+        """Delete a card by its ID."""
+        ...
+
+    async def list(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
+        """List cards with optional pagination."""
+        ...
+
+    async def search(self, query: str) -> List[MCard]:
+        """Search for cards based on a query."""
+        ...
+
+    async def save_many(self, cards: List[MCard]) -> None:
+        """Save multiple cards in a batch."""
         ...

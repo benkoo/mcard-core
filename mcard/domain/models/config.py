@@ -1,6 +1,17 @@
 """Configuration domain models."""
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
+
+class HashAlgorithm(str, Enum):
+    """Supported hash algorithms."""
+    MD5 = "md5"
+    SHA1 = "sha1"
+    SHA224 = "sha224"
+    SHA256 = "sha256"
+    SHA384 = "sha384"
+    SHA512 = "sha512"
+    CUSTOM = "custom"
 
 @dataclass
 class HashingSettings:
@@ -9,6 +20,14 @@ class HashingSettings:
     custom_module: Optional[str] = None
     custom_function: Optional[str] = None
     custom_hash_length: Optional[int] = None
+
+@dataclass
+class SQLiteConfig:
+    """Configuration for SQLite database."""
+    db_path: str
+    pool_size: int = 5
+    timeout: float = 30.0
+    max_connections: int = 5
 
 @dataclass
 class DatabaseSettings:

@@ -2,20 +2,20 @@
 from typing import Optional, List
 from datetime import datetime, timezone
 from mcard.domain.models.card import MCard
-from mcard.domain.dependency.hashing import HashingService
-from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
+from mcard.domain.models.protocols import HashingService, CardStore
+from mcard.domain.services.hashing import get_hashing_service
 
 class CardService:
     """Card service implementation."""
     
-    def __init__(self, store: SQLiteStore, hashing_service: HashingService):
+    def __init__(self, store: CardStore, hashing_service: HashingService):
         """Initialize card service."""
         self.store = store
         self.hashing_service = hashing_service
 
     async def save_card(self, content: str) -> str:
         """Save a card with the given content."""
-        hash_str = self.hashing_service.compute_hash(content)
+        hash_str = await self.hashing_service.hash_content(content.encode())
         g_time = datetime.now(timezone.utc).isoformat()
         card = MCard(content=content, hash=hash_str, g_time=g_time)
         await self.store.save(card)
@@ -40,7 +40,7 @@ class CardService:
         now = datetime.now(timezone.utc).isoformat()
         
         for content in contents:
-            hash_str = self.hashing_service.compute_hash(content)
+            hash_str = await self.hashing_service.hash_content(content.encode())
             card = MCard(content=content, hash=hash_str, g_time=now)
             cards.append(card)
             hashes.append(hash_str)
@@ -55,3 +55,7 @@ class CardService:
     async def close(self) -> None:
         """Close the service and its dependencies."""
         await self.store.close()
+
+def get_hashing_service() -> HashingService:
+    """Get the default hashing service."""
+    return get_hashing_service()

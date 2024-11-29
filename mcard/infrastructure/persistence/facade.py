@@ -95,10 +95,17 @@ class DatabaseFacade:
 
     async def initialize_schema(self) -> None:
         """Initialize the database schema."""
-        if hasattr(self._store, '_connection'):
+        # Ensure the store is initialized first
+        if hasattr(self._store, 'initialize'):
+            await self._store.initialize()
+
+        # Now check for connection
+        if hasattr(self._store, '_connection') and self._store._connection is not None:
             schema_handler = self._schema_manager.get_schema_handler(self._config.engine_config.engine_type)
             tables = self._schema_manager._tables  # Get the table definitions
             await schema_handler.initialize_schema(self._store._connection, tables)
+        else:
+            raise StorageError("Database connection not established")
 
     @property
     def store(self) -> CardStore:

@@ -1,6 +1,7 @@
 """Tests for custom hash function."""
 import pytest
-from mcard.domain.dependency.hashing import HashingService, HashingSettings, HashingError
+from mcard.domain.models.protocols import HashingService
+from mcard.domain.services.hashing import HashingSettings, HashingError
 from mcard.domain.dependency.custom_hash_md5 import custom_md5_hash, create_md5_hasher
 
 def test_custom_md5_hash_direct():
