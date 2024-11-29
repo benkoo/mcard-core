@@ -345,16 +345,32 @@ hash_algo = config.hashing.algorithm
 # Attempting to modify will raise RuntimeError
 ```
 
-## Project Structure
-
-- `mcard/`: Contains the core library code.
-- `tests/`: Includes all test cases.
-- `examples/`: Provides example scripts demonstrating library usage.
-
 ## Recent Changes
 
 - Updated the handling of the `g_time` field in the `CardResponse` model.
 - Modified the `create_card`, `get_card`, and `list_cards` functions to ensure the correct handling of `g_time` as a string.
+
+## Recent Improvements in Configuration Management
+
+#### Singleton Configuration Reset Mechanism (v0.x.x)
+
+In our latest update, we've enhanced the `DataEngineConfig` class to provide a more robust singleton reset mechanism. Key improvements include:
+
+- **Thread-Safe Reset**: The configuration reset method now uses a class-level lock to ensure thread-safe resets.
+- **Clean Initialization**: Improved attribute reset to completely clear the singleton state.
+- **Flexible Configuration**: The reset method can now be called without instantiating the class.
+
+These changes provide several benefits:
+- More predictable configuration management in test environments
+- Improved thread safety during configuration changes
+- Simplified reset logic for complex configuration scenarios
+
+```python
+# Example of new reset mechanism
+DataEngineConfig.reset()  # Safely resets the entire configuration
+```
+
+The update ensures that configuration resets are more reliable and consistent across different usage scenarios, particularly in testing and dynamic configuration environments.
 
 ## Usage
 
