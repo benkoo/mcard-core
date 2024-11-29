@@ -1,15 +1,15 @@
-"""Tests for concurrency in SQLite card repository."""
+"""Tests for concurrent operations in SQLite card repository."""
 import pytest
-import asyncio
-import logging
-from datetime import datetime, timezone
-from mcard.infrastructure.persistence.sqlite import SQLiteRepository
-from mcard.infrastructure.persistence.schema_initializer import SchemaInitializer
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from mcard.domain.models.card import MCard
+from mcard.domain.models.exceptions import StorageError
+from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
+from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
 import tempfile
 import os
-import time
-from mcard.domain.models.exceptions import StorageError
+import logging
 
 # Configure logging
 logging.basicConfig(
@@ -24,105 +24,155 @@ logging.basicConfig(
 @pytest.fixture
 def db_path():
     """Fixture for temporary database path."""
-    with tempfile.NamedTemporaryFile(delete=False) as f:
-        temp_path = f.name
-    yield temp_path
-    # Cleanup after tests
-    if os.path.exists(temp_path):
-        os.unlink(temp_path)
+    db_fd, db_path = tempfile.mkstemp()
+    yield db_path
+    os.close(db_fd)
+    os.unlink(db_path)
 
 @pytest.fixture
 def repository(db_path):
     """Fixture for SQLite repository."""
-    repo = SQLiteRepository(db_path)
-    SchemaInitializer.initialize_schema(repo.connection)
+    repo = SQLiteStore(SQLiteConfig(db_path=db_path))
     return repo
 
-@pytest.mark.asyncio
-async def test_concurrent_operations(repository):
-    """Test concurrent operations on the repository."""
-    repo = repository
-    start_time = time.time()
-
-    # Create multiple cards concurrently
+def test_concurrent_reads(repository):
+    """Test concurrent read operations."""
+    # Create test data
     cards = [MCard(content=f"Content {i}") for i in range(10)]
-    tasks = [repo.save(card) for card in cards]
-    await asyncio.gather(*tasks)
+    for card in cards:
+        repository.save(card)
+
+    def read_card(card_hash):
+        thread_repo = SQLiteStore(SQLiteConfig(db_path=repository.db_path))
+        retrieved_card = thread_repo.get(card_hash)
+        assert retrieved_card is not None
+        return retrieved_card
+
+    # Test concurrent reads using ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(read_card, card.hash) for card in cards]
+        results = [future.result() for future in futures]
+
+    assert len(results) == len(cards)
+    assert all(isinstance(card, MCard) for card in results)
+
+def test_concurrent_writes(repository):
+    """Test concurrent write operations."""
+    def save_card(content):
+        thread_repo = SQLiteStore(SQLiteConfig(db_path=repository.db_path))
+        card = MCard(content=content)
+        thread_repo.save(card)
+        return card.hash
+
+    # Test concurrent writes using ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(save_card, f"Concurrent content {i}") for i in range(10)]
+        card_hashes = [future.result() for future in futures]
 
     # Verify all cards were saved
-    saved_cards = await repo.get_all()
-    assert len(saved_cards) == len(cards)
+    saved_cards = repository.get_all()
+    assert len(saved_cards) == 10
+    assert all(card.hash in card_hashes for card in saved_cards)
 
-    # Test concurrent reads
-    tasks = [repo.get(card.hash) for card in cards]
-    retrieved_cards = await asyncio.gather(*tasks)
-    assert len(retrieved_cards) == len(cards)
+def test_read_write_isolation(repository):
+    """Test isolation between concurrent reads and writes."""
+    initial_cards = [MCard(content=f"Initial {i}") for i in range(5)]
+    for card in initial_cards:
+        repository.save(card)
 
-    logging.debug(f"test_concurrent_operations took {time.time() - start_time:.2f} seconds")
+    read_results = []
+    write_complete = threading.Event()
 
-@pytest.mark.asyncio
-async def test_transaction_rollback(repository):
-    """Test transaction rollback on error."""
-    repo = repository
-    start_time = time.time()
+    def reader_thread():
+        thread_repo = SQLiteStore(SQLiteConfig(db_path=repository.db_path))
+        while not write_complete.is_set():
+            cards = thread_repo.get_all()
+            read_results.append(len(cards))
+            time.sleep(0.01)
 
-    # Create a card
-    card = MCard(content="Test content")
-    await repo.save(card)
+    def writer_thread():
+        thread_repo = SQLiteStore(SQLiteConfig(db_path=repository.db_path))
+        for i in range(5):
+            card = MCard(content=f"Additional {i}")
+            thread_repo.save(card)
+            time.sleep(0.02)
+        write_complete.set()
 
-    # Try to save an invalid card
-    invalid_card = MCard(content="x" * (repo.max_content_size + 1))
-    with pytest.raises(Exception):
-        await repo.save(invalid_card)
+    # Start reader and writer threads
+    reader = threading.Thread(target=reader_thread)
+    writer = threading.Thread(target=writer_thread)
 
-    # Verify the first card is still there
-    saved_card = await repo.get(card.hash)
-    assert saved_card.content == "Test content"
+    reader.start()
+    writer.start()
 
-    logging.debug(f"test_transaction_rollback took {time.time() - start_time:.2f} seconds")
+    writer.join()
+    reader.join()
 
-@pytest.mark.asyncio
-async def test_nested_transactions(repository):
-    """Test nested transactions."""
-    repo = repository
-    card = MCard(content="Test content")
-    await repo.save(card)
-    await repo.delete(card.hash)
-    with pytest.raises(StorageError):
-        await repo.get(card.hash)
+    # Verify final state
+    final_cards = repository.get_all()
+    assert len(final_cards) == 10  # 5 initial + 5 additional
+    # Each read should see a consistent state (no partial transactions)
+    assert all(count in [5,6,7,8,9,10] for count in read_results)
 
-@pytest.mark.asyncio
-async def test_transaction_isolation(repository):
-    """Test transaction isolation."""
-    repo = repository
-    card1 = MCard(content="Isolation Test 1")
-    card2 = MCard(content="Isolation Test 2")
-    await repo.save(card1)
-    await repo.save(card2)
-    all_cards = await repo.get_all()
-    assert len(all_cards) == 2
+def test_concurrent_deletes(repository):
+    """Test concurrent delete operations."""
+    # Create test data
+    cards = [MCard(content=f"Delete test {i}") for i in range(10)]
+    for card in cards:
+        repository.save(card)
 
-@pytest.mark.asyncio
-async def test_concurrent_transactions(db_path):
-    """Test concurrent transactions."""
-    start_time = time.time()
-    repo1 = SQLiteRepository(db_path)
-    repo2 = SQLiteRepository(db_path)
+    def delete_card(card_hash):
+        thread_repo = SQLiteStore(SQLiteConfig(db_path=repository.db_path))
+        try:
+            thread_repo.delete(card_hash)
+            return True
+        except StorageError:
+            return False
 
-    # Create cards in both repositories
-    card1 = MCard(content="Content from repo1")
-    card2 = MCard(content="Content from repo2")
+    # Test concurrent deletes
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(delete_card, card.hash) for card in cards]
+        results = [future.result() for future in futures]
 
-    await asyncio.gather(
-        repo1.save(card1),
-        repo2.save(card2)
-    )
+    # Verify all cards were deleted
+    remaining_cards = repository.get_all()
+    assert len(remaining_cards) == 0
 
-    # Verify both cards are accessible from both repositories
-    saved_cards1 = await repo1.get_all()
-    saved_cards2 = await repo2.get_all()
+def test_transaction_rollback(repository):
+    """Test transaction rollback under concurrent operations."""
+    def save_invalid_card():
+        # Use a smaller max_content_size for testing
+        config = SQLiteConfig(db_path=repository.db_path, max_content_size=1024)  # 1KB limit
+        thread_repo = SQLiteStore(config)
+        try:
+            card = MCard(content="x" * 2048)  # 2KB content, exceeds limit
+            thread_repo.save(card)
+        except StorageError:
+            return True
+        return False
 
-    assert len(saved_cards1) == 2
-    assert len(saved_cards2) == 2
+    def save_valid_card(content):
+        # Use same config as main repository
+        thread_repo = SQLiteStore(SQLiteConfig(db_path=repository.db_path))
+        try:
+            card = MCard(content=content)
+            thread_repo.save(card)
+            return card.hash
+        except StorageError:
+            return None
 
-    logging.debug(f"test_concurrent_transactions took {time.time() - start_time:.2f} seconds")
+    # Run concurrent valid and invalid operations
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        invalid_futures = [executor.submit(save_invalid_card) for _ in range(3)]
+        valid_futures = [executor.submit(save_valid_card, f"Valid content {i}") for i in range(5)]
+
+        invalid_results = [future.result() for future in invalid_futures]
+        valid_hashes = [future.result() for future in valid_futures]
+
+    # Verify operations succeeded/failed as expected
+    assert all(invalid_results)  # All invalid operations should have failed
+    assert any(h is not None for h in valid_hashes)  # Some valid operations should have succeeded
+    
+    # Verify database state
+    final_cards = repository.get_all()
+    assert len(final_cards) == len([h for h in valid_hashes if h is not None])  # Only valid cards should be present

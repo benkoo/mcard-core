@@ -40,7 +40,7 @@ async def test_mcard_api_persistent():
         conn.close()
 
     # Create a persistent repository
-    shared_repo = SQLiteRepository(db_path=DB_PATH)
+    shared_repo = SQLiteStore(db_path=DB_PATH)
 
     # Test content
     test_contents = [

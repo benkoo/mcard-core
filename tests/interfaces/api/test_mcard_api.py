@@ -1,172 +1,115 @@
-import os
+"""Test MCard API."""
 import pytest
-import logging
-from fastapi.testclient import TestClient
-from mcard.interfaces.api.mcard_api import app, load_app_settings, get_repository
-from dotenv import load_dotenv
 import pytest_asyncio
-from httpx import AsyncClient
+import logging
+import asyncio
+from datetime import datetime, timezone
 from mcard.domain.models.card import MCard
-from mcard.domain.models.config import AppSettings, DatabaseSettings
-from mcard.infrastructure.persistence.schema_utils import initialize_schema
-from pathlib import Path
-
-# Set testing mode
-os.environ['TESTING'] = 'true'
-
-# Load test-specific environment variables
-test_env_path = Path(__file__).parent.parent.parent / '.env.test'
-load_dotenv(test_env_path, override=True)  # Add override=True to ensure test values take precedence
-
-# Load AppSettings with required fields
-test_settings = AppSettings(
-    database=DatabaseSettings(
-        db_path=":memory:",  # Use in-memory database for tests
-        data_source="sqlite",
-        pool_size=3,
-        timeout=15.0
-    ),
-    mcard_api_key="test_custom_api_key_12345"  # Use the same API key as in the environment
-)
+from mcard.interfaces.api.mcard_api import MCardAPI
+from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
+from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
+from mcard.infrastructure.persistence.async_wrapper import AsyncSQLiteWrapper
+from mcard.domain.models.exceptions import StorageError
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Initialize a single repository instance for all tests
-from mcard.infrastructure.persistence.sqlite import SQLiteRepository
-
-@pytest_asyncio.fixture(scope="function", autouse=True)
-async def shared_repo():
-    """Create a fresh repository for each test."""
-    repo = SQLiteRepository(db_path=':memory:')
-    initialize_schema(repo.connection)
-    try:
-        yield repo
-    finally:
-        await repo.close_connection()
-
-@pytest_asyncio.fixture
-async def async_client(shared_repo):
-    """Create an async test client."""
-    app.dependency_overrides[load_app_settings] = lambda: test_settings
-    app.dependency_overrides[get_repository] = lambda: shared_repo
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        yield client
-    app.dependency_overrides.clear()
+@pytest_asyncio.fixture(scope="function")
+async def shared_repo(async_repository):
+    """Create API instance with test database."""
+    async with async_repository as repo:
+        api = MCardAPI(repository=repo)
+        yield api
 
 @pytest.mark.asyncio
-async def test_create_card(async_client):
-    """Test card creation."""
-    response = await async_client.post(
-        "/cards/",
-        json={"content": "Test content"},
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    assert response.status_code == 201
-    assert "hash" in response.json()
+async def test_create_card(shared_repo):
+    """Test creating a card."""
+    api = shared_repo
+    content = "Test content"
+    card = await api.create_card(content)
+    assert card.content == content
 
 @pytest.mark.asyncio
-async def test_get_card(async_client):
-    # First, create a card
-    create_response = await async_client.post(
-        "/cards/",
-        json={"content": "Test content"},
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    card_hash = create_response.json().get("hash")
-    logging.debug(f"Hash from creation response: {card_hash}")
-
-    # Get the card
-    response = await async_client.get(
-        f"/cards/{card_hash}",
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["hash"] == card_hash
-    assert data["content"] == "Test content"
+async def test_get_card(shared_repo):
+    """Test getting a card."""
+    api = shared_repo
+    content = "Test content"
+    card = await api.create_card(content)
+    retrieved = await api.get_card(card.hash)
+    assert retrieved.content == content
 
 @pytest.mark.asyncio
-async def test_list_cards(async_client):
-    # Create some test cards
-    for i in range(3):
-        await async_client.post(
-            "/cards/",
-            json={"content": f"Test content {i}"},
-            headers={"x-api-key": test_settings.mcard_api_key}
-        )
-
-    response = await async_client.get(
-        "/cards/",
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 3
-    assert all("Test content" in card["content"] for card in data)
-
-@pytest.mark.asyncio
-async def test_list_cards_by_content(async_client):
-    # Create test cards with different content
-    await async_client.post(
-        "/cards/",
-        json={"content": "Unique test content"},
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    await async_client.post(
-        "/cards/",
-        json={"content": "Different content"},
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-
-    response = await async_client.get(
-        "/cards/?content=Unique",
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 1
-    assert "Unique" in data[0]["content"]
-
-@pytest.mark.asyncio
-async def test_list_cards_with_pagination(async_client):
-    # Create test cards
+async def test_list_cards(shared_repo):
+    """Test listing cards."""
+    api = shared_repo
+    cards = []
     for i in range(5):
-        await async_client.post(
-            "/cards/",
-            json={"content": f"Test content {i}"},
-            headers={"x-api-key": test_settings.mcard_api_key}
-        )
-
-    response = await async_client.get(
-        "/cards/?limit=2&offset=1",
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 2
+        card = await api.create_card(f"Content {i}")
+        cards.append(card)
+    
+    listed = await api.list_cards()
+    assert len(listed) == len(cards)
 
 @pytest.mark.asyncio
-async def test_remove_card(async_client):
-    # First, create a card
-    create_response = await async_client.post(
-        "/cards/",
-        json={"content": "Test content"},
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    card_hash = create_response.json().get("hash")
-    logging.debug(f"Hash from creation response: {card_hash}")
+async def test_list_cards_by_content(shared_repo):
+    """Test listing cards by content."""
+    api = shared_repo
+    cards = []
+    for i in range(5):
+        card = await api.create_card(f"Content {i}")
+        cards.append(card)
+    
+    # Add a specific card to search for
+    search_content = "Unique content"
+    search_card = await api.create_card(search_content)
+    
+    listed = await api.list_cards(content=search_content)
+    assert len(listed) == 1
+    assert listed[0].hash == search_card.hash
 
-    # Delete the card
-    response = await async_client.delete(
-        f"/cards/{card_hash}",
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    assert response.status_code == 204
+@pytest.mark.asyncio
+async def test_list_cards_with_pagination(shared_repo):
+    """Test listing cards with pagination."""
+    api = shared_repo
+    cards = []
+    for i in range(10):
+        card = await api.create_card(f"Content {i}")
+        cards.append(card)
+    
+    # Test pagination
+    page1 = await api.list_cards(limit=5)
+    page2 = await api.list_cards(limit=5, offset=5)
+    
+    assert len(page1) == 5
+    assert len(page2) == 5
+    assert all(c1.hash != c2.hash for c1 in page1 for c2 in page2)
 
-    # Verify card is deleted
-    response = await async_client.get(
-        f"/cards/{card_hash}",
-        headers={"x-api-key": test_settings.mcard_api_key}
-    )
-    assert response.status_code == 404
+@pytest.mark.asyncio
+async def test_remove_card(shared_repo):
+    """Test removing a card."""
+    api = shared_repo
+    content = "Test content"
+    card = await api.create_card(content)
+    
+    # Remove the card
+    await api.remove_card(card.hash)
+    
+    # Verify it's gone
+    with pytest.raises(Exception):
+        await api.get_card(card.hash)
+
+@pytest.mark.asyncio
+async def test_create_card_large_content(shared_repo):
+    """Test creating a card with large content."""
+    api = shared_repo
+    large_content = "x" * (500 * 1024)
+    card = await api.create_card(large_content)
+    assert card.content == large_content
+
+@pytest.mark.asyncio
+async def test_create_card_binary_content(shared_repo):
+    """Test creating a card with binary content."""
+    api = shared_repo
+    binary_content = bytes([0x00, 0x01, 0x02, 0x03])
+    card = await api.create_card(binary_content.hex())
+    assert bytes.fromhex(card.content) == binary_content

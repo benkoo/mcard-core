@@ -10,11 +10,11 @@ import dotenv
 
 # Import configuration and schema initialization
 from mcard.domain.models.config import AppSettings, DatabaseSettings
-from mcard.infrastructure.persistence.schema_initializer import SchemaInitializer, get_repository
+from mcard.infrastructure.persistence.schema import SQLiteSchemaHandler
 from mcard.infrastructure.repository import SQLiteRepository
 
 # Import the main API application
-from mcard.interfaces.api.mcard_api import app, load_app_settings, app_settings as loaded_app_settings
+from mcard.interfaces.api.mcard_api import app, load_app_settings
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -28,7 +28,7 @@ def temp_env_file():
 # Custom Test Configuration
 MCARD_API_KEY=test_custom_api_key_12345
 MCARD_API_PORT=8888
-MCARD_MANAGER_DB_PATH=test_custom_database.db
+MCARD_STORE_DB_PATH=data/test_custom_database.db
 MCARD_MANAGER_DATA_SOURCE=sqlite
 MCARD_MANAGER_POOL_SIZE=3
 MCARD_MANAGER_TIMEOUT=15.0
@@ -41,29 +41,23 @@ MCARD_MANAGER_TIMEOUT=15.0
     # Verify the environment variables are loaded
     print("Loaded Environment Variables:")
     print(f"MCARD_API_KEY: {os.getenv('MCARD_API_KEY')}")
-    print(f"MCARD_MANAGER_DB_PATH: {os.getenv('MCARD_MANAGER_DB_PATH')}")
+    print(f"MCARD_STORE_DB_PATH: {os.getenv('MCARD_STORE_DB_PATH')}")
     
     # Reload the app settings to ensure they reflect the latest environment variables
-    global loaded_app_settings
     loaded_app_settings = load_app_settings()
     
     yield temp_env.name
     
     # Clean up: remove the temporary file and reset environment
-    os.unlink(temp_env.name)
-    # Unset the environment variables
-    for key in [
-        'MCARD_API_KEY', 'MCARD_API_PORT', 
-        'MCARD_MANAGER_DB_PATH', 'MCARD_MANAGER_DATA_SOURCE', 
-        'MCARD_MANAGER_POOL_SIZE', 'MCARD_MANAGER_TIMEOUT'
-    ]:
-        os.unsetenv(key)
+    try:
+        os.unlink(temp_env.name)
+    except OSError:
+        pass
 
 @pytest_asyncio.fixture
 async def app_settings():
     """Load application settings from the temporary .env file."""
-    # Return the reloaded app_settings
-    return loaded_app_settings
+    return load_app_settings()
 
 @pytest_asyncio.fixture
 async def async_client():
@@ -76,32 +70,41 @@ async def initialized_database(app_settings):
     """Initialize the database for testing."""
     db_path = app_settings.database.db_path
     
-    # Ensure database file is removed before test
+    # Remove existing database if it exists
     if os.path.exists(db_path):
         os.remove(db_path)
-
+    
+    # Create database directory if it doesn't exist
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
     # Initialize database schema
     conn = sqlite3.connect(db_path)
-    try:
-        # Manually initialize the schema
-        SchemaInitializer.initialize_schema(conn)
-        
-        # Create a repository instance for the test
-        repo = SQLiteRepository(db_path=db_path)
-    finally:
-        conn.close()
+    schema_handler = SQLiteSchemaHandler()
+    tables = {
+        'card': TableDefinition(
+            name='card',
+            columns=[
+                ColumnDefinition(name='id', type=ColumnType.TEXT, primary_key=True),
+                ColumnDefinition(name='content', type=ColumnType.BLOB),
+                ColumnDefinition(name='created_at', type=ColumnType.TIMESTAMP),
+                ColumnDefinition(name='updated_at', type=ColumnType.TIMESTAMP),
+            ]
+        )
+    }
+    schema_handler.initialize_schema(conn, tables)
+    conn.close()
     
     return db_path
 
-@pytest_asyncio.fixture
-async def custom_api_key(app_settings):
+@pytest.fixture
+def custom_api_key(app_settings):
     """Return the custom API key from settings."""
     return app_settings.mcard_api_key
 
-@pytest_asyncio.fixture
-async def test_content():
+@pytest.fixture
+def test_content():
     """Provide a test content for card creation."""
-    return "Configuration Test Card"
+    return {"content": "Configuration Test Card"}
 
 @pytest.mark.asyncio
 async def test_config_env_loading(
@@ -119,54 +122,36 @@ async def test_config_env_loading(
     3. Test API authentication with custom key
     4. Verify database creation at custom path
     """
-    # Print out loaded settings for debugging
-    print("\n--- Loaded Configuration ---")
-    print(f"API Key: {app_settings.mcard_api_key}")
-    print(f"Database Path: {app_settings.database.db_path}")
-    print(f"Data Source: {app_settings.database.data_source}")
-    print(f"Pool Size: {app_settings.database.pool_size}")
-    print(f"Timeout: {app_settings.database.timeout}")
-
-    # Verify custom API key
-    assert app_settings.mcard_api_key == 'test_custom_api_key_12345', "Custom API key not loaded correctly"
+    # Verify custom API key is loaded
+    assert app_settings.mcard_api_key == custom_api_key
     
-    # Try creating a card with the custom API key
-    create_response = await async_client.post("/cards/", 
-                                            json={"content": test_content}, 
-                                            headers={"x-api-key": custom_api_key})
+    # Verify custom database path is used
+    expected_db_path = "data/test_custom_database.db"
+    assert app_settings.database.db_path == expected_db_path
     
-    # Verify card creation successful
-    assert create_response.status_code == 200, f"Card creation failed with custom API key. Response: {create_response.text}"
-    created_card = create_response.json()
+    # Test API authentication with custom key
+    headers = {"X-API-Key": custom_api_key}
+    async with async_client as client:
+        response = await client.post("/api/v1/cards", json=test_content, headers=headers)
+        assert response.status_code == 200
+        
+        # Verify card was created
+        card_id = response.json()["id"]
+        response = await client.get(f"/api/v1/cards/{card_id}", headers=headers)
+        assert response.status_code == 200
+        assert response.json()["content"] == test_content["content"]
     
-    # Verify card content
-    assert created_card['content'] == test_content, "Card content mismatch"
-
-    # List cards to further verify API functionality
-    list_response = await async_client.get("/cards/", 
-                                         headers={"x-api-key": custom_api_key})
-    assert list_response.status_code == 200, "Card listing failed"
+    # Verify database was created at custom path
+    db_path = app_settings.database.db_path
+    assert os.path.exists(db_path)
     
-    # Verify the card is in the list
-    list_cards = list_response.json()
-    assert any(card['content'] == test_content for card in list_cards), "Created card not found in list"
-
-    # Verify database file was created at the specified path
-    assert os.path.exists(initialized_database), f"Database file not created at {initialized_database}"
-
-    # Optional: Verify database contents directly
-    conn = sqlite3.connect(initialized_database)
+    # Clean up database file
     try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT content FROM card")
-        db_contents = [row[0] for row in cursor.fetchall()]
-        assert test_content.encode() in db_contents, "Card not saved in database"
-    finally:
-        conn.close()
-
-    print("\n--- Test Completed Successfully ---")
+        if os.path.exists(db_path):
+            os.remove(db_path)
+    except OSError:
+        pass
 
 if __name__ == "__main__":
     # Use pytest to run the async test
-    import pytest
     pytest.main([__file__])

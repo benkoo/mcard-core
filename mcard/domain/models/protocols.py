@@ -19,26 +19,26 @@ class HashingService(Protocol):
         ...
 
 @runtime_checkable
-class CardRepository(Protocol):
-    """Abstract card repository."""
+class CardStore(Protocol):
+    """Abstract card store for persistence operations."""
     async def save(self, card: MCard) -> None:
-        """Save a card to the repository."""
+        """Save a card to the store."""
         ...
 
     async def save_many(self, cards: list[MCard]) -> None:
-        """Save multiple cards to the repository."""
+        """Save multiple cards to the store."""
         ...
 
     async def get(self, hash_str: str) -> Optional[MCard]:
-        """Retrieve a card by its hash."""
+        """Retrieve a card by its hash from the store."""
         ...
 
     async def get_many(self, hash_strs: list[str]) -> list[MCard]:
-        """Retrieve multiple cards by their hashes."""
+        """Retrieve multiple cards by their hashes from the store."""
         ...
 
     async def get_all(self, limit: Optional[int] = None, offset: Optional[int] = None) -> list[MCard]:
-        """Retrieve all cards with optional pagination."""
+        """Retrieve all cards from the store with optional pagination."""
         ...
 
     async def list(
@@ -49,7 +49,7 @@ class CardRepository(Protocol):
         offset: Optional[int] = None
     ) -> list[MCard]:
         """
-        List cards with optional time range and pagination.
+        List cards from the store with optional time range and pagination.
         
         Args:
             start_time: Start of time range (inclusive). If None, no lower bound.
@@ -70,7 +70,7 @@ class CardRepository(Protocol):
         offset: Optional[int] = None
     ) -> list[MCard]:
         """
-        Retrieve cards within a time range.
+        Retrieve cards from the store within a time range.
         
         Args:
             start_time: Start of time range (inclusive). If None, no lower bound.
@@ -90,7 +90,7 @@ class CardRepository(Protocol):
         offset: Optional[int] = None
     ) -> list[MCard]:
         """
-        Retrieve cards created before the specified time.
+        Retrieve cards from the store created before the specified time.
         
         Args:
             time: Upper bound time (exclusive)
@@ -109,7 +109,7 @@ class CardRepository(Protocol):
         offset: Optional[int] = None
     ) -> list[MCard]:
         """
-        Retrieve cards created after the specified time.
+        Retrieve cards from the store created after the specified time.
         
         Args:
             time: Lower bound time (exclusive)
@@ -122,16 +122,16 @@ class CardRepository(Protocol):
         ...
 
     async def delete(self, hash_str: str) -> None:
-        """Delete a card by its hash."""
+        """Delete a card from the store by its hash."""
         ...
 
     async def delete_many(self, hash_strs: list[str]) -> None:
-        """Delete multiple cards by their hashes."""
+        """Delete multiple cards from the store by their hashes."""
         ...
 
     async def delete_before_time(self, time: datetime) -> int:
         """
-        Delete all cards created before the specified time.
+        Delete all cards from the store created before the specified time.
         
         Args:
             time: Upper bound time (exclusive)
@@ -142,15 +142,15 @@ class CardRepository(Protocol):
         ...
 
     async def begin_transaction(self) -> None:
-        """Begin a transaction."""
+        """Begin a store transaction."""
         ...
 
     async def commit_transaction(self) -> None:
-        """Commit the current transaction."""
+        """Commit the current store transaction."""
         ...
 
     async def rollback_transaction(self) -> None:
-        """Rollback the current transaction."""
+        """Rollback the current store transaction."""
         ...
 
 @runtime_checkable

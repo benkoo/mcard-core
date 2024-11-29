@@ -1,82 +1,57 @@
-"""
-Application service for card management.
-"""
-from typing import Any, List, Optional
-from ..domain.models.card import MCard
-from ..domain.models.protocols import CardRepository, ContentTypeService
-from ..domain.models.exceptions import ValidationError
-from ..domain.services.hashing import get_hashing_service
+"""Card service implementation."""
+from typing import Optional, List
+from datetime import datetime, timezone
+from mcard.domain.models.card import MCard
+from mcard.domain.dependency.hashing import HashingService
+from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
 
 class CardService:
-    """Application service for card management."""
+    """Card service implementation."""
+    
+    def __init__(self, store: SQLiteStore, hashing_service: HashingService):
+        """Initialize card service."""
+        self.store = store
+        self.hashing_service = hashing_service
 
-    def __init__(
-        self,
-        repository: CardRepository,
-        content_service: ContentTypeService
-    ):
-        self._repository = repository
-        self._content_service = content_service
-        self._hashing_service = get_hashing_service()
+    async def save_card(self, content: str) -> str:
+        """Save a card with the given content."""
+        hash_str = self.hashing_service.compute_hash(content)
+        g_time = datetime.now(timezone.utc).isoformat()
+        card = MCard(content=content, hash=hash_str, g_time=g_time)
+        await self.store.save(card)
+        return hash_str
 
-    async def _compute_hash(self, content: Any) -> str:
-        """Compute hash for the given content."""
-        if isinstance(content, bytes):
-            content_bytes = content
-        else:
-            content_bytes = str(content).encode('utf-8')
-        return await self._hashing_service.hash_content(content_bytes)
+    async def get_card(self, hash_str: str) -> Optional[MCard]:
+        """Get a card by its hash."""
+        return await self.store.get(hash_str)
 
-    async def create_card(self, content: Any) -> MCard:
-        """Create a new card with proper hash."""
-        if not self._content_service.validate_content(content):
-            raise ValidationError("Invalid content type")
+    async def get_cards(self, content: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
+        """Get all cards, optionally filtered by content."""
+        return await self.store.get_all(content=content, limit=limit, offset=offset)
+
+    async def get_many_cards(self, hashes: List[str]) -> List[MCard]:
+        """Get multiple cards by their hashes."""
+        return await self.store.get_many(hashes)
+
+    async def save_many_cards(self, contents: List[str]) -> List[str]:
+        """Save multiple cards."""
+        cards = []
+        hashes = []
+        now = datetime.now(timezone.utc).isoformat()
         
-        # Create card with temporary hash first
-        card = MCard(content=content)
+        for content in contents:
+            hash_str = self.hashing_service.compute_hash(content)
+            card = MCard(content=content, hash=hash_str, g_time=now)
+            cards.append(card)
+            hashes.append(hash_str)
         
-        # Compute real hash
-        hash_value = await self._compute_hash(content)
-        
-        # Create new card with real hash
-        card = MCard(content=content, hash=hash_value)
-        await self._repository.save(card)
-        return card
+        await self.store.save_many(cards)
+        return hashes
 
-    async def update_card_content(self, hash: str, new_content: Any) -> MCard:
-        """Update a card's content and compute new hash."""
-        if not self._content_service.validate_content(new_content):
-            raise ValidationError("Invalid content type")
-
-        # Get existing card
-        card = await self._repository.get(hash)
-        if not card:
-            raise ValidationError(f"Card with hash {hash} not found")
-
-        # Compute new hash
-        new_hash = await self._compute_hash(new_content)
-        
-        # Create new card with updated content and hash
-        updated_card = MCard(content=new_content, hash=new_hash)
-        await self._repository.save(updated_card)
-        
-        # Delete old card
-        await self._repository.delete(hash)
-        
-        return updated_card
-
-    async def get_card(self, hash: str) -> Optional[MCard]:
-        """Retrieve a card by its hash."""
-        return await self._repository.get(hash)
-
-    async def get_all_cards(self) -> List[MCard]:
-        """Retrieve all cards."""
-        return await self._repository.get_all()
-
-    async def delete_card(self, hash: str) -> None:
+    async def delete_card(self, hash_str: str) -> None:
         """Delete a card by its hash."""
-        await self._repository.delete(hash)
+        await self.store.delete(hash_str)
 
-    def get_content_type(self, content: Any) -> str:
-        """Get content type for the given content."""
-        return self._content_service.detect_type(content)
+    async def close(self) -> None:
+        """Close the service and its dependencies."""
+        await self.store.close()

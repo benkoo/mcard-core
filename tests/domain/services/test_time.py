@@ -2,7 +2,7 @@
 import pytest
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
-from mcard.domain.services.time import (
+from mcard.domain.dependency.time import (
     TimeService, get_time_service, set_time_service,
     get_now_with_located_zone
 )

@@ -2,7 +2,7 @@
 Tests for hashing service implementation.
 """
 import pytest
-from mcard.domain.services.hashing import (
+from mcard.domain.dependency.hashing import (
     DefaultHashingService,
     CollisionAwareHashingService,
     get_hashing_service,

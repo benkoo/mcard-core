@@ -7,7 +7,7 @@ from click.testing import CliRunner
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from mcard.domain.models.card import MCard
-from mcard.infrastructure.persistence.sqlite import SQLiteRepository
+from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
 from mcard.interfaces.cli.commands import cli
 
 # Test data

@@ -1,31 +1,27 @@
-"""
-Configuration models for MCard.
-"""
-from typing import Optional, Literal
-from pydantic import BaseModel, Field
+"""Configuration domain models."""
+from dataclasses import dataclass
+from typing import Optional
 
-# Simple literal type for hash algorithms
-HashAlgorithm = Literal["sha256", "sha512", "sha1", "md5", "custom"]
+@dataclass
+class HashingSettings:
+    """Settings for content hashing."""
+    algorithm: str = "sha256"
+    custom_module: Optional[str] = None
+    custom_function: Optional[str] = None
+    custom_hash_length: Optional[int] = None
 
-class DatabaseSettings(BaseModel):
-    """Database configuration."""
-    db_path: str = Field(default=':memory:', description="Path to the database file")
-    data_source: Optional[str] = Field(None, description="Optional data source identifier")
-    pool_size: int = Field(default=5, description="Connection pool size")
-    timeout: float = Field(default=30.0, description="Database operation timeout in seconds")
+@dataclass
+class DatabaseSettings:
+    """Settings for database configuration."""
+    db_path: str
+    max_connections: int = 5
+    timeout: float = 30.0
+    data_source: str = "sqlite"
 
-class HashingSettings(BaseModel):
-    """Hashing configuration."""
-    algorithm: HashAlgorithm = Field(
-        default="sha256",
-        description="Hash function to use"
-    )
-    custom_module: Optional[str] = Field(None, description="Custom hash function module")
-    custom_function: Optional[str] = Field(None, description="Custom hash function name")
-    custom_hash_length: Optional[int] = Field(None, description="Expected length of custom hash")
-
-class AppSettings(BaseModel):
+@dataclass
+class AppSettings:
     """Application settings."""
     database: DatabaseSettings
-    hashing: HashingSettings = Field(default_factory=HashingSettings)
-    mcard_api_key: str = Field(description="API key for accessing the application")
+    hashing: HashingSettings
+    mcard_api_key: Optional[str] = None
+    mcard_api_port: Optional[int] = None

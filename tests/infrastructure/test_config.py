@@ -114,6 +114,14 @@ import os
 from pathlib import Path
 from mcard.infrastructure.config import load_config, get_project_root
 
+# Clear any existing MCARD_ environment variables
+for key in list(os.environ.keys()):
+    if key.startswith('MCARD_'):
+        del os.environ[key]
+
+# Set force default config
+os.environ['MCARD_FORCE_DEFAULT_CONFIG'] = 'true'
+
 config = load_config()
 assert config.repository.db_path == "data/mcard.db", f"Expected data/mcard.db, got {config.repository.db_path}"
 assert config.repository.max_connections == 5

@@ -1,93 +1,172 @@
-"""Tests for connection and error handling in SQLite card repository."""
-import pytest
-import asyncio
+"""Test SQLite connection management."""
+import logging
 import os
 import tempfile
-from mcard.infrastructure.persistence.sqlite import SQLiteRepository
-from mcard.infrastructure.persistence.schema_initializer import SchemaInitializer
+import pytest
+import sqlite3
 from mcard.domain.models.card import MCard
-from mcard.domain.models.exceptions import StorageError, ValidationError
-import logging
+from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
+from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
+from mcard.infrastructure.persistence.async_wrapper import AsyncSQLiteWrapper
+from mcard.domain.models.exceptions import StorageError
 
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),  # Output to console
-        logging.FileHandler('test.log')  # Output to file
-    ]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
-@pytest.fixture
-def db_path():
-    """Fixture for temporary database path."""
-    with tempfile.NamedTemporaryFile(delete=False) as f:
-        temp_path = f.name
-    yield temp_path
-    # Cleanup after tests
-    if os.path.exists(temp_path):
-        os.unlink(temp_path)
 
 @pytest.fixture
 def repository():
     """Fixture for SQLite repository using in-memory database."""
-    repo = SQLiteRepository(":memory:")
-    logging.debug("Initializing in-memory database schema before tests")
-    repo._init_db()
-    return repo
+    repo = SQLiteStore(SQLiteConfig(db_path=":memory:"))
+    yield repo
+
+@pytest.fixture
+def db_path():
+    """Fixture for temporary database path."""
+    fd, path = tempfile.mkstemp()
+    yield path
+    os.close(fd)
+    os.unlink(path)
 
 @pytest.fixture
 def db_repository(db_path):
     """Fixture for SQLite repository using temporary database."""
-    repo = SQLiteRepository(db_path)
-    SchemaInitializer.initialize_schema(repo.connection)
-    return repo
+    repo = SQLiteStore(SQLiteConfig(db_path=db_path))
+    yield repo
 
-@pytest.mark.asyncio
-async def test_connection_pool_limit(repository):
-    logging.debug("Starting test_connection_pool_limit")
-    repo = repository
-    logging.debug("Performing multiple operations to test connection handling")
-    # Perform multiple get_all operations
-    results = await asyncio.gather(*[repo.get_all() for _ in range(10)])
-    logging.debug("Operations completed for test_connection_pool_limit")
-    assert all(len(result) == 0 for result in results)
-    logging.debug("Exiting test_connection_pool_limit")
+def test_connection_operations(repository):
+    """Test basic connection operations."""
+    logging.debug("Starting test_connection_operations")
+    
+    # Test multiple operations
+    for _ in range(10):
+        results = repository.get_all()
+        assert isinstance(results, list)
+    
+    # Test connection is still valid by performing a query
+    card = MCard(content="Test content")
+    repository.save(card)
+    retrieved = repository.get(card.hash)
+    assert retrieved is not None
+    
+    logging.debug("Test completed successfully")
 
-@pytest.mark.asyncio
-async def test_error_handling(repository):
+def test_error_handling(repository):
+    """Test error handling with invalid SQL."""
     logging.debug("Starting test_error_handling")
-    repo = repository
-    logging.debug("Testing error handling")
-    try:
-        await repo.save(MCard(content="Invalid", hash="", g_time="Invalid"))
-    except ValidationError as e:
-        logging.debug(f"Caught expected ValidationError: {e}")
-    logging.debug("Exiting test_error_handling")
+    
+    # Test error handling with invalid SQL using a raw cursor
+    conn = repository._get_connection()
+    with pytest.raises(sqlite3.OperationalError):
+        cursor = conn.cursor()
+        cursor.execute("INVALID SQL")
+        cursor.close()
+    
+    # Verify repository is still usable
+    card = MCard(content="Test content")
+    repository.save(card)
+    retrieved = repository.get(card.hash)
+    assert retrieved is not None
+    
+    logging.debug("Test completed successfully")
+
+def test_connection_recovery(db_repository):
+    """Test that the repository can recover from connection errors."""
+    # First operation should succeed
+    card = MCard(content="Test content")
+    db_repository.save(card)
+    
+    # Clear the thread-local storage
+    db_repository._local.__dict__.clear()
+    
+    # Next operation should automatically create a new connection
+    retrieved = db_repository.get(card.hash)
+    assert retrieved is not None
+
+def test_connection_isolation(db_repository):
+    """Test connection isolation."""
+    # Create a card
+    card = MCard(content="Test content")
+    db_repository.save(card)
+    
+    # Create a new repository instance for the same database
+    repo2 = SQLiteStore(SQLiteConfig(db_path=db_repository.db_path))
+    
+    # Changes should be visible to second connection
+    retrieved_card = repo2.get(card.hash)
+    assert retrieved_card.content == card.content
+    
+    # Changes in second connection should be visible to first
+    card2 = MCard(content="Test content 2")
+    repo2.save(card2)
+    retrieved_card2 = db_repository.get(card2.hash)
+    assert retrieved_card2.content == card2.content
+
+def test_connection_errors(db_path):
+    """Test handling of connection errors."""
+    # Test with non-existent directory
+    bad_path = "/nonexistent/dir/db.sqlite"
+    with pytest.raises(StorageError) as exc_info:
+        repo = SQLiteStore(SQLiteConfig(db_path=bad_path))
+        repo._get_connection()  # Force connection attempt
+    assert "Failed to create or connect to database" in str(exc_info.value)
+    
+    # Test with read-only directory
+    if os.path.exists(db_path):
+        os.chmod(db_path, 0o444)  # Make read-only
+        with pytest.raises(StorageError) as exc_info:
+            repo = SQLiteStore(SQLiteConfig(db_path=db_path))
+            repo._get_connection()  # Force connection attempt
+        assert "Failed to create or connect to database" in str(exc_info.value)
 
 @pytest.mark.asyncio
-async def test_connection_error_recovery(repository):
-    logging.debug("Starting test_connection_error_recovery")
-    repo = repository
-    repo._init_db()  # Ensure schema initialization
-    card = MCard(content="Recovery Test")
-    logging.debug("Saving card")
-    await repo.save(card)
-    logging.debug("Card saved successfully")
-    logging.debug("Exiting test_connection_error_recovery")
+async def test_connection_context():
+    """Test that the connection context manager works properly."""
+    wrapper = AsyncSQLiteWrapper(SQLiteConfig(db_path=":memory:"))
+    
+    async with wrapper as repo:
+        # Verify we can execute a query
+        async with repo._get_repository()._get_connection() as conn:
+            await conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+            await conn.commit()
+            
+            cursor = await conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = await cursor.fetchall()
+            assert len(tables) > 0
+            assert ("test",) in tables
 
 @pytest.mark.asyncio
-async def test_connection_pool_management(db_repository):
-    logging.debug("Starting test_connection_pool_management")
-    repo = db_repository
-    try:
-        logging.debug("Creating tasks for test_connection_pool_management")
-        tasks = [repo.get_all for _ in range(10)]
-        logging.debug("Executing tasks for test_connection_pool_management")
-        results = await asyncio.gather(*[task() for task in tasks])  # Execute asynchronously
-        logging.debug("Tasks completed for test_connection_pool_management")
-        assert all(len(result) == 0 for result in results)
-        logging.debug("Exiting test_connection_pool_management")
-    except Exception as e:
-        logging.error(f"Unexpected error occurred in test_connection_pool_management: {e}")
+async def test_connection_isolation():
+    """Test that connections are properly isolated."""
+    wrapper1 = AsyncSQLiteWrapper(SQLiteConfig(db_path=":memory:"))
+    wrapper2 = AsyncSQLiteWrapper(SQLiteConfig(db_path=":memory:"))
+    
+    async with wrapper1 as repo1:
+        async with wrapper2 as repo2:
+            # Create table in first connection
+            async with repo1._get_repository()._get_connection() as conn1:
+                await conn1.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+                await conn1.commit()
+            
+            # Verify table doesn't exist in second connection
+            async with repo2._get_repository()._get_connection() as conn2:
+                cursor = await conn2.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = await cursor.fetchall()
+                assert ("test",) not in tables
+
+@pytest.mark.asyncio
+async def test_connection_cleanup():
+    """Test that connections are properly cleaned up."""
+    wrapper = AsyncSQLiteWrapper(SQLiteConfig(db_path=":memory:"))
+    
+    async with wrapper as repo:
+        # Create a table
+        async with repo._get_repository()._get_connection() as conn:
+            await conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+            await conn.commit()
+    
+    # Verify wrapper is closed
+    with pytest.raises(RuntimeError, match="Repository not initialized"):
+        wrapper._get_repository()

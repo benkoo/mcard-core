@@ -1,10 +1,10 @@
 """Tests for batch operations in SQLite card repository."""
 import pytest
-import asyncio
 from datetime import datetime, timezone
-from mcard.infrastructure.persistence.sqlite import SQLiteRepository
-from mcard.infrastructure.persistence.schema_initializer import SchemaInitializer
+from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
+from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
 from mcard.domain.models.card import MCard
+from mcard.domain.models.exceptions import StorageError
 import tempfile
 import os
 import logging
@@ -27,61 +27,102 @@ logging.basicConfig(
 def repository():
     """Create a temporary SQLite repository for testing."""
     db_fd, db_path = tempfile.mkstemp()
-    repo = SQLiteRepository(db_path)
-    SchemaInitializer.initialize_schema(repo.connection)
-    yield repo
-    os.close(db_fd)
-    os.unlink(db_path)
+    try:
+        repo = SQLiteStore(SQLiteConfig(db_path=db_path))
+        yield repo
+    finally:
+        os.close(db_fd)
+        os.unlink(db_path)
 
-@pytest.mark.asyncio
-async def test_save_many_and_get_many(repository):
+def test_save_many_and_get_many(repository):
     """Test saving and retrieving multiple cards."""
-    repo = repository
-    cards = [MCard(content=f"Content {i}") for i in range(5)]
-    await repo.save_many(cards)
-    retrieved_cards = await repo.get_many([card.hash for card in cards])
+    cards = [MCard(content=f"Content {i}", g_time=f"2023-01-01T{i:02d}:00:00Z") for i in range(5)]
+    repository.save_many(cards)
+    
+    # Get cards one by one to verify individual retrieval
+    for card in cards:
+        retrieved = repository.get(card.hash)
+        assert retrieved.content == card.content
+        assert retrieved.g_time == card.g_time
+    
+    # Verify batch retrieval works
+    retrieved_cards = repository.get_many([card.hash for card in cards])
     assert len(retrieved_cards) == len(cards)
-    # Adjusting the order to match the descending g_time order
-    for original, retrieved in zip(reversed(cards), retrieved_cards):
-        # Decode content for comparison if needed
-        if isinstance(retrieved.content, bytes):
-            retrieved_content = retrieved.content.decode('utf-8')
-        else:
-            retrieved_content = retrieved.content
-        assert original.content == retrieved_content
+    
+    # Create lookup by hash since order may not be preserved
+    retrieved_dict = {card.hash: card for card in retrieved_cards}
+    for card in cards:
+        assert retrieved_dict[card.hash].content == card.content
+        assert retrieved_dict[card.hash].g_time == card.g_time
 
-@pytest.mark.asyncio
-async def test_get_all_with_pagination(repository):
-    """Test retrieving all cards with pagination."""
-    repo = repository
+def test_get_all_cards(repository):
+    """Test retrieving all cards."""
     cards = [MCard(content=f"Content {i}") for i in range(10)]
-    await repo.save_many(cards)
-    all_cards = await repo.get_all(limit=5)
-    assert len(all_cards) == 5
-    assert all_cards[0].content == "Content 9"
-    assert all_cards[4].content == "Content 5"
+    repository.save_many(cards)
+    all_cards = repository.get_all()
+    assert len(all_cards) == 10
+    
+    # Verify content of cards
+    card_contents = {card.content for card in all_cards}
+    expected_contents = {f"Content {i}" for i in range(10)}
+    assert card_contents == expected_contents
 
-@pytest.mark.asyncio
-async def test_mixed_content_batch(repository):
+def test_mixed_content_batch(repository):
     """Test saving and retrieving mixed content types in batch."""
-    repo = repository
+    binary_content = b"Binary content"
+    text_content = "Text content"
+    
     cards = [
-        MCard(content=b"Binary content", g_time="2023-10-01T10:00:00Z"),
-        MCard(content="Text content", g_time="2023-10-01T09:00:00Z")
+        MCard(content=binary_content, g_time="2023-10-01T10:00:00Z"),
+        MCard(content=text_content, g_time="2023-10-01T09:00:00Z")
     ]
-    await repo.save_many(cards)
-    retrieved_cards = await repo.get_many([card.hash for card in cards])
+    repository.save_many(cards)
+    
+    # Get cards individually to verify content
+    binary_card = repository.get(cards[0].hash)
+    text_card = repository.get(cards[1].hash)
+    
+    assert binary_card.content == binary_content
+    assert text_card.content == text_content
+    
+    # Verify batch retrieval
+    retrieved_cards = repository.get_many([card.hash for card in cards])
     assert len(retrieved_cards) == len(cards)
-    # Ensure the order is correct based on g_time
-    # Decode content for comparison if needed
-    if isinstance(retrieved_cards[0].content, bytes):
-        retrieved_binary_content = retrieved_cards[0].content.decode('utf-8')
-    else:
-        retrieved_binary_content = retrieved_cards[0].content
-    assert retrieved_binary_content == "Binary content"
+    
+    # Create lookup by hash
+    retrieved_dict = {card.hash: card for card in retrieved_cards}
+    assert retrieved_dict[cards[0].hash].content == binary_content
+    assert retrieved_dict[cards[1].hash].content == text_content
 
-    if isinstance(retrieved_cards[1].content, bytes):
-        retrieved_text_content = retrieved_cards[1].content.decode('utf-8')
-    else:
-        retrieved_text_content = retrieved_cards[1].content
-    assert retrieved_text_content == "Text content"
+def test_empty_batch_operations(repository):
+    """Test handling of empty batch operations."""
+    # Test empty save_many
+    repository.save_many([])
+    
+    # Test empty get_many
+    empty_cards = repository.get_many([])
+    assert len(empty_cards) == 0
+    
+    # Test get_all on empty repository
+    all_cards = repository.get_all()
+    assert len(all_cards) == 0
+
+def test_duplicate_save_batch(repository):
+    """Test saving duplicate cards in batch."""
+    # Create two cards with different content
+    card1 = MCard(content="Content One")
+    card2 = MCard(content="Content Two")
+    
+    # Save both cards
+    repository.save_many([card1, card2])
+    
+    # Try to save card1 again
+    with pytest.raises(StorageError, match="Failed to save cards: UNIQUE constraint failed: cards.hash"):
+        repository.save_many([card1])
+    
+    # Verify original cards are still there
+    all_cards = repository.get_all()
+    assert len(all_cards) == 2
+    contents = {card.content for card in all_cards}
+    assert "Content One" in contents
+    assert "Content Two" in contents

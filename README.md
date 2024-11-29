@@ -255,6 +255,30 @@ pytest tests/infrastructure/  # Run infrastructure tests only
 pytest tests/interfaces/      # Run interface tests only
 ```
 
+## Testing Configuration
+
+The test suite uses a dedicated SQLite database file for all tests. This ensures consistency and proper transaction handling across test cases. The test database is configured as follows:
+
+1. Location: Tests use a dedicated SQLite database file at `tests/test.db`
+2. Initialization: The database is automatically initialized before tests run
+3. Cleanup: The database file is removed after all tests complete
+4. Configuration: Test database settings are loaded from `tests/.env.test`
+
+To run the tests:
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test file
+pytest tests/path/to/test_file.py
+
+# Run with verbose output
+pytest -v
+```
+
+Note: Do not use in-memory SQLite databases (`:memory:`) for testing as they can cause issues with connection pooling and transaction isolation.
+
 ## Project Structure
 
 - `mcard/`: Contains the core library code.
