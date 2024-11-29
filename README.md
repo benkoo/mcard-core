@@ -255,29 +255,95 @@ pytest tests/infrastructure/  # Run infrastructure tests only
 pytest tests/interfaces/      # Run interface tests only
 ```
 
-## Testing Configuration
+## Configuration System
 
-The test suite uses a dedicated SQLite database file for all tests. This ensures consistency and proper transaction handling across test cases. The test database is configured as follows:
+MCard Core uses a robust configuration management system that provides flexible, environment-aware settings with strong validation. The configuration system is designed with the following principles:
 
-1. Location: Tests use a dedicated SQLite database file at `tests/test.db`
-2. Initialization: The database is automatically initialized before tests run
-3. Cleanup: The database file is removed after all tests complete
-4. Configuration: Test database settings are loaded from `tests/.env.test`
+### Key Features
 
-To run the tests:
+- **Environment-Based Configuration**: Supports multiple configuration sources:
+  - Default configuration for standard deployments
+  - Environment variables for runtime configuration
+  - `.env` files for development settings
+  - Special test configuration for isolated testing
+
+- **Hierarchical Override System**:
+  1. Environment variables (highest priority)
+  2. `.env` file settings
+  3. Default configuration values (lowest priority)
+
+- **Validation and Type Safety**:
+  - Strict validation of all configuration values
+  - Type checking for numeric parameters
+  - Range validation for connection limits and timeouts
+  - Hash algorithm validation with support for custom implementations
+
+### Configuration Components
+
+#### Repository Configuration
+- `db_path`: Database file location (defaults to `data/mcard.db`)
+- `max_connections`: Maximum concurrent database connections (default: 5)
+- `timeout`: Connection timeout in seconds (default: 30.0)
+
+#### Hashing Configuration
+- `algorithm`: Hash algorithm selection (default: "sha256")
+  - Supported algorithms: md5, sha1, sha224, sha256, sha384, sha512
+  - Custom algorithm support with module/function specification
+- `custom_module`: Optional module path for custom hash implementations
+- `custom_function`: Optional function name for custom hash implementations
+- `custom_hash_length`: Optional output length for custom hash functions
+
+### Environment Variables
+
+The following environment variables can be used to configure the system:
 
 ```bash
-# Run all tests
-pytest
+# Database Configuration
+MCARD_STORE_DB_PATH=path/to/db.db
+MCARD_STORE_MAX_CONNECTIONS=10
+MCARD_STORE_TIMEOUT=60.0
 
-# Run specific test file
-pytest tests/path/to/test_file.py
-
-# Run with verbose output
-pytest -v
+# Hash Configuration
+MCARD_HASH_ALGORITHM=sha256
+MCARD_HASH_CUSTOM_MODULE=my_hash_module
+MCARD_HASH_CUSTOM_FUNCTION=my_hash_func
+MCARD_HASH_CUSTOM_LENGTH=32
 ```
 
-Note: Do not use in-memory SQLite databases (`:memory:`) for testing as they can cause issues with connection pooling and transaction isolation.
+### Test Configuration
+
+The test suite uses a dedicated configuration setup that ensures:
+- Isolated test environments with separate database paths
+- Clean environment variables between tests
+- Reproducible test conditions
+- Prevention of test cross-contamination
+
+Test-specific settings can be defined in `tests/.env.test` for consistent test environments.
+
+### Design Patterns
+
+The configuration system implements several design patterns:
+- **Singleton Pattern**: Ensures a single, consistent configuration instance
+- **Strategy Pattern**: Supports different configuration sources
+- **Builder Pattern**: Validates and constructs configuration objects
+- **Immutable Configuration**: Prevents runtime configuration changes
+
+### Usage Example
+
+```python
+from mcard.infrastructure.config import load_config
+
+# Load configuration (automatically detects environment)
+config = load_config()
+
+# Access configuration values
+db_path = config.repository.db_path
+max_conn = config.repository.max_connections
+hash_algo = config.hashing.algorithm
+
+# Configuration is immutable after loading
+# Attempting to modify will raise RuntimeError
+```
 
 ## Project Structure
 
