@@ -3,7 +3,7 @@ MCard Core: A content-addressable data wrapper library.
 """
 
 from .domain.models.card import MCard
-from .domain.services.time import get_now_with_located_zone
+from .domain.dependency.time import get_now_with_located_zone
 from .domain.models.config import AppSettings, HashingSettings
 from .domain.models.repository_config import RepositoryConfig, SQLiteConfig
 from .infrastructure.persistence.engine.sqlite_engine import SQLiteStore
