@@ -43,16 +43,15 @@ def provisioning_app(mock_repository, mock_content_service, mock_hashing, monkey
     """Create a CardProvisioningApp with mocked dependencies."""
     def mock_get_hashing_service():
         return mock_hashing
-    # Patch both the domain and application imports
-    monkeypatch.setattr(
-        "mcard.application.card_provisioning_app.get_hashing_service",
-        mock_get_hashing_service
-    )
+    # Patch the domain services import
     monkeypatch.setattr(
         "mcard.domain.services.hashing.get_hashing_service",
         mock_get_hashing_service
     )
-    return CardProvisioningApp(mock_repository, mock_content_service)
+    
+    app = CardProvisioningApp(mock_repository, mock_hashing)
+    app.content_service = mock_content_service
+    return app
 
 
 @pytest.mark.asyncio
