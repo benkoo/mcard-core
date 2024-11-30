@@ -70,8 +70,13 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - Automated switching to stronger hashing algorithms when potential collisions are detected
 - Configurable hash algorithm selection through `HashingSettings`
 - Built-in safeguards to maintain data integrity
-- Collision-aware hashing service with progressive algorithm strengthening (MD5 → SHA1 → SHA256 → SHA512)
+- Collision-aware hashing service with progressive algorithm strengthening:
+  1. MD5 (least secure)
+  2. SHA1
+  3. SHA256 (default)
+  4. SHA512 (most secure)
 - Async support for repository-based collision detection
+- Detailed collision event logging with content similarity analysis
 
 ### Storage Features
 - SQLite-based persistent storage with connection pooling
@@ -97,6 +102,59 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - Copy-on-read pattern for thread safety
 - Efficient in-memory sorting
 - Real-time collection refresh capability
+
+## Dependencies
+
+The project relies on several key dependencies:
+- `python-dateutil`: Date and time handling utilities
+- `SQLAlchemy`: SQL toolkit and ORM
+- `pydantic`: Data validation using Python type annotations
+- `aiosqlite`: Async SQLite database driver
+- `python-dotenv`: Environment variable management
+- `pytest` and `pytest-asyncio`: Testing framework with async support
+
+## Installation
+
+To set up the project, follow these steps:
+
+1. Create a virtual environment:
+   ```bash
+   python -m venv .venv
+   ```
+
+2. Activate the virtual environment:
+   - On macOS and Linux:
+     ```bash
+     source .venv/bin/activate
+     ```
+   - On Windows:
+     ```bash
+     .venv\Scripts\activate
+     ```
+
+3. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Configure your environment:
+   - Copy `examples/standalone_demo/example.env` to create your own `.env` file
+   - The default configuration uses:
+     - Database path: `data/db/mcard_demo.db`
+     - Hash algorithm: SHA-256
+     - Connection pool size: 5
+     - Connection timeout: 30 seconds
+
+   Example `.env` file:
+   ```bash
+   # Database Settings
+   MCARD_DB_PATH=data/db/mcard_demo.db
+   MCARD_STORE_MAX_CONNECTIONS=5
+   MCARD_STORE_TIMEOUT=30.0
+
+   # Hash Algorithm (md5, sha1, sha256, sha512)
+   MCARD_HASH_ALGORITHM=sha256
+   ```
 
 ## Repository Management
 
@@ -128,132 +186,19 @@ The API uses standard HTTP response codes to indicate the success or failure of 
 
 All error responses include a detail message to help diagnose the issue.
 
-## Dependencies
+## Environment Variables
 
-The project relies on several key dependencies:
-- `python-dateutil`
-- `SQLAlchemy`
-- `pydantic`
-- `aiosqlite`
-- `pytest` and `pytest-asyncio` for testing
+The following environment variables can be used to configure MCard:
 
-## Installation
-
-To set up the project, follow these steps:
-
-1. Create a virtual environment:
-   ```bash
-   python -m venv .venv
-   ```
-
-2. Activate the virtual environment:
-   - On macOS and Linux:
-     ```bash
-     source .venv/bin/activate
-     ```
-   - On Windows:
-     ```bash
-     .venv\Scripts\activate
-     ```
-
-3. Install the dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Testing
-
-The MCard Core library includes a comprehensive test suite organized into several key areas:
-
-### Test Structure
-
-```
-tests/
-├── application/          # Application service layer tests
-├── domain/              # Domain model and service tests
-│   ├── models/          # Core model tests (MCard, exceptions, etc.)
-│   └── services/        # Domain service tests (hashing, time)
-├── infrastructure/      # Infrastructure layer tests
-│   ├── content/         # Content type detection tests
-│   └── persistence/     # SQLite persistence tests
-└── interfaces/          # Interface layer tests
-    └── cli/            # CLI interface tests
-```
-
-### Key Test Areas
-
-1. **Domain Model Tests**
-   - MCard creation with various content types
-   - Hash generation and validation
-   - Time-based operations and ordering
-   - Exception handling and validation
-   - Configuration management
-
-2. **Persistence Layer Tests**
-   - Basic CRUD operations
-   - Transaction management and isolation
-   - Concurrent operations handling
-   - Batch operations and pagination
-   - Content type handling (binary/text)
-   - Connection pool management
-   - Performance benchmarking
-   - Storage error propagation
-   - Race condition prevention
-
-3. **Content Handling Tests**
-   - Binary vs text content detection
-   - MIME type detection
-   - XML and JSON validation
-   - Content size validation
-
-4. **Service Layer Tests**
-   - Card service operations
-   - Collision-aware hashing
-   - Custom hash function support
-   - Time service operations
-
-5. **API Interface Tests**
-   - HTTP status code validation (201 for creation, 204 for deletion)
-   - Error response handling (404 for not found, 500 for server errors)
-   - Content filtering with case-insensitive matching
-   - API key authentication
-   - Request validation
-   - Response format verification
-
-6. **CLI Interface Tests**
-   - Command execution
-   - Error handling
-   - Input validation
-
-### Test Features
-
-- **Automated Fixtures**: Uses pytest fixtures for database setup/teardown
-- **Comprehensive Coverage**: Over 140 test cases covering all major components
-- **Concurrent Testing**: Validates thread-safety and transaction isolation
-- **Error Simulation**: Tests error handling and recovery mechanisms
-- **Performance Metrics**: Includes benchmarks for key operations
-
-### Running Tests
-
-To run the test suite:
-
-```bash
-pytest tests/
-```
-
-For verbose output with logging:
-
-```bash
-pytest -v tests/ --log-cli-level=DEBUG
-```
-
-To run specific test categories:
-
-```bash
-pytest tests/domain/          # Run domain tests only
-pytest tests/infrastructure/  # Run infrastructure tests only
-pytest tests/interfaces/      # Run interface tests only
-```
+| Variable                    | Description                               | Default Value       | Example Value         |
+|----------------------------|-------------------------------------------|--------------------|-----------------------|
+| `MCARD_DB_PATH`            | Path to the SQLite database file          | `data/db/mcard_demo.db` | `custom/path/db.sqlite` |
+| `MCARD_HASH_ALGORITHM`     | Hash algorithm (md5, sha1, sha256, sha512)| `sha256`          | `sha512`             |
+| `MCARD_STORE_MAX_CONNECTIONS` | Maximum database connections           | `5`                | `10`                 |
+| `MCARD_STORE_TIMEOUT`      | Database connection timeout (seconds)     | `30.0`            | `60.0`               |
+| `MCARD_HASH_CUSTOM_MODULE` | Custom hash module path (optional)        | None               | `myapp.hashing`      |
+| `MCARD_HASH_CUSTOM_FUNCTION`| Custom hash function name (optional)     | None               | `my_hash_function`   |
+| `MCARD_HASH_CUSTOM_LENGTH` | Custom hash length (optional)             | None               | `64`                 |
 
 ## Configuration System
 
@@ -371,6 +316,86 @@ DataEngineConfig.reset()  # Safely resets the entire configuration
 ```
 
 The update ensures that configuration resets are more reliable and consistent across different usage scenarios, particularly in testing and dynamic configuration environments.
+
+## Testing
+
+### Running Tests
+
+The test suite can be run using pytest:
+
+```bash
+# Run all tests
+pytest tests/
+
+# Run with verbose output
+pytest -v tests/ --log-cli-level=DEBUG
+
+# Run specific test categories
+pytest tests/domain/          # Domain tests
+pytest tests/infrastructure/  # Infrastructure tests
+pytest tests/interfaces/      # Interface tests
+```
+
+### Test Organization
+
+```
+tests/
+├── application/          # Application service layer tests
+├── domain/              # Domain model and service tests
+│   ├── models/          # Core model tests (MCard, exceptions)
+│   └── services/        # Domain service tests (hashing, time)
+├── infrastructure/      # Infrastructure layer tests
+│   ├── content/         # Content type detection tests
+│   └── persistence/     # SQLite persistence tests
+└── interfaces/          # Interface layer tests
+    └── cli/            # CLI interface tests
+```
+
+### Test Coverage
+
+The test suite includes:
+- Unit tests for all core components
+- Integration tests for database operations
+- Collision detection and handling tests
+- Hash algorithm transition tests
+- Performance benchmarks
+- Error handling and recovery tests
+- Concurrent operation tests
+
+### Configuration Examples
+
+Example `.env` file:
+```bash
+# Database Settings
+MCARD_DB_PATH=data/db/mcard_demo.db
+MCARD_STORE_MAX_CONNECTIONS=5
+MCARD_STORE_TIMEOUT=30.0
+
+# Hash Algorithm Settings
+MCARD_HASH_ALGORITHM=sha256
+
+# Optional Custom Hash Settings
+# MCARD_HASH_CUSTOM_MODULE=myapp.hashing
+# MCARD_HASH_CUSTOM_FUNCTION=custom_hash
+# MCARD_HASH_CUSTOM_LENGTH=64
+```
+
+Example Python configuration:
+```python
+from mcard.domain.models.config import AppSettings, HashingSettings
+from mcard.domain.models.repository_config import SQLiteConfig
+
+app_settings = AppSettings(
+    store=SQLiteConfig(
+        db_path="data/db/mcard_demo.db",
+        pool_size=5,
+        timeout=30.0
+    ),
+    hashing=HashingSettings(
+        algorithm="sha256"
+    )
+)
+```
 
 ## Usage
 
@@ -536,14 +561,16 @@ MCard Core supports flexible configuration through environment variables, allowi
 
 ### Supported Configuration Parameters
 
-| Environment Variable         | Description                                | Default Value       | Example                |
-|------------------------------|--------------------------------------------|---------------------|------------------------|
+| Environment Variable         | Description                                | Default Value       | Example Value         |
+|------------------------------|--------------------------------------------|---------------------|-----------------------|
 | `MCARD_API_KEY`              | API authentication key                     | `default_mcard_api_key` | `test_custom_api_key_12345` |
-| `MCARD_MANAGER_DB_PATH`      | Path to the SQLite database file           | `MCardManagerStore.db` | `test_custom_database.db` |
-| `MCARD_MANAGER_DATA_SOURCE`  | Database backend type                      | `sqlite`           | `sqlite`               |
-| `MCARD_MANAGER_POOL_SIZE`    | Connection pool size                       | `5`                | `3`                   |
-| `MCARD_MANAGER_TIMEOUT`      | Database connection timeout (seconds)      | `30.0`             | `15.0`                |
-| `MCARD_MANAGER_HASH_ALGORITHM` | Cryptographic hash algorithm             | `sha256`           | `sha512`              |
+| `MCARD_DB_PATH`              | Path to the SQLite database file           | `data/db/mcard_demo.db` | `custom/path/db.sqlite` |
+| `MCARD_HASH_ALGORITHM`       | Hash algorithm (md5, sha1, sha256, sha512)| `sha256`          | `sha512`             |
+| `MCARD_STORE_MAX_CONNECTIONS` | Maximum database connections              | `5`                | `10`                 |
+| `MCARD_STORE_TIMEOUT`        | Database connection timeout (seconds)      | `30.0`            | `60.0`               |
+| `MCARD_HASH_CUSTOM_MODULE`   | Custom hash module path (optional)         | None               | `myapp.hashing`      |
+| `MCARD_HASH_CUSTOM_FUNCTION` | Custom hash function name (optional)       | None               | `my_hash_function`   |
+| `MCARD_HASH_CUSTOM_LENGTH`   | Custom hash length (optional)              | None               | `64`                 |
 
 ### Dynamic Configuration Loading
 
@@ -557,15 +584,23 @@ MCard Core implements a dynamic configuration loading mechanism that allows runt
 #### Example Configuration
 
 ```python
+from mcard.domain.models.config import AppSettings, HashingSettings
+from mcard.domain.models.repository_config import SQLiteConfig
+import os
+
 # Load configuration dynamically
 app_settings = AppSettings(
-    database=DatabaseSettings(
-        db_path=os.getenv('MCARD_MANAGER_DB_PATH', 'default_database.db'),
-        data_source=os.getenv('MCARD_MANAGER_DATA_SOURCE'),
-        pool_size=int(os.getenv('MCARD_MANAGER_POOL_SIZE', 5)),
-        timeout=float(os.getenv('MCARD_MANAGER_TIMEOUT', 30.0))
+    store=SQLiteConfig(
+        db_path=os.getenv('MCARD_DB_PATH', 'data/db/mcard_demo.db'),
+        pool_size=int(os.getenv('MCARD_STORE_MAX_CONNECTIONS', '5')),
+        timeout=float(os.getenv('MCARD_STORE_TIMEOUT', '30.0'))
     ),
-    mcard_api_key=os.getenv('MCARD_API_KEY', 'default_test_key')
+    hashing=HashingSettings(
+        algorithm=os.getenv('MCARD_HASH_ALGORITHM', 'sha256'),
+        custom_module=os.getenv('MCARD_HASH_CUSTOM_MODULE'),
+        custom_function=os.getenv('MCARD_HASH_CUSTOM_FUNCTION'),
+        custom_hash_length=int(os.getenv('MCARD_HASH_CUSTOM_LENGTH', '0'))
+    )
 )
 ```
 
