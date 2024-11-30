@@ -20,6 +20,8 @@ class ContentTypeInterpreter:
         b'BM': 'image/bmp',
         b'\x00\x00\x01\x00': 'image/x-icon',
         b'\x00\x00\x02\x00': 'image/x-icon',
+        b'RIFF': 'image/webp',  # WebP file signature
+        b'WEBP': 'image/webp',  # Alternative WebP signature
         
         # Documents
         b'%PDF': 'application/pdf',
@@ -407,6 +409,7 @@ class ContentTypeInterpreter:
             'image/x-icon': 'ico',
             'image/svg+xml': 'svg',
             'image/djvu': 'djvu',
+            'image/webp': 'webp',
             
             # Documents
             'application/pdf': 'pdf',
