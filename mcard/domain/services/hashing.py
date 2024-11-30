@@ -201,6 +201,7 @@ class DefaultHashingService(HashingServiceProtocol):
             or None if no stronger algorithm is available.
         """
         current_strength = self.ALGORITHM_HIERARCHY.get(self.settings.algorithm.lower(), 0)
+        logger.info(f"Current algorithm: {self.settings.algorithm} (strength: {current_strength})")
         
         # Find next strongest algorithm
         next_algo = None
@@ -212,7 +213,10 @@ class DefaultHashingService(HashingServiceProtocol):
                 next_strength = strength
                 
         if next_algo is None:
+            logger.warning("No stronger hash algorithm available")
             return None
+            
+        logger.info(f"Transitioning to stronger algorithm: {next_algo} (strength: {next_strength})")
             
         # Create settings for next level
         new_settings = HashingSettings(

@@ -7,6 +7,9 @@ from mcard.domain.models.hashing_protocol import HashingService
 from mcard.domain.models.exceptions import StorageError
 import json
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CardProvisioningApp:
     """Application for provisioning and managing cards."""
@@ -63,17 +66,23 @@ class CardProvisioningApp:
             if original_content != content:
                 # Hash collision detected - transition to stronger hash
                 try:
+                    logger.warning(f"Hash collision detected - attempting to transition to stronger hash")
+                    logger.warning(f"Current hash: {content_hash} (algorithm: {self.hashing_service.settings.algorithm})")
+                    
                     # Get new hash service and verify it's stronger
                     next_service = await self.hashing_service.next_level_hash()
                     if not next_service:
+                        logger.error("No stronger hash algorithm available")
                         raise RuntimeError("No stronger hash algorithm available")
                         
                     # Atomically update hashing service
                     old_service = self.hashing_service
                     self.hashing_service = next_service
+                    logger.info(f"Upgraded from {old_service.settings.algorithm} to {next_service.settings.algorithm}")
                     
                     # Get new hash with stronger algorithm
                     new_hash = await self.hashing_service.hash_content(content)
+                    logger.info(f"New hash with stronger algorithm: {new_hash}")
                     
                     # Create and save card with stronger hash
                     card = MCard(content=content)
@@ -85,10 +94,12 @@ class CardProvisioningApp:
                     for attempt in range(max_retries):
                         try:
                             await self.store.save(card)
+                            logger.info(f"Successfully saved card with new hash after collision")
                             break
                         except StorageError as e:
                             if "already exists" in str(e) and attempt < max_retries - 1:
                                 # Hash collision with new algorithm, try next level
+                                logger.warning(f"Hash collision with new algorithm, trying next level")
                                 next_service = await self.hashing_service.next_level_hash()
                                 if not next_service:
                                     raise RuntimeError("No stronger hash algorithm available")
@@ -243,20 +254,21 @@ class CardProvisioningApp:
         if isinstance(content, str):
             content = content.encode('utf-8')
             
-        # Get all cards and check for content equality
-        all_cards = await self.store.list()
-        if not all_cards:
+        # Get hash for the content
+        content_hash = await self.hashing_service.hash_content(content)
+        
+        # Check if hash exists in store
+        existing_card = await self.store.get(content_hash)
+        if not existing_card:
             return False
             
-        for card in all_cards:
-            card_content = card.content
-            if isinstance(card_content, str):
-                card_content = card_content.encode('utf-8')
-                
-            if card_content == content:
-                return True
-                
-        return False
+        # Hash exists - verify if it's a collision or duplicate
+        existing_content = existing_card.content
+        if isinstance(existing_content, str):
+            existing_content = existing_content.encode('utf-8')
+            
+        # Return True in both cases - collision detection happens in create_card
+        return True
 
     async def list_provisioned_cards(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
         """List all provisioned cards with optional pagination.

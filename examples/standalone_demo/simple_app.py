@@ -37,17 +37,44 @@ async def load_file(provisioning_app, file_path):
         with open(file_path, 'rb') as f:
             content = f.read()
         
+        logger.info(f"Processing file: {file_path} (size: {len(content)} bytes)")
+        
+        # Get hash before checking for duplicates
+        content_hash = await provisioning_app.hashing_service.hash_content(content)
+        logger.info(f"Generated hash for {file_path}: {content_hash}")
+        
         # Check if content already exists
         if await provisioning_app.has_hash_for_content(content):
-            logger.info(f"Skipping duplicate file: {file_path}")
+            # Get the existing card to check if it's a collision
+            existing_card = await provisioning_app.store.get(content_hash)
+            if existing_card:
+                existing_content = existing_card.content
+                if existing_content != content:
+                    logger.warning(f"Hash collision detected!")
+                    logger.warning(f"File: {file_path}")
+                    logger.warning(f"Hash: {content_hash}")
+                    logger.warning(f"Original content size: {len(existing_content)} bytes")
+                    logger.warning(f"New content size: {len(content)} bytes")
+                    
+                    # Try to create card with stronger hash
+                    try:
+                        card = await provisioning_app.create_card(content)
+                        logger.info(f"Successfully created card with stronger hash: {card.hash}")
+                        return card
+                    except Exception as e:
+                        logger.error(f"Failed to create card with stronger hash: {e}")
+                        return None
+            
+            logger.info(f"Skipping file with existing hash: {file_path}")
             return None
             
         # Create card
         card = await provisioning_app.create_card(content)
-        logger.info(f"Loaded file: {file_path} with hash: {card.hash}")
+        logger.info(f"Successfully loaded file: {file_path} with hash: {card.hash}")
         return card
     except Exception as e:
         logger.error(f"Error loading file {file_path}: {e}")
+        logger.error(traceback.format_exc())
         return None
 
 async def load_files_recursively(provisioning_app, directory):
@@ -101,7 +128,7 @@ async def main():
         logger.info(f"Environment MCARD_DB_PATH: {db_path}")
         
         if not db_path:
-            db_path = 'data/db/mcard_demo.db'
+            db_path = 'data/db/mcard_demo_md5.db'  # Use MD5-specific database
             logger.warning(f"MCARD_DB_PATH not set, using default: {db_path}")
             
         # Make db_path relative to script directory if it's not absolute
@@ -133,6 +160,7 @@ async def main():
             algorithm=os.getenv('MCARD_HASH_ALGORITHM', 'sha1')
         )
         hashing_service = get_hashing_service(hash_settings)
+        logger.info(f"Using hashing algorithm: {hash_settings.algorithm}")
         
         # Create provisioning app
         provisioning_app = CardProvisioningApp(setup.storage, hashing_service)
