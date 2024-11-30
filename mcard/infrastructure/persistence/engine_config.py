@@ -54,6 +54,14 @@ class EngineConfig:
         if check_same_thread is not None and not isinstance(check_same_thread, bool):
             raise ValueError("check_same_thread must be a boolean")
 
+    def create_store(self):
+        """Create a store instance based on the engine type."""
+        if self.engine_type == EngineType.SQLITE:
+            from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
+            return SQLiteStore(self)
+        else:
+            raise ValueError(f"Unsupported engine type: {self.engine_type}")
+
 
 @dataclass
 class SQLiteConfig(EngineConfig):

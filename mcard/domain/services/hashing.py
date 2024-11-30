@@ -5,9 +5,12 @@ import hashlib
 import importlib
 from dataclasses import dataclass, field
 from typing import Optional, Union, Callable, Any, Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 from ..models.config import HashingSettings
-from ..models.protocols import HashingService as HashingServiceProtocol
+from ..models.hashing_protocol import HashingService as HashingServiceProtocol
 
 class HashingError(Exception):
     """Raised when hashing operations fail."""
@@ -18,6 +21,17 @@ class DefaultHashingService(HashingServiceProtocol):
     Default implementation of HashingService.
     Supports multiple hashing algorithms including custom hash functions.
     """
+    # Define algorithm hierarchy with strength ratings (higher is stronger)
+    ALGORITHM_HIERARCHY = {
+        'md5': 1,
+        'sha1': 2,
+        'sha224': 3,
+        'sha256': 4,
+        'sha384': 5,
+        'sha512': 6,
+        'custom': 7
+    }
+    
     def __init__(self, settings: HashingSettings):
         """
         Initialize the hashing service with configuration.
@@ -30,165 +44,186 @@ class DefaultHashingService(HashingServiceProtocol):
         self._hash_length = {
             "md5": 32,
             "sha1": 40,
+            "sha224": 56,
             "sha256": 64,
+            "sha384": 96,
             "sha512": 128,
             "custom": self.settings.custom_hash_length
         }.get(self.settings.algorithm)
-        self.store = None  # Default to None
-
-    def _create_hash_function(self) -> Union[Any, Callable[[bytes], str]]:
-        """
-        Get the appropriate hash function based on configuration.
         
-        Returns:
-            A function that takes bytes and returns a hash string
-        """
-        if self.settings.algorithm == "custom":
-            if not self.settings.custom_module or not self.settings.custom_function:
+        # Validate algorithm is supported
+        if self.settings.algorithm not in self.ALGORITHM_HIERARCHY:
+            raise HashingError(f"Unsupported algorithm: {self.settings.algorithm}")
+            
+        self.store = None  # Default to None
+        
+        # Initialize parallel hashing if configured
+        self._parallel_algorithms = settings.parallel_algorithms or []
+        self._parallel_hash_funcs = {}
+        if self._parallel_algorithms:
+            for algo in self._parallel_algorithms:
+                if algo not in self.ALGORITHM_HIERARCHY:
+                    raise HashingError(f"Unsupported parallel algorithm: {algo}")
+                parallel_settings = HashingSettings(algorithm=algo)
+                self._parallel_hash_funcs[algo] = self._create_hash_function_for_settings(parallel_settings)
+
+    def _create_hash_function_for_settings(self, settings: HashingSettings) -> Union[Any, Callable[[bytes], str]]:
+        """Create a hash function for the given settings."""
+        if settings.algorithm == "custom":
+            if not settings.custom_module or not settings.custom_function:
                 raise HashingError("Custom module and function must be specified")
 
             try:
-                module = importlib.import_module(self.settings.custom_module)
-                hash_func = getattr(module, self.settings.custom_function)
-                return hash_func()  # Call factory function to get hash function
+                # Add security checks for custom module
+                if not self._is_safe_module_path(settings.custom_module):
+                    raise HashingError("Custom module path is not allowed")
+                    
+                module = importlib.import_module(settings.custom_module)
+                return getattr(module, settings.custom_function)
             except (ImportError, AttributeError) as e:
-                raise HashingError(f"Failed to load custom hash function: {e}")
+                raise HashingError(f"Failed to load custom hash function: {str(e)}")
 
-        # Use hashlib functions
-        if self.settings.algorithm == "md5":
-            return lambda content: hashlib.md5(content).hexdigest()
-        elif self.settings.algorithm == "sha1":
-            return lambda content: hashlib.sha1(content).hexdigest()
-        elif self.settings.algorithm == "sha256":
-            return lambda content: hashlib.sha256(content).hexdigest()
-        elif self.settings.algorithm == "sha512":
-            return lambda content: hashlib.sha512(content).hexdigest()
-        else:
-            raise HashingError(f"Unsupported hashing algorithm: {self.settings.algorithm}")
+        if settings.algorithm in hashlib.algorithms_available:
+            def hash_func(content: bytes) -> str:
+                hasher = hashlib.new(settings.algorithm)
+                hasher.update(content)
+                return hasher.hexdigest()
+            return hash_func
 
-    async def async_hash_content(self, content: bytes) -> str:
-        """Hash content and check for collisions."""
-        if not content:
-            raise HashingError("Cannot hash empty content")
+        raise HashingError(f"Unsupported hashing algorithm: {settings.algorithm}")
 
-        # First try with current algorithm
-        hash_str = self._hash_func(content)
+    def _create_hash_function(self) -> Union[Any, Callable[[bytes], str]]:
+        """Get the appropriate hash function based on configuration."""
+        return self._create_hash_function_for_settings(self.settings)
 
-        if self.store:
-            # Check for collision in store
-            existing_card = await self.store.get(hash_str)
-            if existing_card and existing_card.content != content:
-                # Collision detected, upgrade algorithm
-                await self._handle_collision(content, existing_card.content)
-                # Compute hash with new algorithm
-                return self._hash_func(content)
-
-        return hash_str
+    def _is_safe_module_path(self, module_path: str) -> bool:
+        """Check if a module path is safe to import.
+        
+        Implements basic security checks to prevent importing malicious modules.
+        """
+        # Disallow absolute paths and parent directory references
+        if '/' in module_path or '\\' in module_path or '..' in module_path:
+            return False
+            
+        # Only allow modules from specific trusted directories
+        allowed_prefixes = ['mcard.', 'hashlib.', 'cryptography.']
+        return any(module_path.startswith(prefix) for prefix in allowed_prefixes)
 
     async def hash_content(self, content: bytes) -> str:
-        """Wrapper method to ensure async behavior for hash_content."""
-        return await self.async_hash_content(content)
+        """Hash the given content using the configured algorithm."""
+        if not isinstance(content, bytes):
+            raise HashingError("Content must be bytes")
 
-    async def validate_hash(self, content: bytes, hash_str: str) -> bool:
-        """Validate a hash string asynchronously."""
-        # If no hash is provided, return False
+        try:
+            # Get primary hash
+            primary_hash = self._hash_func(content)
+            
+            # If parallel hashing is enabled, compute all hashes
+            if self._parallel_algorithms:
+                parallel_hashes = {}
+                for algo, hash_func in self._parallel_hash_funcs.items():
+                    try:
+                        parallel_hashes[algo] = hash_func(content)
+                    except Exception as e:
+                        logger.warning(f"Parallel hashing failed for algorithm {algo}: {str(e)}")
+                        
+                # Store parallel hashes for later verification
+                if hasattr(self, 'store') and self.store:
+                    await self.store.save_parallel_hashes(primary_hash, parallel_hashes)
+            
+            return primary_hash
+        except Exception as e:
+            raise HashingError(f"Failed to hash content: {str(e)}")
+
+    async def validate_hash(self, hash_str: str) -> bool:
+        """
+        Validate a hash string.
+        
+        Args:
+            hash_str: Hash string to validate
+            
+        Returns:
+            True if valid, False otherwise
+        """
         if not hash_str:
             return False
 
-        # Validate hash length matches the expected length
-        if len(hash_str) != self._hash_length:
+        if not isinstance(hash_str, str):
             return False
 
-        # Validate hash format (hexadecimal)
+        if self._hash_length and len(hash_str) != self._hash_length:
+            return False
+
         try:
-            int(hash_str, 16)
-        except ValueError:
-            return False
-
-        # If content is provided, verify the hash matches the content
-        if content:
-            computed_hash = await self.hash_content(content)
-            return computed_hash == hash_str
-
-        return True
-
-    async def async_validate_hash(self, hash_str: str) -> bool:
-        """Async method to validate a hash string."""
-        # If no hash is provided, return False
-        if not hash_str:
-            return False
-
-        # Validate hash length matches the expected length
-        if len(hash_str) != self._hash_length:
-            return False
-
-        # Validate hash format (hexadecimal)
-        try:
+            # Check if the hash string contains only valid hex characters
             int(hash_str, 16)
             return True
         except ValueError:
             return False
 
-class CollisionAwareHashingService(DefaultHashingService):
-    """A hashing service that automatically upgrades the hashing algorithm when collisions are detected."""
+    def validate_content(self, content: Any) -> bool:
+        """
+        Validate the content for hashing.
+        
+        Args:
+            content: Content to validate
+            
+        Returns:
+            True if valid, False otherwise
+        """
+        if content is None:
+            return False
 
-    def __init__(self, settings: HashingSettings, repository = None):
-        """Initialize the service with the given settings and optional repository."""
-        super().__init__(settings)
-        self._algorithm_hierarchy = ["md5", "sha1", "sha256", "sha512"]
-        self.repository = repository
+        # If content is bytes, it's valid
+        if isinstance(content, bytes):
+            return True
 
-    async def store_collision(self, content1: bytes, content2: bytes, algorithm: str) -> None:
-        """Store a known collision for the given algorithm."""
-        if algorithm.lower() == self.settings.algorithm.lower():
-            await self._handle_collision(content1, content2)
+        # If content is string, it should be convertible to bytes
+        if isinstance(content, str):
+            try:
+                content.encode('utf-8')
+                return True
+            except UnicodeEncodeError:
+                return False
 
-    async def _handle_collision(self, content1: bytes, content2: bytes) -> None:
-        """Handle a collision by upgrading to the next strongest algorithm."""
-        current_algo = self.settings.algorithm.lower()
+        # For any other type, try to convert to string first
         try:
-            current_index = self._algorithm_hierarchy.index(current_algo)
-            if current_index < len(self._algorithm_hierarchy) - 1:
-                next_algo = self._algorithm_hierarchy[current_index + 1]
-                self.settings.algorithm = next_algo
-                self._hash_func = self._create_hash_function()
-                self._hash_length = {
-                    "md5": 32,
-                    "sha1": 40,
-                    "sha256": 64,
-                    "sha512": 128,
-                    "custom": self.settings.custom_hash_length
-                }.get(self.settings.algorithm)
-        except ValueError:
-            # If current algorithm is not in hierarchy, default to strongest
-            self.settings.algorithm = self._algorithm_hierarchy[-1]
-            self._hash_func = self._create_hash_function()
-            self._hash_length = {
-                "md5": 32,
-                "sha1": 40,
-                "sha256": 64,
-                "sha512": 128,
-                "custom": self.settings.custom_hash_length
-            }.get(self.settings.algorithm)
+            str(content).encode('utf-8')
+            return True
+        except (UnicodeEncodeError, TypeError):
+            return False
 
-    async def async_hash_content(self, content: bytes) -> str:
-        """Hash content and check for collisions."""
-        if not content:
-            raise HashingError("Cannot hash empty content")
-
-        # First try with current algorithm
-        hash_str = self._hash_func(content)
-
-        if self.repository:
-            # Check for collision in repository
-            existing_card = await self.repository.get(hash_str)
-            if existing_card and existing_card.content != content:
-                # Collision detected, upgrade algorithm
-                await self._handle_collision(content, existing_card.content)
-                # Compute hash with new algorithm
-                return self._hash_func(content)
-
-        return hash_str
+    async def next_level_hash(self) -> Optional['DefaultHashingService']:
+        """Get the next level hashing service with a stronger algorithm.
+        
+        Returns:
+            A new DefaultHashingService instance with the next stronger algorithm,
+            or None if no stronger algorithm is available.
+        """
+        current_strength = self.ALGORITHM_HIERARCHY.get(self.settings.algorithm.lower(), 0)
+        
+        # Find next strongest algorithm
+        next_algo = None
+        next_strength = current_strength
+        
+        for algo, strength in self.ALGORITHM_HIERARCHY.items():
+            if strength > current_strength and (next_algo is None or strength < next_strength):
+                next_algo = algo
+                next_strength = strength
+                
+        if next_algo is None:
+            return None
+            
+        # Create settings for next level
+        new_settings = HashingSettings(
+            algorithm=next_algo,
+            custom_module=self.settings.custom_module if next_algo == 'custom' else None,
+            custom_function=self.settings.custom_function if next_algo == 'custom' else None,
+            custom_hash_length=self.settings.custom_hash_length if next_algo == 'custom' else None,
+            parallel_algorithms=self.settings.parallel_algorithms
+        )
+        
+        return DefaultHashingService(new_settings)
 
 # Global default service
 _default_service: Optional[DefaultHashingService] = None
@@ -199,15 +234,15 @@ def get_hashing_service(settings: Optional[HashingSettings] = None) -> DefaultHa
     
     Args:
         settings: Optional hashing settings. If not provided, default settings will be used.
-    
+        
     Returns:
         The default hashing service
     """
     global _default_service
-    if _default_service is None or settings is not None:
-        # Create a new service with provided or default settings
-        service_settings = settings or HashingSettings()
-        _default_service = DefaultHashingService(service_settings)
+    if _default_service is None:
+        if settings is None:
+            settings = HashingSettings(algorithm="md5")
+        _default_service = DefaultHashingService(settings)
     return _default_service
 
 def set_hashing_service(service: Optional[DefaultHashingService]) -> None:

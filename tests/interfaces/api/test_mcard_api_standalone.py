@@ -4,15 +4,16 @@ import pytest_asyncio
 import logging
 from mcard.domain.models.card import MCard
 from mcard.interfaces.api.mcard_api import MCardAPI
-from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
-from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
-from mcard.infrastructure.persistence.async_wrapper import AsyncSQLiteWrapper
+from mcard.interfaces.api.async_api_wrapper import AsyncAPIWrapper
+from mcard.infrastructure.persistence.async_persistence_wrapper import AsyncPersistenceWrapper as PersistenceWrapper
+from mcard.infrastructure.persistence.engine_config import SQLiteConfig
 
 @pytest_asyncio.fixture
 async def repository():
     """Create a fresh repository for each test."""
     config = SQLiteConfig(db_path=":memory:")
-    wrapper = AsyncSQLiteWrapper(config)
+    persistence = PersistenceWrapper(config)
+    wrapper = AsyncAPIWrapper(persistence)
     async with wrapper as repo:
         yield repo
 

@@ -7,10 +7,11 @@ import os
 from typing import Optional, List, Dict, Any
 from threading import Lock
 from mcard.domain.models.card import MCard
-from mcard.domain.models.exceptions import StorageError
+from mcard.domain.models.exceptions import StorageError, ConfigurationError
+from mcard.domain.models.config import HashingSettings
 from mcard.infrastructure.persistence.facade import DatabaseFacade, DatabaseConfig
 from mcard.infrastructure.persistence.engine_config import EngineConfig, EngineType, create_engine_config
-from mcard.domain.models.protocols import HashingService
+from mcard.domain.services.hashing import DefaultHashingService
 from mcard.infrastructure.config import load_config
 import asyncio
 
@@ -40,7 +41,7 @@ class MCardStore:
         """
         self._config = config or load_config()
         self._facade: Optional[DatabaseFacade] = None
-        self._hashing_service: Optional[HashingService] = None
+        self._hashing_service: Optional[DefaultHashingService] = None
         self._initialized = False
 
     async def __aenter__(self):
@@ -66,20 +67,23 @@ class MCardStore:
 
     async def initialize(self):
         """Initialize the store with current configuration."""
-        if not self._initialized:
-            # Configure the store if not already configured
-            if not self._facade:
-                self.configure()
+        if not self._config:
+            raise ConfigurationError("Store must be configured before initialization")
 
-            # Initialize the facade
-            self._facade = DatabaseFacade(self._config)
+        # Configure the store if not already configured
+        if not self._facade:
+            self.configure()
 
-            # Initialize the hashing service
-            self._hashing_service = HashingService(self._config.hashing)
+        # Initialize services
+        hashing_settings = HashingSettings(**self._config.hashing)
+        self._hashing_service = DefaultHashingService(hashing_settings)
 
-            # Initialize the database schema
-            await self._facade.initialize_schema()
-            self._initialized = True
+        # Initialize the facade
+        self._facade = DatabaseFacade(self._config)
+
+        # Initialize the database schema
+        await self._facade.initialize_schema()
+        self._initialized = True
 
     async def close(self):
         """Close the store and release resources."""

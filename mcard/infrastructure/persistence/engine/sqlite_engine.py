@@ -6,17 +6,20 @@ import logging
 import asyncio
 from typing import List, Optional, Union, Dict, Tuple
 from datetime import datetime, timezone
+from pathlib import Path
+
+import aiosqlite
+
 from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import ValidationError, StorageError
 from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType, DatabaseType
 from mcard.infrastructure.persistence.schema import SchemaManager
-from mcard.domain.models.protocols import CardStore
-import aiosqlite
-from pathlib import Path
+from mcard.infrastructure.persistence.engine.base_engine import BaseStore
 
 logger = logging.getLogger(__name__)
 
-class SQLiteStore(CardStore):
+
+class SQLiteStore(BaseStore):
     """SQLite store implementation."""
 
     def __init__(self, config: Union[str, SQLiteConfig]):
@@ -35,27 +38,6 @@ class SQLiteStore(CardStore):
         self._max_retries = 3
         self._retry_delay = 0.1  # 100ms
 
-    async def __aenter__(self):
-        """
-        Async context manager entry point.
-        
-        Returns:
-            Initialized store instance
-        """
-        await self.initialize()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """
-        Async context manager exit point.
-        
-        Args:
-            exc_type: Exception type
-            exc_val: Exception value
-            exc_tb: Exception traceback
-        """
-        await self.close()
-
     async def initialize(self):
         """Initialize the database connection."""
         if not self._initialized:
@@ -73,15 +55,11 @@ class SQLiteStore(CardStore):
             await self._connection.execute('PRAGMA journal_mode=WAL')
             await self._connection.execute('PRAGMA synchronous=NORMAL')
             await self._connection.execute('PRAGMA foreign_keys=ON')
+            await self._connection.execute(f'PRAGMA busy_timeout={self._busy_timeout}')
             
-            # Create table if not exists
-            await self._connection.execute("""
-                CREATE TABLE IF NOT EXISTS card (
-                    hash TEXT PRIMARY KEY,
-                    content BLOB NOT NULL,
-                    g_time TEXT NOT NULL
-                )
-            """)
+            # Initialize schema using SchemaManager
+            await self._schema_manager.initialize_schema(EngineType.SQLITE, self._connection)
+            
             await self._connection.commit()
             self._initialized = True
 
@@ -91,268 +69,182 @@ class SQLiteStore(CardStore):
             await self._connection.close()
             self._initialized = False
 
-    async def reset(self):
-        """Reset the store to its initial state."""
-        await self.close()
-        self._connection = None
-        self._initialized = False
-
     async def _execute_with_retry(self, operation, *args):
         """Execute a database operation with retry logic."""
         for attempt in range(self._max_retries):
             try:
                 return await operation(*args)
             except sqlite3.OperationalError as e:
-                if "database is locked" in str(e) and attempt < self._max_retries - 1:
-                    await asyncio.sleep(self._retry_delay * (attempt + 1))
-                    continue
-                raise StorageError(f"Database operation failed: {str(e)}")
-            except Exception as e:
-                raise StorageError(f"Database operation failed: {str(e)}")
+                if attempt == self._max_retries - 1:
+                    raise StorageError(f"Database operation failed after {self._max_retries} attempts: {e}")
+                await asyncio.sleep(self._retry_delay * (attempt + 1))
 
-    async def get_all(self, content: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
-        """Get all cards from the database with optional filtering and pagination."""
-        await self.initialize()
-        query = 'SELECT hash, content, g_time FROM card'
-        params = []
-        
-        if content is not None:
-            query += ' WHERE content LIKE ?'
-            params.append(f'%{content}%')
-            
-        query += ' ORDER BY g_time DESC'
-            
-        if limit is not None:
-            query += ' LIMIT ?'
-            params.append(limit)
-            
-        if offset is not None:
-            query += ' OFFSET ?'
-            params.append(offset)
-            
-        cursor = await self._connection.execute(query, params)
-        rows = await cursor.fetchall()
-        
+    async def create(self, content: str) -> MCard:
+        """Create a new card with the given content."""
+        if not self._initialized:
+            await self.initialize()
+
+        if not content:
+            raise ValidationError("Content cannot be empty")
+
+        if len(content) > self.max_content_size:
+            raise ValidationError(f"Content size exceeds maximum allowed size of {self.max_content_size} bytes")
+
+        async def _create():
+            cursor = await self._connection.cursor()
+            try:
+                now = datetime.now(timezone.utc).isoformat()
+                card = MCard(content=content, g_time=now)
+                await cursor.execute(
+                    'INSERT INTO card (hash, content, g_time) VALUES (?, ?, ?)',
+                    (card.hash, content, now)
+                )
+                await self._connection.commit()
+                return card
+            finally:
+                await cursor.close()
+
+        return await self._execute_with_retry(_create)
+
+    async def create_many(self, contents: List[str]) -> List[MCard]:
+        """Create multiple cards with the given contents."""
+        if not self._initialized:
+            await self.initialize()
+
         cards = []
-        for row in rows:
-            hash_str, content, g_time = row
-            restored_content = self._restore_content_from_storage(content)
-            cards.append(MCard(content=restored_content, hash=hash_str, g_time=g_time))
-        return cards
+        async def _create_many():
+            cursor = await self._connection.cursor()
+            try:
+                now = datetime.now(timezone.utc).isoformat()
+                for content in contents:
+                    if not content:
+                        raise ValidationError("Content cannot be empty")
+                    if len(content) > self.max_content_size:
+                        raise ValidationError(f"Content size exceeds maximum allowed size of {self.max_content_size} bytes")
+                    
+                    card = MCard(content=content, g_time=now)
+                    await cursor.execute(
+                        'INSERT INTO card (hash, content, g_time) VALUES (?, ?, ?)',
+                        (card.hash, content, now)
+                    )
+                    cards.append(card)
+                await self._connection.commit()
+                return cards
+            finally:
+                await cursor.close()
+
+        return await self._execute_with_retry(_create_many)
 
     async def get(self, hash_str: str) -> Optional[MCard]:
         """Get a card by its hash."""
-        await self.initialize()
-        
+        if not self._initialized:
+            await self.initialize()
+
         async def _get():
-            cursor = await self._connection.execute(
-                "SELECT content, g_time FROM card WHERE hash = ?",
-                (hash_str,)
-            )
-            row = await cursor.fetchone()
-            if row:
-                content, g_time = row
-                restored_content = self._restore_content_from_storage(content)
-                return MCard(content=restored_content, hash=hash_str, g_time=g_time)
-            return None
+            cursor = await self._connection.cursor()
+            try:
+                await cursor.execute('SELECT content, g_time FROM card WHERE hash = ?', (hash_str,))
+                row = await cursor.fetchone()
+                if row:
+                    return MCard(content=row[0], hash=hash_str, g_time=row[1])
+                return None
+            finally:
+                await cursor.close()
 
         return await self._execute_with_retry(_get)
-
-    async def get_many(self, hashes: List[str]) -> List[MCard]:
-        """Get multiple cards by their hashes."""
-        await self.initialize()
-        if not hashes:
-            return []
-
-        placeholders = ','.join(['?' for _ in hashes])
-        query = f'SELECT hash, content, g_time FROM card WHERE hash IN ({placeholders})'
-        cursor = await self._connection.execute(query, hashes)
-        rows = await cursor.fetchall()
-
-        cards = []
-        for row in rows:
-            hash_str, content, g_time = row
-            restored_content = self._restore_content_from_storage(content)
-            cards.append(MCard(content=restored_content, hash=hash_str, g_time=g_time))
-        return cards
-
-    async def save(self, card: MCard) -> None:
-        """Save a card to the database."""
-        await self.initialize()
-        
-        content_size = len(card.content.encode()) if isinstance(card.content, str) else len(card.content)
-        if content_size > self.max_content_size:
-            raise StorageError(f"Content size exceeds maximum limit of {self.max_content_size} bytes")
-
-        content_bytes = self._prepare_content_for_storage(card.content)
-        formatted_time = self._format_timestamp(card.g_time)
-        
-        async def _save():
-            try:
-                await self._connection.execute(
-                    'INSERT INTO card (hash, content, g_time) VALUES (?, ?, ?)',
-                    (card.hash, content_bytes, formatted_time)
-                )
-                await self._connection.commit()
-            except sqlite3.IntegrityError as e:
-                raise StorageError(f"Card with hash {card.hash} already exists") from e
-            except sqlite3.Error as e:
-                raise StorageError(f"Failed to save card: {str(e)}") from e
-
-        await self._execute_with_retry(_save)
-
-    async def save_many(self, cards: List[MCard]) -> None:
-        """Save multiple cards to the database."""
-        await self.initialize()
-        
-        for card in cards:
-            await self.save(card)
 
     async def list(
         self,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
+        content: Optional[str] = None,
         limit: Optional[int] = None,
-        offset: Optional[int] = None
+        offset: Optional[int] = None,
     ) -> List[MCard]:
-        """List cards from the store with optional time range and pagination."""
-        await self.initialize()
-        query = 'SELECT hash, content, g_time FROM card WHERE 1=1'
-        params = []
-        
-        if start_time:
-            query += ' AND g_time >= ?'
-            params.append(start_time.isoformat())
-        
-        if end_time:
-            query += ' AND g_time <= ?'
-            params.append(end_time.isoformat())
-        
-        query += ' ORDER BY g_time DESC'
-        
-        if limit is not None:
-            query += ' LIMIT ?'
-            params.append(limit)
-        
-        if offset is not None:
-            query += ' OFFSET ?'
-            params.append(offset)
-        
-        cursor = await self._connection.execute(query, params)
-        rows = await cursor.fetchall()
-        
-        return [
-            MCard(content=self._restore_content_from_storage(content), hash=hash_str, g_time=g_time)
-            for hash_str, content, g_time in rows
-        ]
+        """List cards with optional filtering and pagination."""
+        if not self._initialized:
+            await self.initialize()
 
-    async def get_by_time_range(
-        self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None
-    ) -> List[MCard]:
-        """Retrieve cards within a time range."""
-        return await self.list(start_time, end_time, limit, offset)
-
-    async def get_before_time(
-        self,
-        time: datetime,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None
-    ) -> List[MCard]:
-        """Retrieve cards created before the specified time."""
-        return await self.list(end_time=time, limit=limit, offset=offset)
-
-    async def get_after_time(
-        self,
-        time: datetime,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None
-    ) -> List[MCard]:
-        """Retrieve cards created after the specified time."""
-        return await self.list(start_time=time, limit=limit, offset=offset)
-
-    async def delete(self, hash_str: str) -> None:
-        """Delete a card from the store by its hash."""
-        await self.initialize()
-        
-        async def _delete():
+        async def _list():
+            cursor = await self._connection.cursor()
             try:
-                await self._connection.execute('DELETE FROM card WHERE hash = ?', (hash_str,))
+                query = ['SELECT content, g_time FROM card WHERE 1=1']
+                params = []
+
+                if start_time:
+                    query.append('AND g_time >= ?')
+                    params.append(start_time.isoformat())
+                if end_time:
+                    query.append('AND g_time <= ?')
+                    params.append(end_time.isoformat())
+                if content:
+                    query.append('AND content LIKE ?')
+                    params.append(f'%{content}%')
+
+                query.append('ORDER BY g_time DESC')
+
+                if limit is not None:
+                    query.append('LIMIT ?')
+                    params.append(limit)
+                if offset is not None:
+                    query.append('OFFSET ?')
+                    params.append(offset)
+
+                await cursor.execute(' '.join(query), params)
+                rows = await cursor.fetchall()
+                return [MCard(content=row[0], hash=None, g_time=row[1]) for row in rows]
+            finally:
+                await cursor.close()
+
+        return await self._execute_with_retry(_list)
+
+    async def save(self, card: MCard) -> None:
+        """Save a card to the store."""
+        if not self._initialized:
+            await self.initialize()
+
+        if not card.content:
+            raise ValidationError("Content cannot be empty")
+
+        if len(str(card.content)) > self.max_content_size:
+            raise ValidationError(f"Content size exceeds maximum allowed size of {self.max_content_size} bytes")
+
+        async def _save():
+            cursor = await self._connection.cursor()
+            try:
+                # Check if hash already exists
+                await cursor.execute('SELECT 1 FROM card WHERE hash = ?', (card.hash,))
+                if await cursor.fetchone():
+                    raise StorageError(f"Card with hash {card.hash} already exists")
+                    
+                # Insert new card
+                now = datetime.now(timezone.utc).isoformat()
+                try:
+                    await cursor.execute(
+                        'INSERT INTO card (content, hash, g_time) VALUES (?, ?, ?)',
+                        (card.content, card.hash, now)
+                    )
+                    await self._connection.commit()
+                except sqlite3.IntegrityError as e:
+                    if "UNIQUE constraint failed" in str(e):
+                        raise StorageError(f"Card with hash {card.hash} already exists")
+                    raise StorageError(f"Failed to save card: {str(e)}")
+            finally:
+                await cursor.close()
+
+        await self._execute_with_retry(_save)
+
+    async def remove(self, hash_str: str) -> None:
+        """Remove a card by its hash."""
+        if not self._initialized:
+            await self.initialize()
+
+        async def _remove():
+            cursor = await self._connection.cursor()
+            try:
+                await cursor.execute('DELETE FROM card WHERE hash = ?', (hash_str,))
                 await self._connection.commit()
-            except sqlite3.Error as e:
-                raise StorageError(f"Failed to delete card: {str(e)}") from e
+            finally:
+                await cursor.close()
 
-        await self._execute_with_retry(_delete)
-
-    async def delete_many(self, hash_strs: List[str]) -> None:
-        """Delete multiple cards from the store by their hashes."""
-        await self.initialize()
-        
-        async def _delete_many():
-            try:
-                placeholders = ','.join(['?' for _ in hash_strs])
-                await self._connection.execute(f'DELETE FROM card WHERE hash IN ({placeholders})', hash_strs)
-                await self._connection.commit()
-            except sqlite3.Error as e:
-                raise StorageError(f"Failed to delete cards: {str(e)}") from e
-
-        await self._execute_with_retry(_delete_many)
-
-    async def delete_before_time(self, time: datetime) -> int:
-        """Delete all cards created before the specified time."""
-        await self.initialize()
-        
-        async def _delete_before_time():
-            try:
-                await self._connection.execute('DELETE FROM card WHERE g_time < ?', (time.isoformat(),))
-                await self._connection.commit()
-                return await self._connection.total_changes
-            except sqlite3.Error as e:
-                raise StorageError(f"Failed to delete cards before time: {str(e)}") from e
-
-        return await self._execute_with_retry(_delete_before_time)
-
-    async def begin_transaction(self) -> None:
-        """Begin a store transaction."""
-        await self._connection.execute('BEGIN TRANSACTION')
-
-    async def commit_transaction(self) -> None:
-        """Commit the current store transaction."""
-        await self._connection.commit()
-
-    async def rollback_transaction(self) -> None:
-        """Rollback the current store transaction."""
-        await self._connection.rollback()
-
-    def _prepare_content_for_storage(self, content: Union[str, bytes]) -> bytes:
-        """Prepare content for storage by converting to bytes if needed."""
-        if isinstance(content, str):
-            return content.encode('utf-8')
-        return content
-
-    def _restore_content_from_storage(self, content: bytes) -> Union[str, bytes]:
-        """Restore content from storage."""
-        try:
-            return content.decode('utf-8')
-        except UnicodeDecodeError:
-            return content
-
-    def _format_timestamp(self, timestamp: Union[str, datetime]) -> str:
-        """Format timestamp as ISO 8601 string with timezone."""
-        if isinstance(timestamp, str):
-            # Validate that the string is a proper ISO format
-            try:
-                datetime.fromisoformat(timestamp)
-                return timestamp
-            except ValueError as e:
-                raise ValidationError(f"Invalid timestamp format. Expected ISO 8601 format: {str(e)}")
-        elif isinstance(timestamp, datetime):
-            # Ensure timezone is set
-            if timestamp.tzinfo is None:
-                timestamp = timestamp.replace(tzinfo=timezone.utc)
-            return timestamp.isoformat()
-        else:
-            raise ValidationError(f"Invalid timestamp type: {type(timestamp)}")
+        await self._execute_with_retry(_remove)

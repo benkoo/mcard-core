@@ -4,9 +4,9 @@ import pytest
 import pytest_asyncio
 import tempfile
 from mcard.interfaces.api.mcard_api import MCardAPI
-from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
-from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
-from mcard.infrastructure.persistence.async_wrapper import AsyncSQLiteWrapper
+from mcard.interfaces.api.async_api_wrapper import AsyncAPIWrapper
+from mcard.infrastructure.persistence.async_persistence_wrapper import AsyncPersistenceWrapper as PersistenceWrapper
+from mcard.infrastructure.persistence.engine_config import SQLiteConfig
 
 @pytest.fixture
 def db_path():
@@ -19,7 +19,8 @@ def db_path():
 @pytest_asyncio.fixture
 async def async_repository(db_path):
     """Create a repository with the temporary database."""
-    wrapper = AsyncSQLiteWrapper(SQLiteConfig(db_path=db_path))
+    persistence = PersistenceWrapper(SQLiteConfig(db_path=db_path))
+    wrapper = AsyncAPIWrapper(persistence)
     async with wrapper as repo:
         yield repo
 

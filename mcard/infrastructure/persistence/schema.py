@@ -1,15 +1,29 @@
 """
 Schema manager for database operations.
-Provides a centralized place for defining and managing database schemas across different database types.
+This module implements a deliberately simple, single-table database design for the MCard application.
+All card data is stored in a single 'card' table for simplicity, maintainability, and performance.
+
+The schema consists of:
+- A 'card' table with columns:
+  - id: INTEGER PRIMARY KEY - Auto-incrementing primary key
+  - hash: TEXT - Hash identifier for the card
+  - content: BLOB - Card content
+  - g_time: TEXT - Global timestamp
+- An index on g_time for efficient time-based queries
+- An index on hash for efficient hash-based queries
+
+This single-table design was chosen to:
+1. Simplify database maintenance and backups
+2. Reduce complexity in schema management
+3. Minimize potential for data inconsistencies
+4. Optimize for the core use case of storing and retrieving cards
 """
 
-from typing import Optional, Dict, Any, Type, Union
+from typing import Optional, Dict, Any, Type, Union, List
 from enum import Enum
 import logging
-import sqlite3
-import aiosqlite
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from mcard.domain.models.exceptions import StorageError
 from mcard.infrastructure.persistence.engine_config import EngineType
@@ -50,9 +64,8 @@ class TableDefinition:
 
 
 class SchemaManager:
-    """
-    Singleton class for managing database schemas.
-    Provides a centralized place for defining and managing database schemas.
+    """Singleton class for managing the card database schema.
+    Implements a single-table design pattern for storing all card-related data.
     """
     _instance = None
     _initialized = False
@@ -63,9 +76,10 @@ class SchemaManager:
         return cls._instance
 
     def __init__(self):
+        """Initialize the schema manager."""
         if not self._initialized:
             self._initialized = True
-            self._tables = self._define_tables()
+            self._tables = None  # Initialize tables on first use
             self._schema_handlers = {
                 EngineType.SQLITE: SQLiteSchemaHandler()
                 # Add more handlers for different databases
@@ -74,17 +88,33 @@ class SchemaManager:
             }
 
     def _define_tables(self) -> Dict[str, TableDefinition]:
-        """Define all database tables and their schemas."""
+        """Define the database schema.
+        
+        This implementation deliberately uses a single-table design for simplicity and maintainability.
+        All card-related data is stored in the 'card' table with the following structure:
+        - id: INTEGER PRIMARY KEY - Auto-incrementing primary key
+        - hash: TEXT - Hash identifier for the card
+        - content: BLOB - The actual card content in binary format
+        - g_time: TEXT - Global timestamp with timezone information
+        """
         return {
             "card": TableDefinition(
                 name="card",
                 columns=[
                     ColumnDefinition(
-                        name="hash",
-                        type=ColumnType.TEXT,
+                        name="id",
+                        type=ColumnType.INTEGER,
                         primary_key=True,
                         nullable=False,
-                        comment="Unique hash identifier for the card"
+                        comment="Auto-incrementing primary key"
+                    ),
+                    ColumnDefinition(
+                        name="hash",
+                        type=ColumnType.TEXT,
+                        nullable=False,
+                        unique=True,
+                        index=True,
+                        comment="Hash identifier for the card"
                     ),
                     ColumnDefinition(
                         name="content",
@@ -101,15 +131,17 @@ class SchemaManager:
                     )
                 ],
                 indexes={
-                    "idx_card_g_time": ["g_time"]
+                    "idx_card_g_time": ["g_time"],
+                    "idx_card_hash": ["hash"]
                 },
-                comment="Stores card data with content and global timestamp"
+                comment="Single table storing all card data including content and timestamps"
             )
-            # Add more table definitions as needed
         }
 
     def get_table_definition(self, table_name: str) -> TableDefinition:
         """Get the definition of a specific table."""
+        if self._tables is None:
+            self._tables = self._define_tables()
         if table_name not in self._tables:
             raise ValueError(f"Table {table_name} not defined in schema")
         return self._tables[table_name]
@@ -122,6 +154,8 @@ class SchemaManager:
 
     async def initialize_schema(self, engine_type: EngineType, connection: Any) -> None:
         """Initialize the schema for a specific database type."""
+        # Force reload tables to get latest schema
+        self._tables = self._define_tables()
         handler = self.get_schema_handler(engine_type)
         await handler.initialize_schema(connection, self._tables)
 
@@ -137,6 +171,23 @@ class BaseSchemaHandler(ABC):
     @abstractmethod
     def get_column_type(self, column_type: ColumnType) -> str:
         """Get the database-specific column type."""
+        pass
+
+    @abstractmethod
+    def _build_column_definition(self, column: ColumnDefinition) -> str:
+        """Build database-specific column definition string."""
+        pass
+
+    @abstractmethod
+    def _generate_table_sql(self, table: TableDefinition) -> tuple[str, list[str]]:
+        """Generate SQL statements for table creation and indexes.
+        
+        Args:
+            table: Table definition containing columns and indexes
+            
+        Returns:
+            Tuple of (create table SQL, list of create index SQLs)
+        """
         pass
 
 
@@ -161,79 +212,56 @@ class SQLiteSchemaHandler(BaseSchemaHandler):
         parts = [
             column.name,
             self.get_column_type(column.type),
-            "PRIMARY KEY" if column.primary_key else "",
+            "PRIMARY KEY AUTOINCREMENT" if column.primary_key and column.type == ColumnType.INTEGER else "",
             "NOT NULL" if not column.nullable else "",
-            "UNIQUE" if column.unique else "",
+            "UNIQUE" if column.unique and not column.primary_key else "",  # Don't add UNIQUE if it's already a primary key
             f"DEFAULT {column.default}" if column.default is not None else "",
             f"/* {column.comment} */" if column.comment else ""
         ]
         return " ".join(part for part in parts if part)
 
-    async def initialize_schema(self, connection: Union[sqlite3.Connection, aiosqlite.Connection], tables: Dict[str, TableDefinition]) -> None:
-        """Initialize SQLite schema."""
-        try:
-            if isinstance(connection, aiosqlite.Connection):
-                await self._initialize_schema_async(connection, tables)
-            else:
-                self._initialize_schema_sync(connection, tables)
-        except (sqlite3.Error, Exception) as e:
-            raise StorageError(f"Failed to initialize schema: {str(e)}")
-
-    def _initialize_schema_sync(self, connection: sqlite3.Connection, tables: Dict[str, TableDefinition]) -> None:
-        """Initialize schema for synchronous connection."""
-        cursor = connection.cursor()
+    def _generate_table_sql(self, table: TableDefinition) -> tuple[str, list[str]]:
+        """Generate SQL statements for table creation and indexes.
         
-        # Set pragmas for better performance and reliability
-        cursor.execute("PRAGMA busy_timeout = 5000")
-        cursor.execute("PRAGMA journal_mode=WAL")
-        
-        for table in tables.values():
-            # Create table
-            columns = [self._build_column_definition(col) for col in table.columns]
-            create_table_sql = f"""
-                CREATE TABLE IF NOT EXISTS {table.name} (
-                    {', '.join(columns)}
-                ) /* {table.comment or ''} */
-            """
-            cursor.execute(create_table_sql)
-
-            # Create indexes
-            if table.indexes:
-                for idx_name, idx_columns in table.indexes.items():
-                    create_index_sql = f"""
-                        CREATE INDEX IF NOT EXISTS {idx_name}
-                        ON {table.name} ({', '.join(idx_columns)})
-                    """
-                    cursor.execute(create_index_sql)
-
-        connection.commit()
-        logger.info(f"Successfully initialized schema for tables: {', '.join(tables.keys())}")
-
-    async def _initialize_schema_async(self, connection: aiosqlite.Connection, tables: Dict[str, TableDefinition]) -> None:
-        """Initialize schema for asynchronous connection."""
-        async with connection.cursor() as cursor:
-            # Set pragmas for better performance and reliability
-            await cursor.execute("PRAGMA busy_timeout = 5000")
-            await cursor.execute("PRAGMA journal_mode=WAL")
+        Args:
+            table: Table definition containing columns and indexes
             
-            for table in tables.values():
-                # Create table
-                columns = [self._build_column_definition(col) for col in table.columns]
-                create_table_sql = f"""
-                    CREATE TABLE IF NOT EXISTS {table.name} (
-                        {', '.join(columns)}
-                    ) /* {table.comment or ''} */
+        Returns:
+            Tuple of (create table SQL, list of create index SQLs)
+        """
+        columns = [self._build_column_definition(col) for col in table.columns]
+        create_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS {table.name} (
+                {', '.join(columns)}
+            ) /* {table.comment or ''} */
+        """
+        
+        create_index_sqls = []
+        if table.indexes:
+            for idx_name, idx_columns in table.indexes.items():
+                create_index_sql = f"""
+                    CREATE INDEX IF NOT EXISTS {idx_name}
+                    ON {table.name} ({', '.join(idx_columns)})
                 """
-                await cursor.execute(create_table_sql)
+                create_index_sqls.append(create_index_sql)
+                
+        return create_table_sql, create_index_sqls
 
-                # Create indexes
-                if table.indexes:
-                    for idx_name, idx_columns in table.indexes.items():
-                        create_index_sql = f"""
-                            CREATE INDEX IF NOT EXISTS {idx_name}
-                            ON {table.name} ({', '.join(idx_columns)})
-                        """
+    async def initialize_schema(self, connection: Any, tables: Dict[str, TableDefinition]) -> None:
+        """Initialize schema for the database connection."""
+        async with connection.cursor() as cursor:
+            for table in tables.values():
+                # Check if table exists
+                await cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table.name}'")
+                if not await cursor.fetchone():
+                    # Table doesn't exist, create it
+                    create_table_sql, create_index_sqls = self._generate_table_sql(table)
+                    await cursor.execute(create_table_sql)
+                    for create_index_sql in create_index_sqls:
                         await cursor.execute(create_index_sql)
+                    logger.info(f"Created table: {table.name}")
+                else:
+                    logger.info(f"Table {table.name} already exists, skipping creation")
 
-            await connection.commit()
-            logger.info(f"Successfully initialized schema for tables: {', '.join(tables.keys())}")
+        await connection.commit()
+        logger.info(f"Successfully initialized schema for tables: {', '.join(tables.keys())}")

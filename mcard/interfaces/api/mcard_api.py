@@ -19,7 +19,7 @@ from mcard.domain.models.config import AppSettings, HashingSettings
 from mcard.domain.models.repository_config import RepositoryConfig, SQLiteConfig
 from mcard.domain.models.card import MCard
 from mcard.domain.models.protocols import CardStore
-from mcard.infrastructure.persistence.async_wrapper import AsyncSQLiteWrapper
+from mcard.infrastructure.persistence.async_persistence_wrapper import AsyncPersistenceWrapper
 from mcard.domain.services.hashing import get_hashing_service
 from dotenv import load_dotenv
 
@@ -82,7 +82,7 @@ class CardResponse(BaseModel):
 async def get_store() -> CardStore:
     """Get store instance."""
     settings = load_config()
-    return AsyncSQLiteWrapper(settings.store)
+    return AsyncPersistenceWrapper(settings.store)
 
 class MCardAPI:
     """API wrapper for MCard operations."""

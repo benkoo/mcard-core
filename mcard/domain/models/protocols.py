@@ -8,21 +8,6 @@ from datetime import datetime
 from .card import MCard
 
 @runtime_checkable
-class HashingService(Protocol):
-    """Abstract hashing service."""
-    def __init__(self, settings: Any):
-        """Initialize the hashing service."""
-        pass
-
-    async def hash_content(self, content: bytes) -> str:
-        """Hash the given content."""
-        ...
-
-    async def validate_hash(self, hash_str: str) -> bool:
-        """Validate a hash string."""
-        ...
-
-@runtime_checkable
 class CardStore(Protocol):
     """Abstract card store for persistence operations."""
     async def save(self, card: MCard) -> None:
@@ -50,20 +35,26 @@ class CardStore(Protocol):
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
         limit: Optional[int] = None,
-        offset: Optional[int] = None
+        offset: Optional[int] = None,
     ) -> list[MCard]:
-        """
-        List cards from the store with optional time range and pagination.
-        
-        Args:
-            start_time: Start of time range (inclusive). If None, no lower bound.
-            end_time: End of time range (inclusive). If None, no upper bound.
-            limit: Maximum number of records to return
-            offset: Number of records to skip
-            
-        Returns:
-            List of cards matching the criteria, ordered by g_time DESC
-        """
+        """List cards with optional time range and pagination."""
+        ...
+
+    async def delete(self, hash_str: str) -> None:
+        """Delete a card from the store."""
+        ...
+
+    async def delete_many(self, hash_strs: list[str]) -> None:
+        """Delete multiple cards from the store."""
+        ...
+
+    async def search(
+        self,
+        query: str,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> list[MCard]:
+        """Search for cards matching a query."""
         ...
 
     async def get_by_time_range(
@@ -125,14 +116,6 @@ class CardStore(Protocol):
         """
         ...
 
-    async def delete(self, hash_str: str) -> None:
-        """Delete a card from the store by its hash."""
-        ...
-
-    async def delete_many(self, hash_strs: list[str]) -> None:
-        """Delete multiple cards from the store by their hashes."""
-        ...
-
     async def delete_before_time(self, time: datetime) -> int:
         """
         Delete all cards from the store created before the specified time.
@@ -160,12 +143,52 @@ class CardStore(Protocol):
 @runtime_checkable
 class ContentTypeService(Protocol):
     """Abstract content type service."""
-    def detect_type(self, content: Union[str, bytes]) -> str:
+    def detect_type(self, content: Union[str, bytes]):
         """Detect the content type."""
         ...
 
-    def validate_content(self, content: Any) -> bool:
+    def validate_content(self, content: Any):
         """Validate the content."""
+        ...
+
+@runtime_checkable
+class HashingService(Protocol):
+    """Protocol for hashing service operations."""
+    
+    async def hash_content(self, content: bytes) -> str:
+        """
+        Hash the given content.
+        
+        Args:
+            content: Content to hash
+            
+        Returns:
+            Hash string
+        """
+        ...
+
+    async def validate_hash(self, hash_str: str) -> bool:
+        """
+        Validate a hash string.
+        
+        Args:
+            hash_str: Hash string to validate
+            
+        Returns:
+            True if valid, False otherwise
+        """
+        ...
+
+    async def validate_content(self, content: Any) -> bool:
+        """
+        Validate the content for hashing.
+        
+        Args:
+            content: Content to validate
+            
+        Returns:
+            True if valid, False otherwise
+        """
         ...
 
 @runtime_checkable
@@ -183,11 +206,15 @@ class CardRepository(Protocol):
         """Delete a card by its ID."""
         ...
 
-    async def list(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
+    async def list(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> list[MCard]:
         """List cards with optional pagination."""
         ...
 
-    async def search(self, query: str) -> List[MCard]:
+    async def search(self, query: str) -> list[MCard]:
         """Search for cards based on a query."""
         ...
 

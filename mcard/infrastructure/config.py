@@ -294,8 +294,7 @@ class DataEngineConfig:
             
             # Add hashing configuration
             self.hashing = {
-                'algorithm': 'sha256',
-                'length': 64
+                'algorithm': 'sha256'
             }
             
             self._initialized = True
@@ -343,8 +342,7 @@ class DataEngineConfig:
 
         # Update hashing configuration
         self.hashing = config.get('hashing', {
-            'algorithm': 'sha256',
-            'length': 64
+            'algorithm': 'sha256'
         })
 
 def create_engine_config(
