@@ -2,7 +2,13 @@
 
 A comprehensive CRUD (Create, Read, Update, Delete) application for managing MCards, built with Flask and Bootstrap 5. This application demonstrates the capabilities of the MCard library while providing an intuitive web interface for card management.
 
-## Features
+## Key Features
+- Asynchronous content storage using MCard
+- Support for multiple content types (text, binary, SVG)
+- Timestamp tracking with `g_time`
+- Flexible content management
+- Dual view modes: Grid and Table layouts
+- PDF content support with inline viewer
 
 ### Core Functionality
 - Create new MCards with text or file content
@@ -10,106 +16,87 @@ A comprehensive CRUD (Create, Read, Update, Delete) application for managing MCa
 - Delete MCards from storage
 - Automatic content hash generation and verification
 - Binary and text content support
+- Switch between grid and table views
 
 ### Content Management
 - **Intelligent Content Handling**:
   - Automatic content type detection
   - SVG content special handling with inline rendering
   - Image content with thumbnail generation
+  - PDF content with built-in viewer
   - Binary content download support
   - Text content formatting
 - **Content Type Support**:
   - Images: SVG, PNG, JPEG, GIF, and other common formats
+  - Documents: PDF with inline viewer
   - Text: Plain text, JSON, and other text formats
   - Binary: Any binary content with proper MIME type detection
 
-### User Interface
-- **Clean Bootstrap 5 Design**:
-  - Responsive layout for all screen sizes
-  - Intuitive navigation
-  - Clear content presentation
-- **Card Management**:
-  - Create new cards with text or file upload
-  - View card details with content preview
-  - Download card content
-  - Delete cards with confirmation
-- **Pagination**:
-  - Configurable items per page
-  - Page navigation controls
-  - Current page indicator
+## Views and Navigation
+- **Table View**:
+  - Compact list view with columns for preview, type, hash, g_time
+  - Quick access to view and delete actions
+  - Sortable columns
+- **Grid View**:
+  - Visual card-based layout
+  - Large content previews
+  - Metadata display
+  - Action buttons for each card
 
-## Technical Details
+## Endpoints
+- `/`: List all cards with view mode toggle
+- `/view/<hash>`: View a specific card's content
+- `/delete/<hash>`: Delete a specific card
+- `/get_binary_content/<hash>`: Retrieve binary content
+- `/thumbnail/<hash>`: Get a thumbnail of the content
+- `/pdf/<hash>`: Serve PDF content directly
 
-### Project Structure
-```
-mcard_crud_app/
-├── app.py              # Main Flask application
-├── templates/          # Jinja2 templates
-│   ├── base.html      # Base template with layout
-│   ├── index.html     # Main card listing
-│   ├── grid.html      # Grid view layout
-│   ├── new_card.html  # Card creation form
-│   ├── view_card.html # Card detail view
-│   └── components/    # Reusable components
-└── mcard_crud.db      # SQLite database
-```
+## Timestamp Handling
+The application uses the `g_time` attribute from MCard to track content creation time. This attribute:
+- Represents the global timestamp of content creation
+- Is automatically generated when a card is created
+- Used consistently across all views (table, grid, and detail)
+- Formatted using a custom datetime filter
 
-### Dependencies
-- **Flask**: Web application framework
-- **MCard**: Core library for card management
-- **Bootstrap 5**: Frontend styling and components
-- **SQLite**: Database storage
+### Timestamp Display
+- Consistent formatting across all views
+- Uses custom Jinja2 datetime filter
+- Handles both datetime objects and timestamp strings
+- Fallback to 'Unknown' for missing timestamps
 
-### Implementation Features
-- Thread-safe database connections
-- Proper MIME type detection and handling
-- Secure file uploads
-- Error handling and user feedback
-- Template inheritance for consistent UI
-- Jinja2 custom filters for formatting
+## Content Types Supported
+- Plain Text with syntax highlighting
+- PDF Documents with inline viewer
+- Images (PNG, JPEG, GIF, WebP)
+- SVG Graphics with inline rendering
+- Binary Files with download option
+- Dynamically detected content types
 
-## Setup and Usage
+## Development Setup
+1. Clone the repository
+2. Install dependencies: `pip install -r requirements.txt`
+3. Run the application: `python app.py`
 
-1. **Installation**:
-   ```bash
-   # Clone the repository
-   git clone [repository-url]
-   cd mcard-core
-   
-   # Install dependencies
-   pip install -r requirements.txt
-   ```
+## Key Technologies
+- Python 3.12
+- Flask with async support
+- MCard Library
+- SQLite (Async)
+- PDF.js for PDF viewing
+- Bootstrap 5 for UI
+- Font Awesome icons
 
-2. **Running the Application**:
-   ```bash
-   cd examples/mcard_crud_app
-   python app.py
-   ```
-   The application will be available at `http://localhost:5000`
+## Recent Updates
+- Added PDF content support with inline viewer
+- Implemented grid/table view toggle
+- Enhanced timestamp display consistency
+- Fixed View button functionality
+- Improved error handling and logging
+- Updated UI components for better user experience
 
-3. **Using the Application**:
-   - Visit the homepage to see existing cards
-   - Click "New Card" to create a card
-   - Use text input or file upload to add content
-   - View, download, or delete cards from the main interface
-
-## Development
-
-### Adding New Features
-1. Modify `app.py` for new routes and functionality
-2. Add templates in the `templates` directory
-3. Update static assets as needed
-
-### Best Practices
-- Use proper error handling
-- Follow Flask application factory pattern
-- Keep templates modular and reusable
-- Maintain consistent styling
-- Handle content types appropriately
-
-## Security Notes
-- The application uses a development secret key
-- Implement proper security measures for production
-- Validate all file uploads
-- Use secure database connections
-- Implement user authentication if needed
+## Roadmap
+- [ ] Add advanced filtering
+- [ ] Implement content search
+- [ ] Enhance timestamp-based operations
+- [ ] Add batch operations for multiple cards
+- [ ] Implement card content editing

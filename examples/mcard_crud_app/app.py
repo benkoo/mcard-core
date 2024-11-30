@@ -2,13 +2,124 @@ from datetime import datetime
 import json
 import os
 import mimetypes
-from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response, flash, send_file
-from mcard import MCard, MCardStorage, ContentTypeInterpreter
+from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response, flash, send_file, session, make_response
+from flask_cors import CORS
+import asyncio
+import mimetypes
+from mcard.domain.models.card import MCard
+from mcard.infrastructure.setup import MCardSetup
+from mcard.domain.dependency.interpreter import ContentTypeInterpreter
+from flask_wtf.csrf import CSRFProtect, CSRFError
+from flask_wtf import FlaskForm
+from wtforms import StringField, FileField, TextAreaField
+from wtforms.validators import DataRequired
 from urllib.parse import quote
 from io import BytesIO
+import functools
+import logging
+from logging.handlers import RotatingFileHandler
+import base64
+from markupsafe import Markup
+import uuid
 
+# Import configuration and forms
+from config import *
+from forms import TextCardForm, FileCardForm, DeleteCardForm, NewCardForm
+
+# Configure Flask app
 app = Flask(__name__)
-app.secret_key = 'dev'  # For development only. Use a secure key in production.
+app.config['SECRET_KEY'] = FLASK_SECRET_KEY
+app.config['WTF_CSRF_SECRET_KEY'] = CSRF_SECRET_KEY
+app.config['WTF_CSRF_ENABLED'] = True
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_SIZE
+
+# Configure logging
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        RotatingFileHandler(LOG_FILE, maxBytes=1024*1024, backupCount=5),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Initialize CSRF protection
+csrf = CSRFProtect(app)
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """Handle CSRF errors by redirecting to the form page."""
+    logger.error(f"CSRF error: {str(e)}")
+    flash("Invalid form submission. Please try again.", "error")
+    return redirect(url_for('index'))
+
+# Initialize CORS with CSRF support
+CORS(app, supports_credentials=True)
+
+# Initialize MCardSetup
+mcard_setup = None
+
+# Global storage variable
+storage = None
+
+async def init_mcard():
+    """Initialize MCard storage system."""
+    global storage, mcard_setup
+    try:
+        if mcard_setup is None:
+            logger.info(f"Initializing MCard with database at: {DB_PATH}")
+            mcard_setup = MCardSetup(
+                db_path=DB_PATH,
+                max_connections=DB_MAX_CONNECTIONS,
+                timeout=DB_TIMEOUT,
+                max_content_size=MAX_CONTENT_SIZE
+            )
+            await mcard_setup.initialize()
+        
+        # Ensure storage is created
+        if storage is None:
+            storage = mcard_setup.storage
+            logger.info("MCard storage initialized")
+        
+        return storage
+    except Exception as e:
+        logger.error(f"Failed to initialize MCard: {e}", exc_info=True)
+        raise
+
+async def get_storage():
+    """Get storage instance."""
+    global storage
+    try:
+        if storage is None:
+            await init_mcard()
+        return storage
+    except Exception as e:
+        logger.error(f"Failed to get storage: {e}", exc_info=True)
+        raise
+
+@app.teardown_appcontext
+async def teardown_storage(exception):
+    """Close the storage connection at the end of each request."""
+    global storage
+    if storage is not None:
+        try:
+            await storage.close()
+        except Exception as e:
+            logger.error(f"Error closing storage: {e}", exc_info=True)
+        storage = None
+
+# Async wrapper for route handlers
+def async_route(f):
+    @functools.wraps(f)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await f(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in async route {f.__name__}: {e}", exc_info=True)
+            flash(f"An error occurred: {str(e)}", "error")
+            return redirect(url_for('index'))
+    return wrapper
 
 # Add min and max functions to Jinja2 environment
 app.jinja_env.globals.update(min=min, max=max)
@@ -16,308 +127,684 @@ app.jinja_env.globals.update(min=min, max=max)
 # Add datetime filter
 @app.template_filter('datetime')
 def format_datetime(value):
-    """Format a datetime object."""
+    """Format a datetime object or timestamp string."""
     if value is None:
         return ""
-    return value.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # If it's already a datetime object, format it
+    if hasattr(value, 'strftime'):
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # If it's a string, try to parse it
+    try:
+        from datetime import datetime
+        # Try parsing ISO format or other common formats
+        parsed_datetime = datetime.fromisoformat(str(value))
+        return parsed_datetime.strftime('%Y-%m-%d %H:%M:%S')
+    except (ValueError, TypeError):
+        # If parsing fails, return the original value as a string
+        return str(value)
 
-# Initialize database path
-db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcard_crud.db")
-print(f"Using database at: {db_path}")  # Debug log
+# Register custom Jinja2 filter for timestamp conversion
+@app.template_filter('timestamp')
+def timestamp_filter(value):
+    """Convert timestamp to human-readable format."""
+    if value is None:
+        return 'Unknown'
+    try:
+        return datetime.fromtimestamp(value).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        logger.error(f"Error converting timestamp {value}: {e}")
+        return 'Invalid Timestamp'
 
-# Ensure the database directory exists
-os.makedirs(os.path.dirname(db_path), exist_ok=True)
+# Add base64 encoding filter
+@app.template_filter('b64encode')
+def b64encode_filter(s):
+    """
+    Base64 encode the input.
+    Handles both string and bytes input.
+    """
+    if isinstance(s, str):
+        s = s.encode('utf-8')
+    return base64.b64encode(s).decode('utf-8') if s else ''
 
-def get_storage():
-    """Get thread-local storage instance."""
-    if 'storage' not in g:
-        g.storage = MCardStorage(db_path)
-    return g.storage
+def base64_encode(data):
+    """Base64 encode binary data for display."""
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    return base64.b64encode(data).decode('utf-8')
 
-@app.teardown_appcontext
-def teardown_db(exception):
-    """Close database connection when app context ends."""
-    storage = g.pop('storage', None)
-    if storage is not None:
-        storage.conn.close()
+def json_format(data):
+    """Pretty print JSON data."""
+    try:
+        # If it's already a dictionary, use json.dumps
+        if isinstance(data, dict):
+            return json.dumps(data, indent=2)
+        
+        # If it's a string, try to parse and format
+        parsed_json = json.loads(data)
+        return json.dumps(parsed_json, indent=2)
+    except (TypeError, json.JSONDecodeError):
+        # If it can't be parsed, return original data
+        return data
+
+def b64encode(s):
+    """Base64 encode data for display in templates."""
+    if s is None:
+        return ''
+    if isinstance(s, str):
+        s = s.encode('utf-8')
+    return base64.b64encode(s).decode('utf-8')
+
+# Add custom Jinja2 filters to the application
+def add_template_filters():
+    """Add custom Jinja2 filters to the application."""
+    app.jinja_env.filters['b64encode'] = b64encode
+    app.jinja_env.filters['json_format'] = json_format
+
+# Call the function when the app is created
+add_template_filters()
 
 @app.route('/')
-def index():
+@async_route
+async def index():
+    """Render the index page with paginated cards."""
     try:
-        # Get pagination parameters
+        # Get storage and list cards
+        storage = await get_storage()
+        logger.info("Attempting to list cards")
+        all_cards = await storage.list()
+        logger.info(f"Retrieved {len(all_cards)} cards from storage")
+        
+        # Pagination parameters
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        per_page = 12  # Adjust as needed
         
-        # Get all cards using storage
-        storage = get_storage()
-        all_cards = list(storage.get_all())
+        # Sort cards by g_time (most recent first)
+        sorted_cards = sorted(all_cards, key=lambda card: card.g_time or 0, reverse=True)
         
-        # Calculate pagination values
-        total_items = len(all_cards)
-        total_pages = max((total_items + per_page - 1) // per_page, 1)
+        # Manual pagination
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        current_page_cards = sorted_cards[start_index:end_index]
         
-        # Ensure page is within valid range
-        page = min(max(page, 1), total_pages)
-        
-        # Slice the cards for current page
-        start_idx = (page - 1) * per_page
-        end_idx = min(start_idx + per_page, total_items)
-        page_cards = all_cards[start_idx:end_idx]
-
-        # Convert MCard objects to dictionaries with required attributes
-        current_page_cards = []
-        for card in page_cards:
-            content = card.content
-            
-            # Check for SVG content first
-            if ContentTypeInterpreter.is_svg_content(content):
-                content_type = 'image/svg+xml'
-                is_image = True
-                is_svg = True
-                extension = 'svg'  # Add this line to set extension for SVG files
-                # Ensure content is string for SVG
-                content_str = content if isinstance(content, str) else content.decode('utf-8')
-                content = content_str
-            else:
-                # Determine content type for non-SVG content
-                is_binary = isinstance(content, bytes)
-                is_svg = False
-                if is_binary:
+        # Process cards
+        processed_cards = []
+        for card in current_page_cards:
+            try:
+                # Safely extract content
+                content = card.content or b''
+                
+                # Ensure content is bytes
+                if not isinstance(content, bytes):
+                    content = str(content).encode('utf-8') if content is not None else b''
+                
+                # Detect content type
+                try:
                     content_type, _ = ContentTypeInterpreter.detect_content_type(content)
-                    content_str = None
-                    is_image = content_type.startswith('image/')
-                else:
-                    content_str = str(content)
-                    content_type = 'text/plain'
-                    is_image = False
-                    content = content_str
-
-            current_page_cards.append({
-                'content_hash': card.content_hash,
-                'content': content,
-                'content_type': content_type,
-                'is_image': is_image,
-                'is_svg': is_svg,
-                'svg_content': content_str if is_svg else None,
-                'time_claimed': card.time_claimed,
-                'is_binary': is_binary,
-                'name': f'Card {card.content_hash[:8]}'  # Generate a name if none exists
-            })
+                except Exception:
+                    content_type = 'application/octet-stream'
+                
+                is_binary = not content_type.startswith('text/')
+                
+                # Prepare content for display
+                display_content = content
+                if not is_binary:
+                    try:
+                        display_content = content.decode('utf-8').strip()
+                    except UnicodeDecodeError:
+                        display_content = str(content).strip("b'")
+                    
+                    # Additional cleaning to remove any remaining quotes or b prefix
+                    if display_content.startswith("'") and display_content.endswith("'"):
+                        display_content = display_content[1:-1]
+                    if display_content.startswith('"') and display_content.endswith('"'):
+                        display_content = display_content[1:-1]
+                    if display_content.startswith('b"') or display_content.startswith("b'"):
+                        display_content = display_content[2:-1]
+                
+                # Enhanced image detection
+                is_image = (
+                    content_type.startswith('image/') or 
+                    (is_binary and content_type == 'application/octet-stream' and 
+                        (content.startswith(b'\x89PNG') or 
+                         content.startswith(b'\xff\xd8\xff') or  # JPEG
+                         content.startswith(b'GIF87a') or 
+                         content.startswith(b'GIF89a') or 
+                         content.startswith(b'RIFF') or 
+                         content.startswith(b'WEBP')))
+                )
+                is_svg = content_type == 'image/svg+xml'
+                
+                # Image-specific handling
+                if is_image and content_type.startswith('image/'):
+                    # Ensure consistent image type detection
+                    if content_type == 'image/jpeg' and not content.startswith(b'\xff\xd8\xff'):
+                        is_image = False
+                    elif content_type == 'image/png' and not content.startswith(b'\x89PNG'):
+                        is_image = False
+                    elif content_type == 'image/gif' and not (content.startswith(b'GIF87a') or content.startswith(b'GIF89a')):
+                        is_image = False
+                
+                # SVG content handling
+                svg_content = content.decode('utf-8', errors='ignore') if is_svg else None
+                
+                # Create card dictionary with fallback values
+                card_dict = {
+                    'hash': card.hash or str(uuid.uuid4()),
+                    'content': display_content if not is_binary else None,
+                    'content_type': content_type,
+                    'is_binary': is_binary,
+                    'is_image': is_image,
+                    'is_svg': is_svg,
+                    'svg_content': svg_content,
+                    'g_time': card.g_time,
+                    'content_length': len(content)
+                }
+                
+                processed_cards.append(card_dict)
+            except Exception as card_error:
+                logger.error(f"Error processing card {card.hash}: {card_error}", exc_info=True)
+                # Add a minimal card representation to prevent total failure
+                processed_cards.append({
+                    'hash': card.hash or str(uuid.uuid4()),
+                    'content_type': 'application/octet-stream',
+                    'is_binary': True,
+                    'is_image': False,
+                    'is_svg': False,
+                    'g_time': card.g_time,
+                    'content_length': 0,
+                    'error': str(card_error)
+                })
         
-        return render_template('index.html',
-                             cards=current_page_cards,
-                             page=page,
-                             per_page=per_page,
-                             total_pages=total_pages,
-                             total_items=total_items)
+        # Pagination context
+        total_cards = len(sorted_cards)
+        total_pages = (total_cards + per_page - 1) // per_page
+        
+        # Create delete form
+        delete_form = DeleteCardForm()
+        
+        return render_template('index.html', 
+                               cards=processed_cards, 
+                               delete_form=delete_form,
+                               page=page, 
+                               total_pages=total_pages)
+        
     except Exception as e:
-        app.logger.error(f"Error in index: {str(e)}")
-        flash(f"An error occurred: {str(e)}", "error")
-        return render_template('index.html',
-                             cards=[],
-                             page=1,
-                             per_page=10,
-                             total_pages=1,
-                             total_items=0)
+        logger.error(f"Error in index route: {e}", exc_info=True)
+        flash(f"Detailed error: {str(e)}", "error")
+        return render_template('index.html', cards=[], delete_form=DeleteCardForm(), page=1, total_pages=1)
 
-@app.route('/new')
+@app.route('/new_card', methods=['GET'])
 def new_card():
-    """Display form for creating a new card."""
-    warning = request.args.get('warning')
-    hash = request.args.get('hash')
-    return render_template('new_card.html', warning=warning, hash=hash)
+    """Render the new card form."""
+    return render_template('new_card.html', form=NewCardForm())
+
+@app.route('/create_card', methods=['POST'])
+@async_route
+async def create_card():
+    """Create a new card with either text or file content."""
+    form = NewCardForm()
+    
+    if form.validate_on_submit():
+        try:
+            # Check if a file is uploaded
+            file = form.file.data
+            content = None
+            card_type = form.type.data or 'default'
+            
+            if file:
+                # If file is uploaded, prioritize file content
+                content = file.read()
+                # Detect content type from the uploaded file
+                content_type, _ = ContentTypeInterpreter.detect_content_type(content)
+            else:
+                # If no file, use text content
+                content = form.content.data.strip()
+                # Detect content type for text content
+                content_type, _ = ContentTypeInterpreter.detect_content_type(content)
+            
+            # Create and save the card
+            card = MCard(content=content)
+            
+            # Save the card
+            storage = await get_storage()
+            await storage.save(card)
+            
+            # If a type was specified, log it separately
+            if card_type and card_type != 'default':
+                logger.info(f'Card created with type: {card_type}')
+            
+            flash(f'Card created successfully', 'success')
+            return redirect(url_for('index'))
+        
+        except Exception as e:
+            logger.error(f"Error creating card: {e}", exc_info=True)
+            flash(f'Error creating card: {str(e)}', 'error')
+    
+    # If form validation fails, re-render the form with errors
+    return render_template('new_card.html', form=form)
 
 @app.route('/add_text_card', methods=['POST'])
-def add_text_card():
+@async_route
+async def add_text_card():
     """Add a new text card."""
-    app.logger.info('=== Starting add_text_card ===')
-    storage = get_storage()
-    content = request.form.get('content')
-    app.logger.info(f'Received content (first 100 chars): {content[:100] if content else None}')
+    form = TextCardForm()
+    if form.validate_on_submit():
+        try:
+            content = form.content.data.strip()
+            storage = await get_storage()
+            card = MCard(content=content)
+            await storage.save(card)
+            flash('Card created successfully', 'success')
+            return redirect(url_for('index'))
+        except Exception as e:
+            logger.error(f"Error creating text card: {e}")
+            flash(f'Error creating card: {str(e)}', 'error')
+    else:
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f'{field}: {error}', 'error')
     
-    if not content:
-        app.logger.warning('No content provided')
-        flash('No content provided', 'error')
-        return redirect(url_for('new_card'))
-
-    try:
-        app.logger.info('Checking for duplicate text content')
-        
-        # Check for duplicate content
-        app.logger.info('About to call ContentTypeInterpreter.check_duplicate_content')
-        duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
-        app.logger.info(f'Duplicate check result: {duplicate_check}')
-        
-        if duplicate_check["found"]:
-            app.logger.info(f'Found existing card with hash {duplicate_check["hash"]}')
-            return redirect(url_for('new_card', 
-                warning="This content already exists",
-                hash=duplicate_check["hash"]))
-
-        # Create and save the new card
-        app.logger.info('Creating new MCard')
-        card = MCard(content=content)
-        app.logger.info(f'Generated hash for new card: {card.content_hash}')
-        storage.save(card)
-        app.logger.info(f'Successfully added text content with hash {card.content_hash}')
-        return redirect(url_for('index'))
-    except Exception as e:
-        app.logger.error(f'Error adding text content: {str(e)}')
-        flash(f'Error: {str(e)}', 'error')
-        return redirect(url_for('new_card'))
+    return redirect(url_for('new_card'))
 
 @app.route('/add_file_card', methods=['POST'])
-def add_file_card():
+@async_route
+async def add_file_card():
     """Add a new file card."""
-    storage = get_storage()
-    if 'file' not in request.files:
-        flash('No file provided', 'error')
-        return redirect(url_for('new_card'))
-
-    file = request.files['file']
-    if file.filename == '':
-        flash('No file selected', 'error')
-        return redirect(url_for('new_card'))
-
-    try:
-        # Read file content as bytes
-        content = file.read()
-        app.logger.info('Checking for duplicate file content')
-        
-        # Check for duplicate content
-        duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
-        if duplicate_check["found"]:
-            app.logger.info(f'Found existing card with hash {duplicate_check["hash"]}')
-            return redirect(url_for('new_card',
-                warning="This content already exists",
-                hash=duplicate_check["hash"]))
-
-        # Create and save the new card
-        card = MCard(content=content)
-        storage.save(card)
-        app.logger.info(f'Successfully added file content with hash {card.content_hash}')
-        return redirect(url_for('index'))
-    except Exception as e:
-        app.logger.error(f'Error adding file content: {str(e)}')
-        flash(f'Error: {str(e)}', 'error')
-        return redirect(url_for('new_card'))
-
-@app.route('/view/<content_hash>')
-def view_card(content_hash):
-    """View a card's content."""
-    storage = get_storage()
-    card = storage.get(content_hash)
-    
-    if not card:
-        flash('No card found', 'error')
-        return redirect(url_for('index'))
-    
-    content = card.content
-    is_binary = isinstance(content, bytes)
-    
-    # Get content size
-    size = len(content) if content else 0
-    
-    # Check for SVG content first
-    if ContentTypeInterpreter.is_svg_content(content):
-        content_type = 'image/svg+xml'
-        is_image = True
-        is_svg = True
-        extension = 'svg'  # Add this line to set extension for SVG files
-        # Ensure content is string for SVG
-        content = content if isinstance(content, str) else content.decode('utf-8')
+    form = FileCardForm()
+    if form.validate_on_submit():
+        try:
+            file = form.file.data
+            if file:
+                # Log file details
+                logger.info(f"Uploading file: {file.filename}")
+                logger.info(f"File type: {file.content_type}")
+                
+                # Read file content safely
+                content = file.read()
+                
+                # Extensive logging for debugging
+                logger.info(f"Raw content type: {type(content)}")
+                logger.info(f"Raw content length: {len(content) if content is not None else 'N/A'}")
+                
+                # Ensure content is bytes
+                if content is None:
+                    logger.error("File content is None")
+                    flash("Error: Unable to read file content", 'error')
+                    return redirect(url_for('new_card'))
+                
+                if not isinstance(content, bytes):
+                    try:
+                        content = content.encode('utf-8') if isinstance(content, str) else bytes(content)
+                    except Exception as encode_error:
+                        logger.error(f"Error converting content to bytes: {encode_error}")
+                        flash(f"Error processing file: {encode_error}", 'error')
+                        return redirect(url_for('new_card'))
+                
+                # Detect content type
+                try:
+                    content_type, file_ext = ContentTypeInterpreter.detect_content_type(content)
+                    logger.info(f"Detected content type: {content_type}")
+                    logger.info(f"Detected file extension: {file_ext}")
+                except Exception as type_error:
+                    logger.error(f"Error detecting content type: {type_error}")
+                    content_type = 'application/octet-stream'
+                    file_ext = ''
+                
+                storage = await get_storage()
+                card = MCard(content=content)
+                await storage.save(card)
+                
+                # Log successful upload
+                logger.info(f"Uploaded file: {file.filename}, Content Type: {content_type}, Size: {len(content)} bytes, Hash: {card.hash}")
+                
+                flash(f'File "{file.filename}" uploaded successfully', 'success')
+                return redirect(url_for('index'))
+            else:
+                logger.warning("No file uploaded")
+                flash("Please select a file to upload", 'warning')
+        except Exception as e:
+            logger.error(f"Comprehensive error uploading file: {e}", exc_info=True)
+            flash(f'Error uploading file: {str(e)}', 'error')
     else:
-        # Determine content type for non-SVG content
-        is_svg = False
-        if is_binary:
-            content_type, extension = ContentTypeInterpreter.detect_content_type(content)
-            is_image = content_type.startswith('image/')
-            content = None  # Don't pass binary content to template
-        else:
-            content = str(content)
-            content_type = 'text/plain'
-            extension = 'txt'
-            is_image = False
+        for field, errors in form.errors.items():
+            for error in errors:
+                logger.warning(f"Form validation error - {field}: {error}")
+                flash(f'{field}: {error}', 'error')
     
-    return render_template('view_card.html',
-                         card=card,
-                         content=content,
-                         content_type=content_type,
-                         extension=extension,
-                         size=size,
-                         is_binary=is_binary,
-                         is_image=is_image,
-                         is_svg=is_svg)
+    return redirect(url_for('new_card'))
 
-@app.route('/binary/<content_hash>')
-def get_binary_content(content_hash):
-    """Serve binary content with proper content type."""
-    storage = get_storage()
-    card = storage.get(content_hash)
+@app.route('/view/<hash>')
+@async_route
+async def view_card(hash):
+    """View a specific card."""
+    try:
+        # Log the request
+        logger.info(f"View card request received for hash: {hash}")
+        
+        # Ensure storage is initialized
+        storage = await get_storage()
+        logger.info(f"Storage initialized, attempting to list cards")
+        
+        # Fetch all cards to find the specific card
+        try:
+            all_cards = await storage.list()
+            logger.info(f"Retrieved {len(all_cards)} cards from storage")
+        except Exception as list_error:
+            logger.error(f"Error listing cards: {list_error}")
+            flash("Unable to retrieve cards from storage.", "error")
+            return redirect(url_for('index'))
+        
+        # Find the card with the matching hash
+        target_card = next((card for card in all_cards if card.hash == hash), None)
+        
+        if target_card is None:
+            logger.error(f"Card with hash {hash} not found")
+            flash(f"Card with hash {hash} not found.", "error")
+            return redirect(url_for('index'))
+        
+        logger.info(f"Found card with hash {hash}, processing content")
+        
+        # Determine content type and handle different content types
+        content = target_card.content
+        
+        # Ensure content is valid
+        if content is None:
+            content = b''
+        
+        # Ensure content is bytes
+        if not isinstance(content, bytes):
+            content = str(content).encode('utf-8') if content is not None else b''
+        
+        # Detect content type
+        try:
+            content_type, _ = ContentTypeInterpreter.detect_content_type(content)
+        except Exception:
+            content_type = 'application/octet-stream'
+        
+        is_binary = not content_type.startswith('text/')
+        
+        # Prepare content for display
+        display_content = content
+        if not is_binary:
+            try:
+                display_content = content.decode('utf-8').strip()
+            except UnicodeDecodeError:
+                display_content = str(content).strip("b'")
+            
+            # Additional cleaning to remove any remaining quotes or b prefix
+            if display_content.startswith("'") and display_content.endswith("'"):
+                display_content = display_content[1:-1]
+            if display_content.startswith('"') and display_content.endswith('"'):
+                display_content = display_content[1:-1]
+            if display_content.startswith('b"') or display_content.startswith("b'"):
+                display_content = display_content[2:-1]
+        
+        # Enhanced image detection
+        is_image = (
+            content_type.startswith('image/') or 
+            (is_binary and content_type == 'application/octet-stream' and 
+                (content.startswith(b'\x89PNG') or 
+                 content.startswith(b'\xff\xd8\xff') or  # JPEG
+                 content.startswith(b'GIF87a') or 
+                 content.startswith(b'GIF89a') or 
+                 content.startswith(b'RIFF') or 
+                 content.startswith(b'WEBP')))
+        )
+        is_svg = content_type == 'image/svg+xml'
+        
+        # Image-specific handling
+        if is_image and content_type.startswith('image/'):
+            # Ensure consistent image type detection
+            if content_type == 'image/jpeg' and not content.startswith(b'\xff\xd8\xff'):
+                is_image = False
+            elif content_type == 'image/png' and not content.startswith(b'\x89PNG'):
+                is_image = False
+            elif content_type == 'image/gif' and not (content.startswith(b'GIF87a') or content.startswith(b'GIF89a')):
+                is_image = False
+        
+        # SVG content handling
+        svg_content = content.decode('utf-8', errors='ignore') if is_svg else None
+        
+        # Ensure PDF content is handled correctly
+        if content_type == 'application/pdf':
+            # Verify PDF signature
+            if not content.startswith(b'%PDF-'):
+                logger.warning(f"Invalid PDF signature for card {hash}")
+                content_type = 'application/octet-stream'
+        
+        # Prepare delete form
+        delete_form = DeleteCardForm()
+        
+        # Prepare card context
+        card = {
+            'hash': target_card.hash,
+            'content': display_content if not is_binary else None,
+            'content_type': content_type,
+            'is_binary': is_binary,
+            'is_image': is_image,
+            'is_svg': is_svg,
+            'svg_content': svg_content,
+            'g_time': target_card.g_time,
+            'content_length': len(content)
+        }
+        
+        logger.info(f"Rendering view_card.html template for card {hash}")
+        return render_template('view_card.html', 
+                             card=card,
+                             delete_form=delete_form)
     
-    if not card or not isinstance(card.content, bytes):
-        return 'No binary content found', 404
-    
-    content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
-    return Response(card.content, mimetype=content_type)
-
-@app.route('/download/<content_hash>')
-def download_card(content_hash):
-    """Download a card's content."""
-    storage = get_storage()
-    card = storage.get(content_hash)
-    
-    if not card:
-        flash('No card found', 'error')
+    except Exception as e:
+        logger.error(f"Error while viewing card: {e}", exc_info=True)
+        flash(f"An error occurred while viewing the card: {str(e)}", "error")
         return redirect(url_for('index'))
+
+@app.route('/delete/<hash>', methods=['POST'])
+@async_route
+async def delete_card(hash):
+    """Delete a specific card."""
+    try:
+        logger.info(f"Attempting to delete card with hash: {hash}")
+        
+        # Verify CSRF token
+        form = DeleteCardForm()
+        if not form.validate_on_submit():
+            logger.error(f"CSRF validation failed: {form.errors}")
+            flash("Invalid form submission", "error")
+            return redirect(url_for('index'))
+        
+        # Get storage and delete card
+        storage = await get_storage()
+        await storage.remove(hash)
+        logger.info(f"Successfully deleted card {hash}")
+        flash(f"Card deleted successfully.", "success")
+        
+    except Exception as e:
+        logger.error(f"Error deleting card: {e}", exc_info=True)
+        flash(f"Error deleting card: {str(e)}", "error")
     
-    content = card.content
-    is_binary = isinstance(content, bytes)
+    return redirect(url_for('index'))
+
+@app.route('/binary/<hash>')
+@async_route
+async def get_binary_content(hash):
+    """Retrieve binary content for a specific card."""
+    try:
+        # Ensure storage is initialized
+        storage = await get_storage()
+        
+        # Find the card
+        try:
+            target_card = await storage.get(hash)
+        except Exception as get_error:
+            logger.error(f"Error retrieving card {hash}: {get_error}")
+            return '', 404
+        
+        # Ensure content is valid
+        content = target_card.content
+        if content is None:
+            logger.warning(f"Card {hash} has no content")
+            return '', 404
+        
+        # Ensure content is bytes
+        if not isinstance(content, bytes):
+            content = str(content).encode('utf-8') if content is not None else b''
+        
+        # Detect content type
+        try:
+            content_type, _ = ContentTypeInterpreter.detect_content_type(content)
+        except Exception:
+            content_type = 'application/octet-stream'
+        
+        # Create response with appropriate headers
+        response = make_response(content)
+        response.headers.set('Content-Type', content_type)
+        response.headers.set('Cache-Control', 'public, max-age=3600')  # Cache for 1 hour
+        
+        return response
     
-    if is_binary:
-        content_type, extension = ContentTypeInterpreter.detect_content_type(content)
-        filename = f"card_{content_hash[:8]}.{extension}"
-        return send_file(
-            BytesIO(content),
+    except Exception as e:
+        logger.error(f"Error serving binary content for card {hash}: {e}", exc_info=True)
+        return '', 500
+
+@app.route('/download/<hash>')
+@async_route
+async def download_card(hash):
+    """Download a card's content."""
+    try:
+        # Ensure storage is initialized
+        storage = await get_storage()
+        
+        # Find the card
+        try:
+            target_card = await storage.get(hash)
+        except Exception as get_error:
+            logger.error(f"Error retrieving card {hash}: {get_error}")
+            flash("Card not found", "error")
+            return redirect(url_for('index'))
+        
+        # Ensure content is valid
+        content = target_card.content
+        if content is None:
+            logger.warning(f"Card {hash} has no content")
+            flash("No content available for download", "warning")
+            return redirect(url_for('index'))
+        
+        # Ensure content is bytes
+        if not isinstance(content, bytes):
+            content = str(content).encode('utf-8') if content is not None else b''
+        
+        # Detect content type
+        try:
+            content_type, file_ext = ContentTypeInterpreter.detect_content_type(content)
+        except Exception:
+            content_type = 'application/octet-stream'
+            file_ext = ''
+        
+        # Generate filename
+        filename = f"{hash}.{file_ext}" if file_ext else f"{hash}"
+        
+        # Create response with appropriate headers
+        response = send_file(
+            io.BytesIO(content),
             mimetype=content_type,
             as_attachment=True,
             download_name=filename
         )
-    else:
-        # For text content, create a text file
-        content_str = str(content)
-        filename = f"card_{content_hash[:8]}.txt"
-        return send_file(
-            BytesIO(content_str.encode('utf-8')),
-            mimetype='text/plain',
-            as_attachment=True,
-            download_name=filename
-        )
+        
+        return response
+    
+    except Exception as e:
+        logger.error(f"Error downloading card {hash}: {e}", exc_info=True)
+        flash("Error downloading card", "error")
+        return redirect(url_for('index'))
 
-@app.route('/delete/<content_hash>', methods=['POST'])
-def delete(content_hash):
-    """Delete a card."""
-    storage = get_storage()
-    storage.delete(content_hash)
-    flash('Card deleted successfully', 'success')
-    return redirect(url_for('index'))
-
-@app.route('/thumbnail/<content_hash>')
-def serve_thumbnail(content_hash):
+@app.route('/thumbnail/<hash>')
+@async_route
+async def serve_thumbnail(hash):
     """Serve thumbnail for image content."""
-    storage = get_storage()
-    card = storage.get(content_hash)
+    storage = await get_storage()
+    try:
+        # Retrieve the card
+        all_cards = await storage.list()
+        card = next((c for c in all_cards if c.hash == hash), None)
+        
+        if not card or not isinstance(card.content, bytes):
+            flash('Thumbnail not found', 'error')
+            return redirect(url_for('index'))
+        
+        # Determine content type
+        content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
+        # Check if it's an image
+        if not content_type.startswith('image/'):
+            flash('Not an image', 'error')
+            return redirect(url_for('index'))
+        
+        # Here you would typically generate a thumbnail
+        # For now, just return the original image
+        return send_file(
+            BytesIO(card.content),
+            mimetype=content_type,
+            as_attachment=False
+        )
     
-    if not card or not isinstance(card.content, bytes):
-        return 'No image content found', 404
-    
-    content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
-    if not content_type.startswith('image/'):
-        return 'Not an image', 400
-    
-    # For now, just serve the original image
-    # TODO: Implement actual thumbnail generation
-    return Response(card.content, mimetype=content_type)
+    except Exception as e:
+        app.logger.error(f'Error serving thumbnail: {str(e)}')
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/pdf/<hash>')
+@async_route
+async def get_pdf_content(hash):
+    """Serve PDF content directly."""
+    try:
+        storage = await get_storage()
+        target_card = await storage.get(hash)
+        
+        if not target_card or not target_card.content:
+            return '', 404
+            
+        # Verify it's actually a PDF
+        if not target_card.content.startswith(b'%PDF-'):
+            return 'Not a valid PDF', 400
+            
+        response = make_response(target_card.content)
+        response.headers.set('Content-Type', 'application/pdf')
+        response.headers.set('Content-Disposition', 'inline')
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error serving PDF content for {hash}: {e}")
+        return str(e), 500
+
+def get_file_extension(content_type):
+    if content_type == 'image/jpeg':
+        return '.jpg'
+    elif content_type == 'image/png':
+        return '.png'
+    elif content_type == 'image/gif':
+        return '.gif'
+    elif content_type == 'image/bmp':
+        return '.bmp'
+    elif content_type == 'image/tiff':
+        return '.tiff'
+    elif content_type == 'image/webp':
+        return '.webp'
+    elif content_type == 'image/svg+xml':
+        return '.svg'
+    elif content_type == 'application/pdf':
+        return '.pdf'
+    elif content_type == 'text/plain':
+        return '.txt'
+    elif content_type == 'application/json':
+        return '.json'
+    elif content_type == 'application/xml':
+        return '.xml'
+    else:
+        return ''
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Initialize MCard before running the app
+    asyncio.run(init_mcard())
+    app.run(debug=DEBUG, port=PORT)

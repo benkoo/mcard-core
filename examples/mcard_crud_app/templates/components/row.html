@@ -1,15 +1,16 @@
 {% from 'components/actions.html' import render_actions %}
 
-{% macro render_row(card) %}
+{% macro render_row(card, delete_form) %}
 <style>
     .preview-cell {
         width: 70px;
         max-width: 100px;
         height: 75px !important;
+        vertical-align: middle !important;
     }
     
     .preview-container {
-        height: 40px;
+        height: 65px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -33,52 +34,99 @@
     .text-preview {
         padding: 5px;
         width: 100%;
-        overflow: auto;
+        overflow: hidden;
         max-height: 65px;
+        font-size: 0.875rem;
+        color: #495057;
+    }
+
+    .content-type {
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-family: monospace;
+    }
+
+    .hash-cell {
+        font-family: monospace;
+        font-size: 0.875rem;
+        color: #495057;
+    }
+
+    td {
+        vertical-align: middle !important;
+        padding: 0.75rem !important;
+    }
+
+    .timestamp {
+        font-size: 0.875rem;
+        color: #6c757d;
+        white-space: nowrap;
     }
 </style>
 
 <tr>
     <!-- Preview -->
     <td class="preview-cell">
-        {% if card.is_image %}
-            {% if card.is_svg and card.svg_content %}
-                <div class="preview-container">
-                    {{ card.svg_content|safe }}
-                </div>
-            {% else %}
-                <div class="preview-container">
-                    <img src="{{ url_for('get_binary_content', content_hash=card.content_hash) }}" alt="Preview">
-                </div>
-            {% endif %}
-        {% else %}
-            {% if card.content %}
-                <div class="preview-container">
-                    <div class="text-preview">
-                        <pre style="margin: 0; font-size: 0.875rem;">{{ card.content[:100] }}...</pre>
+        <div class="card-preview">
+            {% if card.is_image or (card.is_binary and card.content_type.startswith('image/')) %}
+                {% if card.is_svg and card.svg_content %}
+                    <div class="card-img-top svg-preview">
+                        {{ card.svg_content|safe }}
                     </div>
+                {% else %}
+                    <img src="{{ url_for('get_binary_content', hash=card.hash) }}" 
+                         class="card-img-top" 
+                         alt="Card Image" 
+                         onerror="this.onerror=null; this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+                    <div class="card-img-top binary-preview text-center d-none">
+                        <div class="p-3 text-muted">
+                            <span class="d-block">{{ card.content_type or 'Unknown Image' }}</span>
+                            <small>{{ card.content_length or 0 }} bytes</small>
+                        </div>
+                    </div>
+                {% endif %}
+            {% elif card.content_type.startswith('text/') %}
+                <div class="card-img-top text-preview p-3">
+                    <pre style="margin: 0; font-size: 0.85rem; max-height: 150px; overflow: hidden;">{{ card.content[:300] }}{% if card.content|length > 300 %}...{% endif %}</pre>
                 </div>
             {% else %}
-                <div class="preview-container">
-                    [Binary Content]
+                <div class="text-center py-4">
+                    {% if card.content_type == 'application/pdf' %}
+                        <i class="bi bi-file-pdf text-danger" style="font-size: 2.5rem;"></i>
+                        <div class="mt-2 small text-muted">
+                            {{ card.content_length | default(0) | filesizeformat }}
+                        </div>
+                    {% elif card.is_binary %}
+                        <div class="text-muted">
+                            <span class="d-block">{{ card.content_type }}</span>
+                            <small>{{ card.content_length | default(0) | filesizeformat }}</small>
+                        </div>
+                    {% endif %}
                 </div>
             {% endif %}
+        </div>
+    </td>
+    
+    <!-- Type -->
+    <td class="content-type">
+        {% if card.content_type %}
+            {{ card.content_type }}
+        {% else %}
+            <span class="text-muted">Unknown</span>
         {% endif %}
     </td>
     
-    <!-- Name -->
-    <td>{{ card.name if card.name else 'Untitled' }}</td>
-    
-    <!-- Type -->
-    <td>{{ card.content_type }}</td>
-    
     <!-- Hash -->
-    <td><code>{{ card.content_hash }}</code></td>
+    <td class="hash-cell">{{ card.hash }}</td>
     
-    <!-- Created At -->
-    <td>{{ card.time_claimed.strftime('%Y-%m-%d %H:%M:%S') if card.time_claimed else 'N/A' }}</td>
+    <!-- Timestamp -->
+    <td class="timestamp">
+        {{ card.g_time|datetime if card.g_time else 'Unknown' }}
+    </td>
     
     <!-- Actions -->
-    <td>{{ render_actions(card) }}</td>
+    <td class="action-cell">
+        {{ render_actions(card, delete_form) }}
+    </td>
 </tr>
 {% endmacro %}

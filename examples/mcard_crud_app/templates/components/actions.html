@@ -1,7 +1,9 @@
-{% macro render_actions(card) %}
+{% macro render_actions(card, delete_form) %}
 <div class="btn-group" role="group">
-    <a href="{{ url_for('view_card', content_hash=card.content_hash) }}" class="btn btn-primary btn-sm">View</a>
-    <form action="{{ url_for('delete', content_hash=card.content_hash) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this card?');">
+    <a href="{{ url_for('view_card', hash=card.hash) }}" class="btn btn-primary btn-sm">View</a>
+    <form action="{{ url_for('delete_card', hash=card.hash) }}" method="POST" class="d-inline" style="margin: 0; padding: 0;" onsubmit="return confirm('Are you sure you want to delete this card? This action cannot be undone.');">
+        {{ delete_form.csrf_token }}
+        <input type="hidden" name="hash" value="{{ card.hash }}">
         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
     </form>
 </div>

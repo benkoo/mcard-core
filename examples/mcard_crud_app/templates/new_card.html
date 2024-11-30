@@ -1,63 +1,75 @@
 {% extends "base.html" %}
-{% from "hash_display.html" import render_hash %}
-
-{% block title %}MCard CRUD App - New Card{% endblock %}
 
 {% block content %}
-<div class="content-container">
-    {% if warning %}
-    <div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
-        <div class="d-flex align-items-center">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            <div>
-                <strong>{{ warning }}</strong>
-                {% if hash %}
-                <div class="mt-1">
-                    Existing content hash: {{ render_hash(hash) }}
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    {% endif %}
-
-    <h1 class="mb-4">Create New Card</h1>
-
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Text Content</h5>
-                </div>
-                <div class="card-body">
-                    <form id="textForm" method="POST" action="{{ url_for('add_text_card') }}">
-                        <div class="mb-3">
-                            <label for="content" class="form-label">Content</label>
-                            <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Save
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">File Upload</h5>
+                    <ul class="nav nav-tabs card-header-tabs" id="cardInputTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="text-tab" data-bs-toggle="tab" data-bs-target="#text-pane" type="button" role="tab" aria-controls="text-pane" aria-selected="true">
+                                Text Input
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="file-tab" data-bs-toggle="tab" data-bs-target="#file-pane" type="button" role="tab" aria-controls="file-pane" aria-selected="false">
+                                File Upload
+                            </button>
+                        </li>
+                    </ul>
                 </div>
-                <div class="card-body" id="dropZone">
-                    <form id="fileForm" method="POST" action="{{ url_for('add_file_card') }}" enctype="multipart/form-data">
-                        <div class="mb-3">
-                            <label for="file" class="form-label">Choose File</label>
-                            <input type="file" class="form-control" id="file" name="file" required>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('create_card') }}" enctype="multipart/form-data" id="cardForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="tab-content" id="cardInputTabsContent">
+                            <div class="tab-pane fade show active" id="text-pane" role="tabpanel" aria-labelledby="text-tab">
+                                <div class="mb-3">
+                                    {{ form.content.label(class="form-label") }}
+                                    {{ form.content(class="form-control", rows=5, id="content-input") }}
+                                    {% if form.content.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.content.errors %}
+                                                <span>{{ error }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane fade" id="file-pane" role="tabpanel" aria-labelledby="file-tab">
+                                <div class="mb-3">
+                                    {{ form.file.label(class="form-label") }}
+                                    {{ form.file(class="form-control", id="file-input", onchange="handleFileUpload(this)") }}
+                                    {% if form.file.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.file.errors %}
+                                                <span>{{ error }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div id="file-preview" class="mt-2"></div>
+                                </div>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-upload"></i> Upload
-                        </button>
+                        
+                        <div class="mb-3">
+                            {{ form.type.label(class="form-label") }}
+                            {{ form.type(class="form-control", placeholder="Optional: Specify card type") }}
+                            {% if form.type.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.type.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary" id="createCardBtn">Create Card</button>
+                            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -66,45 +78,63 @@
 </div>
 {% endblock %}
 
-{% block extra_scripts %}
+{% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('file');
+    function handleFileUpload(fileInput) {
+        const contentInput = document.getElementById('content-input');
+        const createCardBtn = document.getElementById('createCardBtn');
+        const filePreview = document.getElementById('file-preview');
+        
+        if (fileInput.files.length > 0) {
+            contentInput.disabled = true;
+            contentInput.value = ''; // Clear text input
+            contentInput.placeholder = 'File content will be used instead of text';
+            createCardBtn.disabled = false;
+            
+            // Display file preview
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                filePreview.innerHTML = `<p>Selected file: ${file.name}</p>`;
+            };
+            reader.readAsText(file);
+        } else {
+            contentInput.disabled = false;
+            contentInput.placeholder = '';
+            createCardBtn.disabled = contentInput.value.trim() === '';
+            filePreview.innerHTML = '';
+        }
+    }
 
-    // Add drag and drop support
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
+    // Ensure only one input method is active at a time
+    document.addEventListener('DOMContentLoaded', function() {
+        const textTab = document.getElementById('text-tab');
+        const fileTab = document.getElementById('file-tab');
+        const contentInput = document.getElementById('content-input');
+        const fileInput = document.querySelector('input[type="file"]');
+        const createCardBtn = document.getElementById('createCardBtn');
+
+        // Initial button state
+        createCardBtn.disabled = true;
+
+        // Text input event listeners
+        contentInput.addEventListener('input', function() {
+            fileInput.value = ''; // Clear file input
+            createCardBtn.disabled = this.value.trim() === '';
+        });
+
+        textTab.addEventListener('shown.bs.tab', function() {
+            fileInput.value = ''; // Clear file input
+            contentInput.disabled = false;
+            createCardBtn.disabled = contentInput.value.trim() === '';
+        });
+
+        fileTab.addEventListener('shown.bs.tab', function() {
+            contentInput.value = ''; // Clear text input
+            contentInput.disabled = true;
+            createCardBtn.disabled = true;
+            contentInput.placeholder = 'Switch to Text Input tab to enter text';
+        });
     });
-
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, highlight, false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, unhighlight, false);
-    });
-
-    function highlight(e) {
-        dropZone.classList.add('bg-light');
-    }
-
-    function unhighlight(e) {
-        dropZone.classList.remove('bg-light');
-    }
-
-    dropZone.addEventListener('drop', handleDrop, false);
-
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        fileInput.files = files;
-    }
-});
 </script>
 {% endblock %}

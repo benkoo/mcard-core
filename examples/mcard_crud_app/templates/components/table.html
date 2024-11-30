@@ -1,26 +1,25 @@
 {% from 'components/row.html' import render_row %}
 
-{% macro render_table(cards) %}
+{% macro render_table(cards, delete_form) %}
 <div class="table-responsive">
     <table class="table table-hover align-middle">
         <thead>
             <tr>
                 <th>Preview</th>
-                <th>Name</th>
                 <th>Type</th>
                 <th>Hash</th>
-                <th>Created At</th>
+                <th>g_time</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% if cards %}
                 {% for card in cards %}
-                    {{ render_row(card) }}
+                    {{ render_row(card, delete_form) }}
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="6" class="text-center">No cards found</td>
+                    <td colspan="5" class="text-center">No cards found</td>
                 </tr>
             {% endif %}
         </tbody>
