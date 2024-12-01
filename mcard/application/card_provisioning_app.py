@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from mcard.domain.models.card import MCard
 from mcard.domain.models.protocols import CardStore
 from mcard.domain.models.hashing_protocol import HashingService
+from mcard.domain.services.hashing import get_hashing_service
 from mcard.domain.models.exceptions import StorageError
 import json
 import asyncio
@@ -281,6 +282,22 @@ class CardProvisioningApp:
             List of MCard instances
         """
         return await self.store.get_all(limit=limit, offset=offset)
+
+    async def list_cards_by_content(self, content: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
+        """List cards with optional content filtering and pagination.
+        
+        Args:
+            content: Optional content string to filter cards by
+            limit: Maximum number of cards to return
+            offset: Number of cards to skip
+            
+        Returns:
+            List of MCard instances matching the content filter
+        """
+        if content is None:
+            return await self.list_provisioned_cards(limit=limit, offset=offset)
+            
+        return await self.store.list(content=content, limit=limit, offset=offset)
 
     async def decommission_card(self, hash_str: str) -> None:
         """Decommission (delete) a card by its hash.
