@@ -3,7 +3,7 @@ import json
 import os
 import mimetypes
 from flask import Flask, render_template, request, redirect, url_for, g, jsonify, Response, flash, send_file
-from mcard import MCard, MCardStorage, ContentTypeInterpreter
+from mcard import MCard, SQLiteRepository as MCardStorage, ContentTypeInterpreter, DatabaseSettings
 from urllib.parse import quote
 from io import BytesIO
 
@@ -11,7 +11,19 @@ app = Flask(__name__)
 app.secret_key = 'dev'  # For development only. Use a secure key in production.
 
 # Add min and max functions to Jinja2 environment
-app.jinja_env.globals.update(min=min, max=max)
+def format_time(time_value):
+    if time_value is None:
+        return 'N/A'
+    if isinstance(time_value, str):
+        try:
+            time_value = datetime.fromisoformat(time_value)
+        except ValueError:
+            return 'N/A'
+    if isinstance(time_value, datetime):
+        return time_value.strftime('%Y-%m-%d %H:%M:%S')
+    return 'N/A'
+
+app.jinja_env.globals.update(min=min, max=max, format_time=format_time)
 
 # Add datetime filter
 @app.template_filter('datetime')
@@ -19,6 +31,11 @@ def format_datetime(value):
     """Format a datetime object."""
     if value is None:
         return ""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return value
     return value.strftime('%Y-%m-%d %H:%M:%S')
 
 # Initialize database path
@@ -38,8 +55,9 @@ def get_storage():
 def teardown_db(exception):
     """Close database connection when app context ends."""
     storage = g.pop('storage', None)
-    if storage is not None:
-        storage.conn.close()
+    if storage is not None and hasattr(storage, '_local'):
+        if hasattr(storage._local, 'connection'):
+            storage._local.connection.close()
 
 @app.route('/')
 def index():
@@ -50,7 +68,15 @@ def index():
         
         # Get all cards using storage
         storage = get_storage()
-        all_cards = list(storage.get_all())
+        all_cards = []
+        with storage.connection as conn:
+            cursor = conn.execute("SELECT * FROM card ORDER BY g_time DESC")
+            for row in cursor:
+                all_cards.append({
+                    'hash': row['hash'],
+                    'content': row['content'],
+                    'g_time': row['g_time']
+                })
         
         # Calculate pagination values
         total_items = len(all_cards)
@@ -64,17 +90,17 @@ def index():
         end_idx = min(start_idx + per_page, total_items)
         page_cards = all_cards[start_idx:end_idx]
 
-        # Convert MCard objects to dictionaries with required attributes
+        # Convert cards to dictionaries with required attributes
         current_page_cards = []
         for card in page_cards:
-            content = card.content
+            content = card['content']
             
             # Check for SVG content first
             if ContentTypeInterpreter.is_svg_content(content):
                 content_type = 'image/svg+xml'
                 is_image = True
                 is_svg = True
-                extension = 'svg'  # Add this line to set extension for SVG files
+                extension = 'svg'
                 # Ensure content is string for SVG
                 content_str = content if isinstance(content, str) else content.decode('utf-8')
                 content = content_str
@@ -92,17 +118,16 @@ def index():
                     is_image = False
                     content = content_str
 
-            current_page_cards.append({
-                'content_hash': card.content_hash,
+            card.update({
                 'content': content,
                 'content_type': content_type,
                 'is_image': is_image,
                 'is_svg': is_svg,
                 'svg_content': content_str if is_svg else None,
-                'time_claimed': card.time_claimed,
                 'is_binary': is_binary,
-                'name': f'Card {card.content_hash[:8]}'  # Generate a name if none exists
+                'name': f'Card {card["hash"][:8]}'  # Generate a name if none exists
             })
+            current_page_cards.append(card)
         
         return render_template('index.html',
                              cards=current_page_cards,
@@ -143,23 +168,32 @@ def add_text_card():
     try:
         app.logger.info('Checking for duplicate text content')
         
-        # Check for duplicate content
-        app.logger.info('About to call ContentTypeInterpreter.check_duplicate_content')
-        duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
-        app.logger.info(f'Duplicate check result: {duplicate_check}')
+        # Create temporary MCard to generate hash
+        temp_card = MCard(content=content)
+        card = {
+            'hash': temp_card.hash,
+            'content': content,
+            'g_time': temp_card.g_time
+        }
         
-        if duplicate_check["found"]:
-            app.logger.info(f'Found existing card with hash {duplicate_check["hash"]}')
-            return redirect(url_for('new_card', 
-                warning="This content already exists",
-                hash=duplicate_check["hash"]))
+        # Check for duplicate content
+        app.logger.info('About to check for duplicate content')
+        with storage.connection as conn:
+            cursor = conn.execute("SELECT hash FROM card WHERE hash = ?", (card['hash'],))
+            if cursor.fetchone():
+                app.logger.info(f'Found existing card with hash {card["hash"]}')
+                return redirect(url_for('new_card', 
+                    warning="This content already exists",
+                    hash=card['hash']))
 
-        # Create and save the new card
-        app.logger.info('Creating new MCard')
-        card = MCard(content=content)
-        app.logger.info(f'Generated hash for new card: {card.content_hash}')
-        storage.save(card)
-        app.logger.info(f'Successfully added text content with hash {card.content_hash}')
+            # Save the new card
+            app.logger.info('Saving new MCard')
+            conn.execute(
+                "INSERT INTO card (hash, content, g_time) VALUES (?, ?, ?)",
+                (card['hash'], card['content'], card['g_time'])
+            )
+            
+        app.logger.info(f'Successfully added text content with hash {card["hash"]}')
         return redirect(url_for('index'))
     except Exception as e:
         app.logger.error(f'Error adding text content: {str(e)}')
@@ -184,18 +218,30 @@ def add_file_card():
         content = file.read()
         app.logger.info('Checking for duplicate file content')
         
+        # Create temporary MCard to generate hash
+        temp_card = MCard(content=content)
+        card = {
+            'hash': temp_card.hash,
+            'content': content,
+            'g_time': temp_card.g_time
+        }
+        
         # Check for duplicate content
-        duplicate_check = ContentTypeInterpreter.check_duplicate_content(storage, content)
-        if duplicate_check["found"]:
-            app.logger.info(f'Found existing card with hash {duplicate_check["hash"]}')
-            return redirect(url_for('new_card',
-                warning="This content already exists",
-                hash=duplicate_check["hash"]))
+        with storage.connection as conn:
+            cursor = conn.execute("SELECT hash FROM card WHERE hash = ?", (card['hash'],))
+            if cursor.fetchone():
+                app.logger.info(f'Found existing card with hash {card["hash"]}')
+                return redirect(url_for('new_card',
+                    warning="This content already exists",
+                    hash=card['hash']))
 
-        # Create and save the new card
-        card = MCard(content=content)
-        storage.save(card)
-        app.logger.info(f'Successfully added file content with hash {card.content_hash}')
+            # Save the new card
+            conn.execute(
+                "INSERT INTO card (hash, content, g_time) VALUES (?, ?, ?)",
+                (card['hash'], card['content'], card['g_time'])
+            )
+            
+        app.logger.info(f'Successfully added file content with hash {card["hash"]}')
         return redirect(url_for('index'))
     except Exception as e:
         app.logger.error(f'Error adding file content: {str(e)}')
@@ -206,13 +252,23 @@ def add_file_card():
 def view_card(content_hash):
     """View a card's content."""
     storage = get_storage()
-    card = storage.get(content_hash)
     
-    if not card:
-        flash('No card found', 'error')
-        return redirect(url_for('index'))
+    with storage.connection as conn:
+        cursor = conn.execute("SELECT * FROM card WHERE hash = ?", (content_hash,))
+        row = cursor.fetchone()
+        
+        if not row:
+            flash('No card found', 'error')
+            return redirect(url_for('index'))
+        
+        # Convert row to dict for template
+        card = {
+            'hash': row['hash'],
+            'content': row['content'],
+            'g_time': row['g_time']
+        }
     
-    content = card.content
+    content = card['content']
     is_binary = isinstance(content, bytes)
     
     # Get content size
@@ -223,7 +279,7 @@ def view_card(content_hash):
         content_type = 'image/svg+xml'
         is_image = True
         is_svg = True
-        extension = 'svg'  # Add this line to set extension for SVG files
+        extension = 'svg'
         # Ensure content is string for SVG
         content = content if isinstance(content, str) else content.decode('utf-8')
     else:
@@ -249,75 +305,82 @@ def view_card(content_hash):
                          is_image=is_image,
                          is_svg=is_svg)
 
+@app.route('/delete/<content_hash>', methods=['POST'])
+def delete(content_hash):
+    """Delete a card."""
+    storage = get_storage()
+    with storage.connection as conn:
+        conn.execute("DELETE FROM card WHERE hash = ?", (content_hash,))
+    flash('Card deleted successfully', 'success')
+    return redirect(url_for('index'))
+
 @app.route('/binary/<content_hash>')
 def get_binary_content(content_hash):
     """Serve binary content with proper content type."""
     storage = get_storage()
-    card = storage.get(content_hash)
+    with storage.connection as conn:
+        cursor = conn.execute("SELECT content FROM card WHERE hash = ?", (content_hash,))
+        row = cursor.fetchone()
+        if not row:
+            return 'Content not found', 404
+        content = row['content']
     
-    if not card or not isinstance(card.content, bytes):
-        return 'No binary content found', 404
-    
-    content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
-    return Response(card.content, mimetype=content_type)
+    content_type, _ = ContentTypeInterpreter.detect_content_type(content)
+    return Response(content, mimetype=content_type)
 
 @app.route('/download/<content_hash>')
 def download_card(content_hash):
-    """Download a card's content."""
+    """Download card content."""
     storage = get_storage()
-    card = storage.get(content_hash)
-    
-    if not card:
-        flash('No card found', 'error')
-        return redirect(url_for('index'))
+    with storage.connection as conn:
+        cursor = conn.execute("SELECT * FROM card WHERE hash = ?", (content_hash,))
+        row = cursor.fetchone()
+        if not row:
+            flash('Card not found', 'error')
+            return redirect(url_for('index'))
+            
+        content = row['content']
+        time_claimed = datetime.fromisoformat(row['g_time'])
+        card = MCard(content=content, hash=row['hash'], g_time=row['g_time'])
     
     content = card.content
     is_binary = isinstance(content, bytes)
     
     if is_binary:
         content_type, extension = ContentTypeInterpreter.detect_content_type(content)
-        filename = f"card_{content_hash[:8]}.{extension}"
-        return send_file(
-            BytesIO(content),
-            mimetype=content_type,
-            as_attachment=True,
-            download_name=filename
-        )
     else:
-        # For text content, create a text file
-        content_str = str(content)
-        filename = f"card_{content_hash[:8]}.txt"
-        return send_file(
-            BytesIO(content_str.encode('utf-8')),
-            mimetype='text/plain',
-            as_attachment=True,
-            download_name=filename
-        )
-
-@app.route('/delete/<content_hash>', methods=['POST'])
-def delete(content_hash):
-    """Delete a card."""
-    storage = get_storage()
-    storage.delete(content_hash)
-    flash('Card deleted successfully', 'success')
-    return redirect(url_for('index'))
+        content = str(content).encode('utf-8')
+        content_type = 'text/plain'
+        extension = 'txt'
+    
+    filename = f"card_{card.hash[:8]}.{extension}"
+    
+    return send_file(
+        BytesIO(content),
+        mimetype=content_type,
+        as_attachment=True,
+        download_name=filename
+    )
 
 @app.route('/thumbnail/<content_hash>')
 def serve_thumbnail(content_hash):
     """Serve thumbnail for image content."""
     storage = get_storage()
-    card = storage.get(content_hash)
+    with storage.connection as conn:
+        cursor = conn.execute("SELECT content FROM card WHERE hash = ?", (content_hash,))
+        row = cursor.fetchone()
+        if not row:
+            return 'Content not found', 404
+        content = row['content']
     
-    if not card or not isinstance(card.content, bytes):
-        return 'No image content found', 404
-    
-    content_type, _ = ContentTypeInterpreter.detect_content_type(card.content)
+    if not isinstance(content, bytes):
+        return 'Not a binary content', 400
+        
+    content_type, _ = ContentTypeInterpreter.detect_content_type(content)
     if not content_type.startswith('image/'):
         return 'Not an image', 400
-    
-    # For now, just serve the original image
-    # TODO: Implement actual thumbnail generation
-    return Response(card.content, mimetype=content_type)
+        
+    return Response(content, mimetype=content_type)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -41,21 +41,21 @@
 <tr>
     <!-- Preview -->
     <td class="preview-cell">
-        {% if card.is_image %}
-            {% if card.is_svg and card.svg_content %}
+        {% if card['is_image'] %}
+            {% if card['is_svg'] and card['svg_content'] %}
                 <div class="preview-container">
-                    {{ card.svg_content|safe }}
+                    {{ card['svg_content']|safe }}
                 </div>
             {% else %}
                 <div class="preview-container">
-                    <img src="{{ url_for('get_binary_content', content_hash=card.content_hash) }}" alt="Preview">
+                    <img src="{{ url_for('get_binary_content', content_hash=card['hash']) }}" alt="Preview">
                 </div>
             {% endif %}
         {% else %}
-            {% if card.content %}
+            {% if card['content'] %}
                 <div class="preview-container">
                     <div class="text-preview">
-                        <pre style="margin: 0; font-size: 0.875rem;">{{ card.content[:100] }}...</pre>
+                        <pre style="margin: 0; font-size: 0.875rem;">{{ card['content'][:100] }}...</pre>
                     </div>
                 </div>
             {% else %}
@@ -67,16 +67,16 @@
     </td>
     
     <!-- Name -->
-    <td>{{ card.name if card.name else 'Untitled' }}</td>
+    <td>{{ card['name'] if 'name' in card else 'Untitled' }}</td>
     
     <!-- Type -->
-    <td>{{ card.content_type }}</td>
+    <td>{{ card['content_type'] }}</td>
     
     <!-- Hash -->
-    <td><code>{{ card.content_hash }}</code></td>
+    <td><code>{{ card['hash'] }}</code></td>
     
     <!-- Created At -->
-    <td>{{ card.time_claimed.strftime('%Y-%m-%d %H:%M:%S') if card.time_claimed else 'N/A' }}</td>
+    <td>{{ format_time(card['g_time']) }}</td>
     
     <!-- Actions -->
     <td>{{ render_actions(card) }}</td>

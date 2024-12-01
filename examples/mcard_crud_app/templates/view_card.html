@@ -33,13 +33,13 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2>View Card</h2>
         <div class="btn-group">
-            <a href="{{ url_for('download_card', content_hash=card.content_hash) }}" class="btn btn-primary">
+            <a href="{{ url_for('download_card', content_hash=card['hash']) }}" class="btn btn-primary">
                 <i class="bi bi-download me-1"></i> Download
             </a>
             <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i> Back
             </a>
-            <form action="{{ url_for('delete', content_hash=card.content_hash) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this card?');">
+            <form action="{{ url_for('delete', content_hash=card['hash']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this card?');">
                 <button type="submit" class="btn btn-outline-danger">
                     <i class="bi bi-trash"></i> Delete
                 </button>
@@ -51,14 +51,14 @@
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h5 class="card-title mb-0">Hash: {{ render_hash(card.content_hash) }}</h5>
+                    <h5 class="card-title mb-0">Hash: {{ render_hash(card['hash']) }}</h5>
                     <small class="text-muted">
                         Type: <span class="badge bg-secondary">{{ content_type }}</span>
                         {% if extension %}<span class="badge bg-info">.{{ extension }}</span>{% endif %}
                         <span class="badge bg-light text-dark">{{ '{:,}'.format(size) }} bytes</span>
                     </small>
                 </div>
-                <small class="text-muted">Created: {{ card.time_claimed.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                <small class="text-muted">Created: {{ format_time(card['g_time']) }}</small>
             </div>
         </div>
         <div class="card-body">
@@ -68,7 +68,7 @@
                 </div>
             {% elif is_binary %}
                 {% if is_image %}
-                    <img src="{{ url_for('get_binary_content', content_hash=card.content_hash) }}" alt="Binary content" class="binary-preview img-fluid">
+                    <img src="{{ url_for('get_binary_content', content_hash=card['hash']) }}" alt="Binary content" class="binary-preview img-fluid">
                 {% else %}
                     <div class="alert alert-info">
                         <i class="bi bi-file me-2"></i>

@@ -62,16 +62,16 @@
     {% for card in cards %}
     <div class="card">
         <div class="card-preview">
-            {% if card.is_image %}
-                {% if card.is_svg and card.svg_content %}
-                    {{ card.svg_content|safe }}
+            {% if card['is_image'] %}
+                {% if card['is_svg'] and card['svg_content'] %}
+                    {{ card['svg_content']|safe }}
                 {% else %}
-                    <img src="{{ url_for('get_binary_content', content_hash=card.content_hash) }}" alt="Preview">
+                    <img src="{{ url_for('get_binary_content', content_hash=card['hash']) }}" alt="Preview">
                 {% endif %}
             {% else %}
-                {% if card.content %}
+                {% if card['content'] %}
                     <div class="text-preview">
-                        <pre style="margin: 0; font-size: 0.875rem;">{{ card.content[:200] }}...</pre>
+                        <pre style="margin: 0; font-size: 0.875rem;">{{ card['content'][:200] }}...</pre>
                     </div>
                 {% else %}
                     [Binary Content]
@@ -79,10 +79,10 @@
             {% endif %}
         </div>
         <div class="card-info">
-            <p><strong>Name:</strong> {{ card.name if card.name else 'Untitled' }}</p>
-            <p><strong>Type:</strong> {{ card.content_type }}</p>
-            <p><strong>Hash:</strong> <code>{{ card.content_hash[:8] }}...</code></p>
-            <p><strong>Created:</strong> {{ card.time_claimed.strftime('%Y-%m-%d %H:%M:%S') if card.time_claimed else 'N/A' }}</p>
+            <p><strong>Name:</strong> {{ card['name'] if 'name' in card else 'Untitled' }}</p>
+            <p><strong>Type:</strong> {{ card['content_type'] }}</p>
+            <p><strong>Hash:</strong> <code>{{ card['hash'][:8] }}...</code></p>
+            <p><strong>Created:</strong> {{ format_time(card['g_time']) }}</p>
         </div>
         <div class="card-actions">
             {{ render_actions(card) }}
