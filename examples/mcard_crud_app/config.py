@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = os.getenv('MCARD_DB_PATH', str(BASE_DIR / 'data' / 'db' / 'MCardStore.db'))
 DB_MAX_CONNECTIONS = int(os.getenv('MCARD_DB_MAX_CONNECTIONS', '5'))
 DB_TIMEOUT = float(os.getenv('MCARD_DB_TIMEOUT', '5.0'))
-MAX_CONTENT_SIZE = int(os.getenv('MCARD_MAX_CONTENT_SIZE', str(10 * 1024 * 1024)))  # 10MB default
+MAX_CONTENT_SIZE = int(os.getenv('MCARD_MAX_CONTENT_SIZE', '10485760'))
 
 # Flask configuration
 FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev')  # Change in production

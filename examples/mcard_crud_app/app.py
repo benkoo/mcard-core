@@ -218,7 +218,7 @@ async def index():
         
         # Pagination parameters
         page = request.args.get('page', 1, type=int)
-        per_page = 12  # Adjust as needed
+        per_page = request.args.get('per_page', 12, type=int)
         
         # Sort cards by g_time (most recent first)
         sorted_cards = sorted(all_cards, key=lambda card: card.g_time or 0, reverse=True)
@@ -328,6 +328,7 @@ async def index():
                                cards=processed_cards, 
                                delete_form=delete_form,
                                page=page, 
+                               per_page=per_page,
                                total_pages=total_pages)
         
     except Exception as e:
