@@ -1,0 +1,47 @@
+---
+import '../styles/globals.css';
+import { ThemeProvider } from '../components/theme-provider';
+import { ThemeToggle } from '../components/theme-toggle';
+import { ToastProvider } from '../components/ui/toast';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en" suppressHydrationWarning>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <ThemeProvider client:only="react">
+      <div class="relative flex min-h-screen flex-col">
+        <header class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div class="container flex h-14 items-center">
+            <div class="mr-4 flex">
+              <a class="mr-6 flex items-center space-x-2" href="/">
+                <span class="font-bold sm:inline-block">MCard</span>
+              </a>
+            </div>
+            <div class="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+              <div class="w-full flex-1 md:w-auto md:flex-none">
+                <ThemeToggle client:only="react" />
+              </div>
+            </div>
+          </div>
+        </header>
+        <main class="flex-1">
+          <slot />
+        </main>
+      </div>
+      <ToastProvider client:only="react" />
+    </ThemeProvider>
+  </body>
+</html>

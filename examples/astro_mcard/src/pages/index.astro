@@ -1,0 +1,74 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Button } from '../components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/ui/card';
+import { Toast } from '../components/ui/toast';
+---
+
+<Layout title="MCard - Astro">
+  <main class="container mx-auto p-8">
+    <div class="max-w-6xl mx-auto space-y-8">
+      <section class="space-y-4">
+        <h1 class="text-4xl font-bold">Welcome to <span class="text-primary">MCard</span></h1>
+        <p class="text-muted-foreground">A beautiful card management system built with Astro and Shadcn UI.</p>
+      </section>
+
+      <section class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Card Management</CardTitle>
+            <CardDescription>Create and manage your cards with ease.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>Add descriptions, tags, and organize your cards in collections.</p>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" class="w-full">Get Started</Button>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Smart Search</CardTitle>
+            <CardDescription>Find cards instantly with powerful search.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>Search by title, content, tags, or any other card property.</p>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" class="w-full">Try Search</Button>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Share & Collaborate</CardTitle>
+            <CardDescription>Work together on card collections.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>Share cards with team members and collaborate in real-time.</p>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" class="w-full">Share Now</Button>
+          </CardFooter>
+        </Card>
+      </section>
+
+      <section class="space-y-4">
+        <h2 class="text-2xl font-semibold">Button Variants</h2>
+        <div class="flex flex-wrap gap-4">
+          <Button client:load>Default Button</Button>
+          <Button client:load variant="destructive">Destructive Button</Button>
+          <Button client:load variant="outline">Outline Button</Button>
+          <Button client:load variant="secondary">Secondary Button</Button>
+          <Button client:load variant="ghost">Ghost Button</Button>
+          <Button client:load variant="link">Link Button</Button>
+        </div>
+      </section>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  // Add click handlers for buttons if needed
+</script>
