@@ -210,15 +210,19 @@ add_template_filters()
 async def index():
     """Render the index page with paginated cards."""
     try:
+        # Redirect to include per_page in the initial request if not present
+        if 'per_page' not in request.args:
+            return redirect(url_for('index', page=1, per_page=12), code=302)
+        
         # Get storage and list cards
         storage = await get_storage()
         logger.info("Attempting to list cards")
         all_cards = await storage.list()
         logger.info(f"Retrieved {len(all_cards)} cards from storage")
         
-        # Pagination parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 12, type=int)
+        # Ensure page and per_page have default values
+        page = request.args.get('page', 1, type=int) or 1
+        per_page = request.args.get('per_page', 12, type=int) or 12
         
         # Sort cards by g_time (most recent first)
         sorted_cards = sorted(all_cards, key=lambda card: card.g_time or 0, reverse=True)
@@ -227,6 +231,10 @@ async def index():
         start_index = (page - 1) * per_page
         end_index = start_index + per_page
         current_page_cards = sorted_cards[start_index:end_index]
+        
+        logger.info(f"Total cards retrieved: {len(sorted_cards)}")
+        logger.info(f"Paginating cards from index {start_index} to {end_index}")
+        logger.info(f"Cards on current page: {len(current_page_cards)}")
         
         # Process cards
         processed_cards = []

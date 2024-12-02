@@ -30,7 +30,7 @@ def test_env(tmp_path):
     env_file = tmp_path / "test.env"
     env_content = """
     # Database configuration
-    MCARD_STORE_DB_PATH=data/test_mcard.db
+    MCARD_STORE_PATH=data/test_mcard.db
     MCARD_STORE_MAX_CONNECTIONS=10
     MCARD_STORE_TIMEOUT=60.0
     
@@ -71,3 +71,27 @@ def test_load_env_test_file(setup_test_env):
     load_dotenv(test_env_path)
     config = load_config()
     assert config.repository.db_path == "data/test_mcard.db"
+
+def test_env_file_loading(setup_test_env, tmp_path):
+    """Test that configuration parameters are loaded from the .env file."""
+    # Create a .env file in the temporary path
+    env_file = tmp_path / '.env'
+    env_file.write_text("MCARD_DB_PATH=./data/card.db\n")
+    load_dotenv(dotenv_path=env_file)
+
+    # Load configuration
+    config = load_config()
+
+    # Assert that the DB path is loaded from the .env file
+    assert config[ENV_DB_PATH] == './data/card.db'
+
+def test_test_env_db_path(setup_test_env):
+    """Test that the test environment uses ./data/test_card.db for the MCard store."""
+    # Set test environment variable
+    os.environ['MCARD_DB_PATH'] = './data/test_card.db'
+
+    # Load configuration
+    config = load_config()
+
+    # Assert that the DB path is set to the test path
+    assert config[ENV_DB_PATH] == './data/test_card.db'

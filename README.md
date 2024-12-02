@@ -244,7 +244,7 @@ The following environment variables can be used to configure the system:
 
 ```bash
 # Database Configuration
-MCARD_STORE_DB_PATH=path/to/db.db
+MCARD_STORE_PATH=path/to/db.db
 MCARD_STORE_MAX_CONNECTIONS=10
 MCARD_STORE_TIMEOUT=60.0
 

@@ -8,19 +8,10 @@ from threading import Lock
 from dotenv import load_dotenv
 from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
 from mcard.domain.services.hashing import HashingSettings
+from mcard.config_constants import DEFAULT_DB_PATH, TEST_DB_PATH, DEFAULT_POOL_SIZE, DEFAULT_TIMEOUT, DEFAULT_HASH_ALGORITHM, ENV_DB_PATH, ENV_DB_MAX_CONNECTIONS, ENV_DB_TIMEOUT, ENV_HASH_ALGORITHM, ENV_HASH_CUSTOM_MODULE, ENV_HASH_CUSTOM_FUNCTION, ENV_HASH_CUSTOM_LENGTH, ENV_FORCE_DEFAULT_CONFIG
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Environment variable names
-ENV_DB_PATH = "MCARD_STORE_DB_PATH"
-ENV_DB_MAX_CONNECTIONS = "MCARD_STORE_MAX_CONNECTIONS"
-ENV_DB_TIMEOUT = "MCARD_STORE_TIMEOUT"
-ENV_HASH_ALGORITHM = "MCARD_HASH_ALGORITHM"
-ENV_HASH_CUSTOM_MODULE = "MCARD_HASH_CUSTOM_MODULE"
-ENV_HASH_CUSTOM_FUNCTION = "MCARD_HASH_CUSTOM_FUNCTION"
-ENV_HASH_CUSTOM_LENGTH = "MCARD_HASH_CUSTOM_LENGTH"
-ENV_FORCE_DEFAULT_CONFIG = "MCARD_FORCE_DEFAULT_CONFIG"
 
 class ConfigurationSource(Protocol):
     """Protocol for configuration sources."""
@@ -72,16 +63,16 @@ class EnvironmentConfigSource(ConfigurationSource):
         
         # Validate max_connections
         max_conn = config.get('max_connections')
-        validated['max_connections'] = int(max_conn) if max_conn is not None else 10
+        validated['max_connections'] = int(max_conn) if max_conn is not None else DEFAULT_POOL_SIZE
         
         # Validate timeout
         timeout = config.get('timeout')
-        validated['timeout'] = float(timeout) if timeout is not None else 30.0
+        validated['timeout'] = float(timeout) if timeout is not None else DEFAULT_TIMEOUT
         
         # Validate hash algorithm
         hash_algo = config.get('hash_algorithm')
         if hash_algo is None or not str(hash_algo).strip():
-            validated['hash_algorithm'] = "sha256"  # Default value
+            validated['hash_algorithm'] = DEFAULT_HASH_ALGORITHM  # Default value
             validated['hash_custom_module'] = None
             validated['hash_custom_function'] = None
             validated['hash_custom_length'] = None
@@ -151,10 +142,10 @@ class TestConfigSource(ConfigurationSource):
         """Load test configuration."""
         # Start with test defaults
         config = {
-            'db_path': "data/test_mcard.db",  # Use test-specific path by default
+            'db_path': TEST_DB_PATH,  # Use test-specific path by default
             'max_connections': 5,  # Default test connections
             'timeout': 30.0,  # Default test timeout
-            'hash_algorithm': "sha256",  # Default test hash algorithm
+            'hash_algorithm': DEFAULT_HASH_ALGORITHM,  # Default test hash algorithm
             'hash_custom_module': None,  # No custom hash by default
             'hash_custom_function': None,
             'hash_custom_length': None,
@@ -198,16 +189,16 @@ class TestConfigSource(ConfigurationSource):
         
         # Validate max_connections
         max_conn = config.get('max_connections')
-        validated['max_connections'] = int(max_conn) if max_conn is not None else 10
+        validated['max_connections'] = int(max_conn) if max_conn is not None else DEFAULT_POOL_SIZE
         
         # Validate timeout
         timeout = config.get('timeout')
-        validated['timeout'] = float(timeout) if timeout is not None else 30.0
+        validated['timeout'] = float(timeout) if timeout is not None else DEFAULT_TIMEOUT
         
         # Validate hash algorithm
         hash_algo = config.get('hash_algorithm')
         if hash_algo is None or not str(hash_algo).strip():
-            validated['hash_algorithm'] = "sha256"  # Default value
+            validated['hash_algorithm'] = DEFAULT_HASH_ALGORITHM  # Default value
             validated['hash_custom_module'] = None
             validated['hash_custom_function'] = None
             validated['hash_custom_length'] = None
@@ -288,13 +279,13 @@ class DataEngineConfig:
         if not hasattr(self, '_initialized'):
             self.repository = None
             self.engine_config = None
-            self.pool_size = 10  # Default pool size
-            self.timeout = 30.0  # Default timeout
+            self.pool_size = DEFAULT_POOL_SIZE  # Default pool size
+            self.timeout = DEFAULT_TIMEOUT  # Default timeout
             self.engine_options = {'check_same_thread': False}
             
             # Add hashing configuration
             self.hashing = {
-                'algorithm': 'sha256'
+                'algorithm': DEFAULT_HASH_ALGORITHM
             }
             
             self._initialized = True
@@ -328,13 +319,13 @@ class DataEngineConfig:
         self.engine_config = create_engine_config(
             engine_type=EngineType.SQLITE,
             connection_string=config['db_path'],
-            max_connections=config.get('max_connections', 10),
-            timeout=config.get('timeout', 30.0)
+            max_connections=config.get('max_connections', DEFAULT_POOL_SIZE),
+            timeout=config.get('timeout', DEFAULT_TIMEOUT)
         )
 
         # Update additional configuration
-        self.pool_size = config.get('max_connections', 10)
-        self.timeout = config.get('timeout', 30.0)
+        self.pool_size = config.get('max_connections', DEFAULT_POOL_SIZE)
+        self.timeout = config.get('timeout', DEFAULT_TIMEOUT)
         self.engine_options = {
             'check_same_thread': False,
             'max_content_size': 10 * 1024 * 1024  # 10 MB default
@@ -342,7 +333,7 @@ class DataEngineConfig:
 
         # Update hashing configuration
         self.hashing = config.get('hashing', {
-            'algorithm': 'sha256'
+            'algorithm': DEFAULT_HASH_ALGORITHM
         })
 
 def create_engine_config(
@@ -365,25 +356,21 @@ def create_engine_config(
     """
     return SQLiteConfig(
         db_path=connection_string,
-        max_connections=max_connections or 10,
-        timeout=timeout or 30.0
+        max_connections=max_connections or DEFAULT_POOL_SIZE,
+        timeout=timeout or DEFAULT_TIMEOUT
     )
 
 def get_project_root() -> Path:
     """Get the project root directory."""
     return Path(__file__).parent.parent.parent
 
-def get_default_db_path() -> Path:
+def get_default_db_path() -> str:
     """Get the default database path."""
-    data_dir = get_project_root() / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir / "mcard.db"
+    return DEFAULT_DB_PATH
 
-def get_test_db_path() -> Path:
+def get_test_db_path() -> str:
     """Get the test database path."""
-    test_data_dir = get_project_root() / "tests" / "data"
-    test_data_dir.mkdir(parents=True, exist_ok=True)
-    return test_data_dir / "test_mcard.db"
+    return TEST_DB_PATH
 
 def resolve_db_path(db_path: Union[str, Path], is_test: bool = False) -> str:
     """
@@ -398,7 +385,7 @@ def resolve_db_path(db_path: Union[str, Path], is_test: bool = False) -> str:
     """
     # If no path is provided, use default paths
     if not db_path or str(db_path).strip() == '':
-        return str(get_test_db_path() if is_test else get_default_db_path())
+        return get_test_db_path() if is_test else get_default_db_path()
     
     # Convert to Path
     path = Path(str(db_path).strip())

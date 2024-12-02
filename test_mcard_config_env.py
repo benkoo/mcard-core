@@ -28,7 +28,7 @@ def temp_env_file():
 # Custom Test Configuration
 MCARD_API_KEY=test_custom_api_key_12345
 MCARD_API_PORT=8888
-MCARD_STORE_DB_PATH=data/test_custom_database.db
+MCARD_STORE_PATH=data/test_custom_database.db
 MCARD_MANAGER_DATA_SOURCE=sqlite
 MCARD_MANAGER_POOL_SIZE=3
 MCARD_MANAGER_TIMEOUT=15.0
@@ -41,7 +41,7 @@ MCARD_MANAGER_TIMEOUT=15.0
     # Verify the environment variables are loaded
     print("Loaded Environment Variables:")
     print(f"MCARD_API_KEY: {os.getenv('MCARD_API_KEY')}")
-    print(f"MCARD_STORE_DB_PATH: {os.getenv('MCARD_STORE_DB_PATH')}")
+    print(f"MCARD_STORE_PATH: {os.getenv('MCARD_STORE_PATH')}")
     
     # Reload the app settings to ensure they reflect the latest environment variables
     loaded_app_settings = load_app_settings()

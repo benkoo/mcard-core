@@ -27,11 +27,11 @@ def test_mcard_api_key_not_set():
             os.environ['MCARD_API_KEY'] = original_key
 
 
-def test_mcard_store_db_path():
-    """Test if MCARD_STORE_DB_PATH is correctly loaded and relative to project root."""
+def test_MCARD_STORE_PATH():
+    """Test if MCARD_STORE_PATH is correctly loaded and relative to project root."""
     expected_db_path = 'data/test_mcard.db'
-    actual_db_path = os.getenv('MCARD_STORE_DB_PATH')
-    assert actual_db_path == expected_db_path, f"Expected MCARD_STORE_DB_PATH to be '{expected_db_path}', but got '{actual_db_path}'"
+    actual_db_path = os.getenv('MCARD_STORE_PATH')
+    assert actual_db_path == expected_db_path, f"Expected MCARD_STORE_PATH to be '{expected_db_path}', but got '{actual_db_path}'"
 
     # Verify the path exists and is relative to project root
     from mcard.infrastructure.config import get_project_root

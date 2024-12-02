@@ -7,10 +7,11 @@ from mcard.domain.models.exceptions import StorageError
 import os
 from pathlib import Path
 import logging
+from mcard.config_constants import ENV_DB_PATH, ENV_API_PORT, ENV_SERVICE_LOG_LEVEL
 
 # Configure logging
 logging.basicConfig(
-    level=os.getenv("MCARD_SERVICE_LOG_LEVEL", "INFO").upper(),
+    level=os.getenv(ENV_SERVICE_LOG_LEVEL, "INFO").upper(),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ def load_config():
     """Load application settings from environment variables."""
     return AppSettings(
         database=DatabaseSettings(
-            db_path=os.getenv('MCARD_MANAGER_DB_PATH', 'MCardManagerStore.db'),
+            db_path=os.getenv(ENV_DB_PATH, 'MCardManagerStore.db'),
             max_connections=int(os.getenv('MCARD_MANAGER_POOL_SIZE', '5')),
             timeout=float(os.getenv('MCARD_MANAGER_TIMEOUT', '30.0')),
             data_source='sqlite'
@@ -49,7 +50,7 @@ def load_config():
             custom_hash_length=int(os.getenv('MCARD_MANAGER_CUSTOM_HASH_LENGTH', '0'))
         ),
         mcard_api_key=os.getenv('MCARD_API_KEY', 'default_mcard_api_key'),
-        mcard_api_port=int(os.getenv('MCARD_API_PORT', '3001'))
+        mcard_api_port=int(os.getenv(ENV_API_PORT, '3001'))
     )
 
 # Debug logging for API key verification
