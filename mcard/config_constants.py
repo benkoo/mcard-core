@@ -12,6 +12,12 @@ TEST_DB_PATH = './tests/data/test_mcard.db'
 DEFAULT_POOL_SIZE = 10  # Maximum number of database connections
 DEFAULT_TIMEOUT = 30.0  # Timeout duration in seconds
 DEFAULT_HASH_ALGORITHM = 'sha256'  # Default algorithm for hashing operations
+DEFAULT_API_PORT = 5320
+DEFAULT_HASH_CUSTOM_MODULE = "custom_module"  # Module for custom hash functions
+DEFAULT_HASH_CUSTOM_FUNCTION = "custom_function"  # Function name for custom hashing
+DEFAULT_HASH_CUSTOM_LENGTH = "64"  # Length of custom hash output
+
+
 
 # Environment Variable Names
 # These constants represent the names of environment variables used for configuration.
@@ -21,9 +27,7 @@ DEFAULT_HASH_ALGORITHM = 'sha256'  # Default algorithm for hashing operations
 # Constants related to hashing operations, allowing for customization and flexibility.
 # These constants are used to define hashing algorithms and custom hashing functions.
 ENV_HASH_ALGORITHM = "MCARD_HASH_ALGORITHM"
-ENV_HASH_CUSTOM_MODULE = "MCARD_HASH_CUSTOM_MODULE"  # Module for custom hash functions
-ENV_HASH_CUSTOM_FUNCTION = "MCARD_HASH_CUSTOM_FUNCTION"  # Function name for custom hashing
-ENV_HASH_CUSTOM_LENGTH = "MCARD_HASH_CUSTOM_LENGTH"  # Length of custom hash output
+
 
 # Other Environment Variables
 # General configuration constants for various application settings.
@@ -33,3 +37,8 @@ ENV_DB_TIMEOUT = "MCARD_STORE_TIMEOUT"
 ENV_SERVICE_LOG_LEVEL = "MCARD_SERVICE_LOG_LEVEL"
 ENV_API_PORT = "MCARD_API_PORT"
 ENV_FORCE_DEFAULT_CONFIG = "MCARD_FORCE_DEFAULT_CONFIG"
+
+ENV_HASH_CUSTOM_MODULE = "MCARD_HASH_CUSTOM_MODULE"  # Module for custom hash functions
+ENV_HASH_CUSTOM_FUNCTION = "MCARD_HASH_CUSTOM_FUNCTION"  # Function name for custom hashing
+ENV_HASH_CUSTOM_LENGTH = "MCARD_HASH_CUSTOM_LENGTH"  # Length of custom hash output
+
