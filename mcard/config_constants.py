@@ -15,7 +15,7 @@ DEFAULT_HASH_ALGORITHM = 'sha256'  # Default algorithm for hashing operations
 DEFAULT_API_PORT = 5320
 DEFAULT_HASH_CUSTOM_MODULE = "custom_module"  # Module for custom hash functions
 DEFAULT_HASH_CUSTOM_FUNCTION = "custom_function"  # Function name for custom hashing
-DEFAULT_HASH_CUSTOM_LENGTH = "64"  # Length of custom hash output
+DEFAULT_HASH_CUSTOM_LENGTH = 64  # Length of custom hash output
 
 
 

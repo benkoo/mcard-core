@@ -16,7 +16,7 @@ class TestExampleEnvLoading(unittest.TestCase):
         self.assertEqual(os.getenv(ENV_HASH_ALGORITHM), DEFAULT_HASH_ALGORITHM)
         self.assertEqual(os.getenv(ENV_HASH_CUSTOM_MODULE), DEFAULT_HASH_CUSTOM_MODULE)
         self.assertEqual(os.getenv(ENV_HASH_CUSTOM_FUNCTION), DEFAULT_HASH_CUSTOM_FUNCTION)
-        self.assertEqual(os.getenv(ENV_HASH_CUSTOM_LENGTH), DEFAULT_HASH_CUSTOM_LENGTH)
+        self.assertEqual(int(os.getenv(ENV_HASH_CUSTOM_LENGTH)), DEFAULT_HASH_CUSTOM_LENGTH)
 
 
 if __name__ == '__main__':
