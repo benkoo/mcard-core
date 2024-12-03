@@ -103,6 +103,22 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - Efficient in-memory sorting
 - Real-time collection refresh capability
 
+## Configuration Constants
+
+The `config_constants.py` file serves as a centralized repository for managing configuration constants used throughout the MCard Core project. This file enhances maintainability by reducing duplication and ensuring consistency across various modules. Key features include:
+
+- **Default Values**: Provides default configurations for various application settings, such as database connection limits, timeout durations, and hashing algorithms.
+- **Environment Variable Names**: Defines constants representing the names of environment variables used for configuration, allowing for flexible and secure configuration management.
+- **Hashing Configuration**: Includes constants related to hashing operations, supporting customization and flexibility in hashing algorithms and functions.
+
+The values defined in `config_constants.py` are illustrated and utilized in various environment files, including:
+
+- **`example.env`**: Serves as a template showcasing the default and recommended environment variable settings for the application. It provides examples of how to configure the environment variables defined in `config_constants.py`.
+- **`.env`**: Used in the development environment to load the actual environment variables. It should contain the real values that the application will use during development.
+- **`.env.test`**: Specifically configured for testing purposes, ensuring that the test environment is isolated and controlled. It mirrors the structure of `.env` but may contain different values to facilitate testing scenarios.
+
+These files ensure that the application can be configured flexibly across different environments while maintaining a consistent and secure setup.
+
 ## Dependencies
 
 The project relies on several key dependencies:
