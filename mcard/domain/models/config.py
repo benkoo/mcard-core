@@ -1,31 +1,67 @@
-"""
-Configuration models for MCard.
-"""
-from typing import Optional, Literal
-from pydantic import BaseModel, Field
+"""Configuration domain models."""
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional, List
 
-# Simple literal type for hash algorithms
-HashAlgorithm = Literal["sha256", "sha512", "sha1", "md5", "custom"]
+class HashAlgorithm(str, Enum):
+    """Supported hash algorithms."""
+    MD5 = "md5"
+    SHA1 = "sha1"
+    SHA224 = "sha224"
+    SHA256 = "sha256"
+    SHA384 = "sha384"
+    SHA512 = "sha512"
+    CUSTOM = "custom"
 
-class DatabaseSettings(BaseModel):
-    """Database configuration."""
-    db_path: str = Field(default=':memory:', description="Path to the database file")
-    data_source: Optional[str] = Field(None, description="Optional data source identifier")
-    pool_size: int = Field(default=5, description="Connection pool size")
-    timeout: float = Field(default=30.0, description="Database operation timeout in seconds")
+@dataclass
+class HashingSettings:
+    """Settings for content hashing."""
+    algorithm: str = "sha256"
+    custom_module: Optional[str] = None
+    custom_function: Optional[str] = None
+    custom_hash_length: Optional[int] = None
+    parallel_algorithms: Optional[List[str]] = field(default=None)  # List of algorithms to run in parallel
+    verify_parallel: bool = False  # Whether to verify parallel hashes on collision
+    max_parallel: int = 3  # Maximum number of parallel algorithms allowed
+    
+    def __post_init__(self):
+        """Validate settings after initialization."""
+        if self.algorithm not in HashAlgorithm.__members__.values():
+            raise ValueError(f"Unsupported algorithm: {self.algorithm}")
+            
+        if self.algorithm == HashAlgorithm.CUSTOM:
+            if not self.custom_module or not self.custom_function:
+                raise ValueError("Custom module and function must be specified for custom algorithm")
+            if not self.custom_hash_length or self.custom_hash_length <= 0:
+                raise ValueError("Custom hash length must be positive")
+                
+        if self.parallel_algorithms:
+            if len(self.parallel_algorithms) > self.max_parallel:
+                raise ValueError(f"Too many parallel algorithms specified (max {self.max_parallel})")
+            for algo in self.parallel_algorithms:
+                if algo not in HashAlgorithm.__members__.values():
+                    raise ValueError(f"Unsupported parallel algorithm: {algo}")
 
-class HashingSettings(BaseModel):
-    """Hashing configuration."""
-    algorithm: HashAlgorithm = Field(
-        default="sha256",
-        description="Hash function to use"
-    )
-    custom_module: Optional[str] = Field(None, description="Custom hash function module")
-    custom_function: Optional[str] = Field(None, description="Custom hash function name")
-    custom_hash_length: Optional[int] = Field(None, description="Expected length of custom hash")
+@dataclass
+class SQLiteConfig:
+    """Configuration for SQLite database."""
+    db_path: str
+    pool_size: int = 5
+    timeout: float = 30.0
+    max_connections: int = 5
 
-class AppSettings(BaseModel):
+@dataclass
+class DatabaseSettings:
+    """Settings for database configuration."""
+    db_path: str
+    max_connections: int = 5
+    timeout: float = 30.0
+    data_source: str = "sqlite"
+
+@dataclass
+class AppSettings:
     """Application settings."""
     database: DatabaseSettings
-    hashing: HashingSettings = Field(default_factory=HashingSettings)
-    mcard_api_key: str = Field(description="API key for accessing the application")
+    hashing: HashingSettings
+    mcard_api_key: Optional[str] = None
+    mcard_api_port: Optional[int] = None

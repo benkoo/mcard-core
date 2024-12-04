@@ -139,41 +139,70 @@
     {% endwith %}
 
     <div id="tableView">
-        {{ render_table(cards) }}
+        {% if cards %}
+            {{ render_table(cards, delete_form) }}
+        {% else %}
+            <div class="alert alert-info text-center" role="alert">
+                <h4 class="alert-heading">No Cards Found</h4>
+                <p>You haven't created any cards yet.</p>
+                <hr>
+                <p class="mb-0">
+                    <a href="{{ url_for('new_card') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> Create Your First Card
+                    </a>
+                </p>
+            </div>
+        {% endif %}
     </div>
 
     <div id="gridView" style="display: none;">
-        {{ render_grid(cards) }}
+        {% if cards %}
+            {{ render_grid(cards, delete_form) }}
+        {% else %}
+            <div class="alert alert-info text-center" role="alert">
+                <h4 class="alert-heading">No Cards Found</h4>
+                <p>You haven't created any cards yet.</p>
+                <hr>
+                <p class="mb-0">
+                    <a href="{{ url_for('new_card') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> Create Your First Card
+                    </a>
+                </p>
+            </div>
+        {% endif %}
     </div>
 
-    {% if total_items > 0 %}
+    {% if cards %}
     <nav aria-label="Page navigation" class="mt-4">
         <div class="d-flex justify-content-between align-items-center">
             <div class="text-muted">
-                Showing {{ cards|length }} of {{ total_items }} items
+                Showing {{ cards|length }} items
             </div>
-            <ul class="pagination mb-0">
-                {% if page > 1 %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('index', page=page-1, per_page=per_page) }}">Previous</a>
-                </li>
-                {% endif %}
-                
-                {% for p in range(1, total_pages + 1) %}
-                <li class="page-item {% if p == page %}active{% endif %}">
-                    <a class="page-link" href="{{ url_for('index', page=p, per_page=per_page) }}">{{ p }}</a>
-                </li>
-                {% endfor %}
-                
-                {% if page < total_pages %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('index', page=page+1, per_page=per_page) }}">Next</a>
-                </li>
-                {% endif %}
-            </ul>
         </div>
     </nav>
     {% endif %}
+
+    <nav aria-label="Card navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('index', page=page-1, per_page=per_page) }}">Previous</a>
+            </li>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+            <li class="page-item {% if p == page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('index', page=p, per_page=per_page) }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('index', page=page+1, per_page=per_page) }}">Next</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
 </div>
 
 {% block scripts %}

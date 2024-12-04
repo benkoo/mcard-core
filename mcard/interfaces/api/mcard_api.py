@@ -1,3 +1,4 @@
+"""MCard API implementation."""
 from typing import List, Optional
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Depends, Header
@@ -5,13 +6,24 @@ from pydantic import BaseModel
 from mcard.domain.models.exceptions import StorageError
 import os
 from pathlib import Path
+import logging
+from mcard.config_constants import ENV_DB_PATH, ENV_API_PORT, ENV_SERVICE_LOG_LEVEL
+
+# Configure logging
+logging.basicConfig(
+    level=os.getenv(ENV_SERVICE_LOG_LEVEL, "INFO").upper(),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Importing configuration models
-from mcard.domain.models.config import AppSettings, DatabaseSettings, HashingSettings
+from mcard.domain.models.config import AppSettings, HashingSettings, DatabaseSettings
+from mcard.infrastructure.persistence.engine_config import SQLiteConfig
 from mcard.domain.models.card import MCard
-from mcard.domain.models.protocols import CardRepository
-from mcard.infrastructure.persistence.schema_initializer import get_repository
+from mcard.domain.models.protocols import CardStore
+from mcard.infrastructure.persistence.async_persistence_wrapper import AsyncPersistenceWrapper
 from mcard.domain.services.hashing import get_hashing_service
+from mcard.application.card_provisioning_app import CardProvisioningApp
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -22,21 +34,23 @@ else:
     load_dotenv()
 
 # Load application settings from environment
-def load_app_settings():
+def load_config():
+    """Load application settings from environment variables."""
     return AppSettings(
         database=DatabaseSettings(
-            db_path=os.getenv('MCARD_MANAGER_DB_PATH', 'MCardManagerStore.db'),
-            data_source=os.getenv('MCARD_MANAGER_DATA_SOURCE'),
-            pool_size=int(os.getenv('MCARD_MANAGER_POOL_SIZE', 5)),
-            timeout=float(os.getenv('MCARD_MANAGER_TIMEOUT', 30.0))
+            db_path=os.getenv(ENV_DB_PATH, 'MCardManagerStore.db'),
+            max_connections=int(os.getenv('MCARD_MANAGER_POOL_SIZE', '5')),
+            timeout=float(os.getenv('MCARD_MANAGER_TIMEOUT', '30.0')),
+            data_source='sqlite'
         ),
         hashing=HashingSettings(
             algorithm=os.getenv('MCARD_MANAGER_HASH_ALGORITHM', 'sha256'),
             custom_module=os.getenv('MCARD_MANAGER_CUSTOM_MODULE'),
             custom_function=os.getenv('MCARD_MANAGER_CUSTOM_FUNCTION'),
-            custom_hash_length=int(os.getenv('MCARD_MANAGER_CUSTOM_HASH_LENGTH', 0))
+            custom_hash_length=int(os.getenv('MCARD_MANAGER_CUSTOM_HASH_LENGTH', '0'))
         ),
-        mcard_api_key=os.getenv('MCARD_API_KEY', 'default_mcard_api_key')
+        mcard_api_key=os.getenv('MCARD_API_KEY', 'default_mcard_api_key'),
+        mcard_api_port=int(os.getenv(ENV_API_PORT, '3001'))
     )
 
 # Debug logging for API key verification
@@ -49,7 +63,9 @@ def debug_api_key_verification(x_api_key: str, settings: AppSettings):
     if x_api_key != settings.mcard_api_key:
         print(f"API Key Verification Failed - Received: {repr(x_api_key)}, Expected: {repr(settings.mcard_api_key)}")
 
-async def verify_api_key(x_api_key: str = Header(...), settings: AppSettings = Depends(load_app_settings)):
+async def verify_api_key(x_api_key: Optional[str] = Header(None), settings: AppSettings = Depends(load_config)):
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API Key required")
     debug_api_key_verification(x_api_key, settings)
     if x_api_key != settings.mcard_api_key:
         raise HTTPException(status_code=403, detail="Invalid API Key")
@@ -63,45 +79,110 @@ class CardCreate(BaseModel):
 class CardResponse(BaseModel):
     content: str
     hash: str
-    g_time: str
+    g_time: Optional[datetime]
 
-@app.post("/cards/", response_model=CardResponse, status_code=201, dependencies=[Depends(verify_api_key)])
-async def create_card(card: CardCreate, repo: CardRepository = Depends(get_repository)):
-    print(f"Received request to create card with content: {card.content}")
+async def get_store() -> CardStore:
+    """Get store instance."""
+    settings = load_config()
+    config = SQLiteConfig(
+        db_path=settings.database.db_path,
+        max_connections=settings.database.max_connections,
+        timeout=settings.database.timeout
+    )
+    return AsyncPersistenceWrapper(config)
+
+class MCardAPI:
+    """API wrapper for MCard operations."""
+    
+    def __init__(self, store: Optional[CardStore] = None, repository: Optional[CardStore] = None):
+        """Initialize MCardAPI with a store or repository."""
+        self.store = store or repository
+        if self.store is None:
+            raise ValueError("Either store or repository must be provided")
+        self.app = CardProvisioningApp(self.store)
+
+    async def create_card(self, content: str) -> MCard:
+        """Create a new card with the given content."""
+        try:
+            return await self.app.create_card(content)
+        except StorageError as e:
+            logger.error(f"Failed to create card: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def get_card(self, hash_str: str) -> MCard:
+        """Get a card by its hash."""
+        try:
+            card = await self.app.retrieve_card(hash_str)
+            if not card:
+                raise HTTPException(status_code=404, detail=f"Card with hash {hash_str} not found")
+            return card
+        except StorageError as e:
+            logger.error(f"Failed to get card: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def list_cards(self, content: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
+        """List cards with optional filtering and pagination."""
+        try:
+            return await self.app.list_cards_by_content(content=content, limit=limit, offset=offset)
+        except StorageError as e:
+            logger.error(f"Failed to list cards: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def remove_card(self, hash_str: str) -> None:
+        """Remove a card by its hash."""
+        try:
+            await self.app.decommission_card(hash_str)
+        except StorageError as e:
+            logger.error(f"Failed to remove card: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the store on startup."""
     try:
-        print(f"Repository instance ID during creation: {id(repo)}")
-        print(f"Attempting to create card with content: {card.content}")
-        content_bytes = card.content.encode('utf-8')
-        hash_value = await get_hashing_service().hash_content(content_bytes)
-        mcard = MCard(content=card.content, hash=hash_value)
-        print(f"Repository instance ID during save: {id(repo)}")
-        print(f"Attempting to save card with hash: {mcard.hash}")
-        await repo.save(mcard)
-        print(f"Card saved with hash: {mcard.hash}")
-        print(f"Card created with hash: {mcard.hash}")
-        g_time_str = mcard.g_time.isoformat() if isinstance(mcard.g_time, datetime) else mcard.g_time
-        print(f"Created card: {mcard}")
-        response_data = CardResponse(content=mcard.content, hash=mcard.hash, g_time=g_time_str)
-        print(f"Returning response for created card: {response_data}")
-        return response_data
+        # Test store connection and initialize schema
+        repo = await get_store()
+        await repo.get_all(limit=1)
+        logger.info("Database connection test successful")
     except Exception as e:
-        print(f"Error creating card: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"store initialization failed with error: {str(e)}")
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources on shutdown."""
+    try:
+        # Get the current store instance and close it
+        repo = await get_store()
+        await repo.close()
+        logger.info("store closed successfully")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {str(e)}")
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {"status": "ok"}
+
+@app.post("/cards/", response_model=CardResponse, dependencies=[Depends(verify_api_key)])
+async def create_card(card: CardCreate, repo: CardStore = Depends(get_store)):
+    api = MCardAPI(repo)
+    result = await api.create_card(card.content)
+    return CardResponse(
+        content=result.content,
+        hash=result.hash,
+        g_time=result.g_time
+    )
 
 @app.get("/cards/{hash_str}", response_model=CardResponse, dependencies=[Depends(verify_api_key)])
-async def get_card(hash_str: str, repo: CardRepository = Depends(get_repository)):
-    print(f"Received request to get card with hash: {hash_str}")
-    print(f"Repository instance ID during retrieval: {id(repo)}")
-    try:
-        card = await repo.get(hash_str)
-        if card is None:
-            raise HTTPException(status_code=404, detail="Card not found")
-        g_time_str = card.g_time.isoformat() if isinstance(card.g_time, datetime) else card.g_time
-        return CardResponse(content=card.content, hash=card.hash, g_time=g_time_str)
-    except StorageError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_card(hash_str: str, repo: CardStore = Depends(get_store)):
+    api = MCardAPI(repo)
+    result = await api.get_card(hash_str)
+    return CardResponse(
+        content=result.content,
+        hash=result.hash,
+        g_time=result.g_time
+    )
 
 @app.get("/cards/", response_model=List[CardResponse], dependencies=[Depends(verify_api_key)])
 async def list_cards(
@@ -110,44 +191,23 @@ async def list_cards(
     content: Optional[str] = None,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
-    repo: CardRepository = Depends(get_repository)
+    repo: CardStore = Depends(get_store)
 ):
-    print("Received request to list cards")
-    cards = await repo.get_all()
-    
-    # Apply filters
-    if start_time:
-        cards = [c for c in cards if c.g_time >= start_time]
-    if end_time:
-        cards = [c for c in cards if c.g_time <= end_time]
-    if content:
-        cards = [c for c in cards if content.lower() in c.content.lower()]
-    
-    # Sort by time
-    cards.sort(key=lambda x: x.g_time, reverse=True)
-    
-    # Apply pagination
-    if offset:
-        cards = cards[offset:]
-    if limit:
-        cards = cards[:limit]
-    
-    return [CardResponse(content=card.content, hash=card.hash, g_time=card.g_time.isoformat() if isinstance(card.g_time, datetime) else card.g_time) for card in cards]
+    api = MCardAPI(repo)
+    results = await api.list_cards(content=content, limit=limit, offset=offset)
+    if results is None:
+        results = []
+    return [
+        CardResponse(
+            content=card.content,
+            hash=card.hash,
+            g_time=card.g_time
+        )
+        for card in results
+    ]
 
 @app.delete("/cards/{hash_str}", status_code=204, dependencies=[Depends(verify_api_key)])
-async def remove_card(hash_str: str, repo: CardRepository = Depends(get_repository)):
-    print(f"Received request to remove card with hash: {hash_str}")
-    
-    try:
-        # First check if the card exists
-        card = await repo.get(hash_str)
-        if card is None:
-            raise HTTPException(status_code=404, detail="Card not found")
-        
-        # Then delete it
-        await repo.delete(hash_str)
-        print(f"Removed card with hash: {hash_str}")
-        return None
-    except Exception as e:
-        print(f"Error removing card: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def remove_card(hash_str: str, repo: CardStore = Depends(get_store)):
+    api = MCardAPI(repo)
+    await api.remove_card(hash_str)
+    return {"message": "Card removed successfully"}

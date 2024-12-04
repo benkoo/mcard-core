@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2>Card Details</h2>
+            <div>
+                <a href="{{ url_for('download_card', hash=card.hash) }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-download"></i> Download
+                </a>
+                <form method="POST" action="{{ url_for('delete_card', hash=card.hash) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this card?');">
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5>Card Information</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Hash</dt>
+                        <dd class="col-sm-8">{{ card.hash }}</dd>
+                        
+                        <dt class="col-sm-4">Created</dt>
+                        <dd class="col-sm-8">{{ card.g_time }}</dd>
+                        
+                        <dt class="col-sm-4">Type</dt>
+                        <dd class="col-sm-8">{{ card.content_type }}</dd>
+                    </dl>
+                </div>
+                <div class="col-md-8">
+                    <h5>Content</h5>
+                    {% if card.is_binary %}
+                        {% if card.is_image %}
+                            <img src="data:{{ card.content_type }};base64,{{ card.content | b64encode }}" 
+                                 class="img-fluid" 
+                                 alt="Card Image" 
+                                 style="max-height: 400px; object-fit: contain;">
+                        {% else %}
+                            <div class="alert alert-info">
+                                <p>This is a binary file of type: {{ card.content_type }}</p>
+                                <p>File size: {{ card.content | length }} bytes</p>
+                                <a href="{{ url_for('download_card', hash=card.hash) }}" class="btn btn-primary btn-sm">
+                                    Download File
+                                </a>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <pre class="card-text bg-light p-3 rounded">{{ card.content }}</pre>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Optional: Add any view-specific JavaScript here
+    });
+</script>
+{% endblock %}

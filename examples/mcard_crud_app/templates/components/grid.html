@@ -1,6 +1,6 @@
 {% from 'components/actions.html' import render_actions %}
 
-{% macro render_grid(cards) %}
+{% macro render_grid(cards, delete_form) %}
 <style>
     .grid-container {
         display: grid;
@@ -50,48 +50,76 @@
     .card-info p {
         margin: 0;
         font-size: 0.875rem;
+        color: #6c757d;
     }
     
     .card-actions {
         padding: 1rem;
         border-top: 1px solid #dee2e6;
+        background-color: #f8f9fa;
     }
 </style>
 
-<div class="grid-container">
-    {% for card in cards %}
-    <div class="card">
-        <div class="card-preview">
-            {% if card['is_image'] %}
-                {% if card['is_svg'] and card['svg_content'] %}
-                    {{ card['svg_content']|safe }}
-                {% else %}
-                    <img src="{{ url_for('get_binary_content', content_hash=card['hash']) }}" alt="Preview">
-                {% endif %}
-            {% else %}
-                {% if card['content'] %}
-                    <div class="text-preview">
-                        <pre style="margin: 0; font-size: 0.875rem;">{{ card['content'][:200] }}...</pre>
+{% if cards %}
+    <div class="grid-container">
+        {% for card in cards %}
+        <div class="card">
+            <div class="card-preview">
+                {% if card.is_image or (card.is_binary and card.content_type.startswith('image/')) %}
+                    {% if card.is_svg and card.svg_content %}
+                        <div class="card-img-top svg-preview">
+                            {{ card.svg_content|safe }}
+                        </div>
+                    {% else %}
+                        <img src="{{ url_for('get_binary_content', hash=card.hash) }}" 
+                             class="card-img-top" 
+                             alt="Card Image" 
+                             onerror="this.onerror=null; this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+                        <div class="card-img-top binary-preview text-center d-none">
+                            <div class="p-3 text-muted">
+                                <span class="d-block">{{ card.content_type or 'Unknown Image' }}</span>
+                                <small>{{ card.content_length or 0 }} bytes</small>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% elif card.content_type.startswith('text/') %}
+                    <div class="card-img-top text-preview p-3">
+                        <pre style="margin: 0; font-size: 0.85rem; max-height: 150px; overflow: hidden;">{{ card.content[:300] }}{% if card.content|length > 300 %}...{% endif %}</pre>
                     </div>
                 {% else %}
-                    [Binary Content]
+                    <div class="text-center py-4">
+                        {% if card.content_type == 'application/pdf' %}
+                            <i class="bi bi-file-pdf text-danger" style="font-size: 2.5rem;"></i>
+                            <div class="mt-2 small text-muted">
+                                {{ card.content_length | default(0) | filesizeformat }}
+                            </div>
+                        {% elif card.is_binary %}
+                            <div class="text-muted">
+                                <span class="d-block">{{ card.content_type }}</span>
+                                <small>{{ card.content_length | default(0) | filesizeformat }}</small>
+                            </div>
+                        {% endif %}
+                    </div>
                 {% endif %}
-            {% endif %}
+            </div>
+            <div class="card-info">
+                <p><strong>Type:</strong> {{ card.content_type }}</p>
+                <p><strong>Hash:</strong> <code>{{ card.hash[:8] }}...</code></p>
+            </div>
+            <div class="card-footer text-muted small">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>{{ card.g_time|datetime if card.g_time else 'Unknown' }}</span>
+                    <div class="btn-group">
+                        {{ render_actions(card, delete_form) }}
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-info">
-            <p><strong>Name:</strong> {{ card['name'] if 'name' in card else 'Untitled' }}</p>
-            <p><strong>Type:</strong> {{ card['content_type'] }}</p>
-            <p><strong>Hash:</strong> <code>{{ card['hash'][:8] }}...</code></p>
-            <p><strong>Created:</strong> {{ format_time(card['g_time']) }}</p>
-        </div>
-        <div class="card-actions">
-            {{ render_actions(card) }}
-        </div>
+        {% endfor %}
     </div>
-    {% else %}
-    <div class="col-12">
-        <div class="alert alert-info text-center">No cards found</div>
+{% else %}
+    <div class="text-center text-muted">
+        <p>No cards found</p>
     </div>
-    {% endfor %}
-</div>
+{% endif %}
 {% endmacro %}

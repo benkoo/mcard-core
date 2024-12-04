@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Script to load content from data/cards directory into the MCard database.
-Recursively finds all files and stores their content as cards.
+Script to load content from data/content directory into the MCard database.
+Recursively finds all files and stores their content as MCard entries.
 """
 
 import sys
@@ -24,7 +24,7 @@ load_dotenv(ENV_FILE, override=True)
 
 from mcard import SQLiteCardRepo, AppSettings, DatabaseSettings, MCard
 from mcard.domain.models.config import HashingSettings, HashAlgorithm
-from mcard.domain.services.hashing import CollisionAwareHashingService, set_hashing_service
+from mcard.domain.services.hashing import DefaultHashingService, set_hashing_service
 
 print(f"MCARD_HASH_ALGORITHM environment variable: {os.environ.get('MCARD_HASH_ALGORITHM')}")
 hash_algo = os.environ.get('MCARD_HASH_ALGORITHM', 'sha256')
@@ -32,6 +32,9 @@ hashing_settings = HashingSettings(algorithm=hash_algo)
 print(f"Using hash algorithm: {hashing_settings.algorithm}")
 
 # Initialize the hashing service with our settings and repository
+hashing_service = DefaultHashingService(settings=hashing_settings)
+set_hashing_service(hashing_service)
+
 def is_binary(file_path: Path) -> bool:
     """Check if a file is binary based on its mimetype."""
     mime_type, _ = mimetypes.guess_type(str(file_path))
@@ -45,8 +48,8 @@ def is_binary(file_path: Path) -> bool:
             return True
     return not mime_type.startswith(('text/', 'application/json', 'application/xml'))
 
-async def load_cards(cards_dir: Path, db_path: str) -> None:
-    """Load all files from cards_dir into the database."""
+async def load_content(content_dir: Path, db_path: str) -> None:
+    """Load all files from content_dir into the database."""
     try:
         # Initialize settings and repository
         settings = AppSettings(
@@ -62,18 +65,14 @@ async def load_cards(cards_dir: Path, db_path: str) -> None:
             pool_size=settings.database.pool_size
         )
 
-        # Initialize the hashing service with our settings and repository
-        hashing_service = CollisionAwareHashingService(settings=hashing_settings, card_repository=repo)
-        set_hashing_service(hashing_service)
-
         try:
             # Find all files recursively
-            files = [f for f in cards_dir.rglob('*') if f.is_file()]
+            files = [f for f in content_dir.rglob('*') if f.is_file()]
             print(f"\nFound {len(files)} files to process")
             
             # Process each file
             for file_path in files:
-                rel_path = file_path.relative_to(cards_dir)
+                rel_path = file_path.relative_to(content_dir)
                 print(f"\nProcessing: {rel_path}")
                 
                 try:
@@ -119,18 +118,18 @@ async def load_cards(cards_dir: Path, db_path: str) -> None:
 
 def main():
     """Main entry point."""
-    cards_dir = PROJECT_ROOT / 'data' / 'cards'
+    content_dir = PROJECT_ROOT / 'data' / 'content'
     db_path = os.getenv('MCARD_DB_PATH')
     
-    if not cards_dir.exists():
-        print(f"Error: Cards directory not found: {cards_dir}", file=sys.stderr)
+    if not content_dir.exists():
+        print(f"Error: Content directory not found: {content_dir}", file=sys.stderr)
         sys.exit(1)
     
     if not db_path:
         print("Error: MCARD_DB_PATH environment variable not set", file=sys.stderr)
         sys.exit(1)
     
-    asyncio.run(load_cards(cards_dir, db_path))
+    asyncio.run(load_content(content_dir, db_path))
 
 if __name__ == "__main__":
     main()

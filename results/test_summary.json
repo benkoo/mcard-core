@@ -1,0 +1,10 @@
+{
+  "total_cards": 3,
+  "mime_types": {
+    "text/plain": 2,
+    "application/json": 1
+  },
+  "languages": {
+    "fr": 1
+  }
+}

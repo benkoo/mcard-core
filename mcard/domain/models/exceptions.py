@@ -1,23 +1,21 @@
-"""
-MCard domain exceptions.
-"""
+"""Domain model exceptions."""
 
 class MCardError(Exception):
-    """Base exception for MCard operations."""
+    """Base exception for all MCard errors."""
     pass
 
 class ValidationError(MCardError):
-    """Validation related errors."""
-    pass
-
-class StorageError(MCardError):
-    """Storage related errors."""
-    pass
-
-class HashingError(MCardError):
-    """Hashing related errors."""
+    """Raised when domain model validation fails."""
     pass
 
 class ConfigurationError(MCardError):
-    """Configuration related errors."""
+    """Raised when configuration validation fails."""
+    pass
+
+class StorageError(MCardError):
+    """Raised when storage operations fail."""
+    pass
+
+class HashingError(MCardError):
+    """Raised when hashing operations fail."""
     pass

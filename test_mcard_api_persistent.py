@@ -24,14 +24,14 @@ async def test_mcard_api_persistent():
         # Create a cursor
         cursor = conn.cursor()
         
-        # Create the cards table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS cards (
+        # Create the card table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS card (
             hash TEXT PRIMARY KEY,
-            content TEXT NOT NULL,
+            content BLOB NOT NULL,
             g_time TEXT NOT NULL
         )
-        ''')
+        """)
         
         # Commit the changes
         conn.commit()
@@ -40,7 +40,7 @@ async def test_mcard_api_persistent():
         conn.close()
 
     # Create a persistent repository
-    shared_repo = SQLiteRepository(db_path=DB_PATH)
+    shared_repo = SQLiteStore(db_path=DB_PATH)
 
     # Test content
     test_contents = [
@@ -75,21 +75,21 @@ async def test_mcard_api_persistent():
             
             # Insert cards directly
             for card_data in list_response.json():
-                cursor.execute('''
-                INSERT OR REPLACE INTO cards (hash, content, g_time)
+                cursor.execute("""
+                INSERT OR REPLACE INTO card (hash, content, g_time)
                 VALUES (?, ?, ?)
-                ''', (card_data['hash'], card_data['content'], card_data['g_time']))
+                """, (card_data['hash'], card_data['content'].encode(), card_data['g_time']))
             
             conn.commit()
             
             # Fetch all cards from the database
-            cursor.execute("SELECT hash, content FROM cards")
+            cursor.execute("SELECT hash, content FROM card")
             db_cards = cursor.fetchall()
             
             print("\nDatabase Contents:")
             for db_hash, db_content in db_cards:
-                print(f"Hash: {db_hash}, Content: {db_content}")
-                assert db_content in test_contents, f"Content {db_content} not found in expected contents"
+                print(f"Hash: {db_hash}, Content: {db_content.decode()}")
+                assert db_content.decode() in test_contents, f"Content {db_content.decode()} not found in expected contents"
             
             # Verify the number of cards
             assert len(db_cards) == len(test_contents), "Not all cards were saved to the database"

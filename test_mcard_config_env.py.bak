@@ -1,0 +1,173 @@
+import os
+import asyncio
+import logging
+import tempfile
+import pytest
+import pytest_asyncio
+from httpx import AsyncClient
+import sqlite3
+import dotenv
+
+# Import configuration and schema initialization
+from mcard.domain.models.config import AppSettings, DatabaseSettings
+from mcard.infrastructure.persistence.schema_initializer import SchemaInitializer, get_repository
+from mcard.infrastructure.repository import SQLiteRepository
+
+# Import the main API application
+from mcard.interfaces.api.mcard_api import app, load_app_settings
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+
+@pytest.fixture
+def temp_env_file():
+    """Create a temporary .env file with custom configuration."""
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.env') as temp_env:
+        # Write custom configuration
+        temp_env.write("""
+# Custom Test Configuration
+MCARD_API_KEY=test_custom_api_key_12345
+MCARD_API_PORT=8888
+MCARD_MANAGER_DB_PATH=test_custom_database.db
+MCARD_MANAGER_DATA_SOURCE=sqlite
+MCARD_MANAGER_POOL_SIZE=3
+MCARD_MANAGER_TIMEOUT=15.0
+""")
+        temp_env.flush()
+        
+    # Explicitly load the environment variables from the temp file
+    dotenv.load_dotenv(temp_env.name, override=True)
+    
+    # Verify the environment variables are loaded
+    print("Loaded Environment Variables:")
+    print(f"MCARD_API_KEY: {os.getenv('MCARD_API_KEY')}")
+    print(f"MCARD_MANAGER_DB_PATH: {os.getenv('MCARD_MANAGER_DB_PATH')}")
+    
+    # Reload the app settings to ensure they reflect the latest environment variables
+    loaded_app_settings = load_app_settings()
+    
+    yield temp_env.name
+    
+    # Clean up: remove the temporary file and reset environment
+    os.unlink(temp_env.name)
+    # Unset the environment variables
+    for key in [
+        'MCARD_API_KEY', 'MCARD_API_PORT', 
+        'MCARD_MANAGER_DB_PATH', 'MCARD_MANAGER_DATA_SOURCE', 
+        'MCARD_MANAGER_POOL_SIZE', 'MCARD_MANAGER_TIMEOUT'
+    ]:
+        os.unsetenv(key)
+
+@pytest_asyncio.fixture
+async def app_settings():
+    """Load application settings from the temporary .env file."""
+    # Return the reloaded app_settings
+    return load_app_settings()
+
+@pytest_asyncio.fixture
+async def async_client():
+    """Create an async client for testing."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        yield client
+
+@pytest_asyncio.fixture
+async def initialized_database(app_settings):
+    """Initialize the database for testing."""
+    db_path = app_settings.database.db_path
+    
+    # Ensure database file is removed before test
+    if os.path.exists(db_path):
+        os.remove(db_path)
+
+    # Initialize database schema
+    conn = sqlite3.connect(db_path)
+    try:
+        # Manually initialize the schema
+        SchemaInitializer.initialize_schema(conn)
+    finally:
+        conn.close()
+    
+    # Clear any existing repository instance to force re-initialization
+    from mcard.infrastructure.persistence.schema_initializer import _shared_repository_instance
+    global _shared_repository_instance
+    _shared_repository_instance = None
+    
+    return db_path
+
+@pytest_asyncio.fixture
+async def custom_api_key(app_settings):
+    """Return the custom API key from settings."""
+    return app_settings.mcard_api_key
+
+@pytest_asyncio.fixture
+async def test_content():
+    """Provide a test content for card creation."""
+    return "Configuration Test Card"
+
+@pytest.mark.asyncio
+async def test_config_env_loading(
+    temp_env_file, 
+    app_settings, 
+    async_client, 
+    initialized_database, 
+    custom_api_key, 
+    test_content
+):
+    """
+    Test configuration loading from a custom .env file:
+    1. Verify that custom API key is loaded correctly
+    2. Verify that custom database path is used
+    3. Test API authentication with custom key
+    4. Verify database creation at custom path
+    """
+    # Print out loaded settings for debugging
+    print("\n--- Loaded Configuration ---")
+    print(f"API Key: {app_settings.mcard_api_key}")
+    print(f"Database Path: {app_settings.database.db_path}")
+    print(f"Data Source: {app_settings.database.data_source}")
+    print(f"Pool Size: {app_settings.database.pool_size}")
+    print(f"Timeout: {app_settings.database.timeout}")
+
+    # Verify custom API key
+    assert app_settings.mcard_api_key == 'test_custom_api_key_12345', "Custom API key not loaded correctly"
+    
+    # Try creating a card with the custom API key
+    create_response = await async_client.post("/cards/", 
+                                            json={"content": test_content}, 
+                                            headers={"x-api-key": custom_api_key})
+    
+    # Verify card creation successful
+    assert create_response.status_code == 201, f"Card creation failed with custom API key. Response: {create_response.text}"
+    created_card = create_response.json()
+    
+    # Verify card content
+    assert created_card['content'] == test_content, "Card content mismatch"
+
+    # List cards to further verify API functionality
+    list_response = await async_client.get("/cards/", 
+                                         headers={"x-api-key": custom_api_key})
+    assert list_response.status_code == 200, "Card listing failed"
+    
+    # Verify the card is in the list
+    list_cards = list_response.json()
+    assert any(card['content'] == test_content for card in list_cards), "Created card not found in list"
+
+    # Verify database file was created at the specified path
+    assert os.path.exists(initialized_database), f"Database file not created at {initialized_database}"
+
+    # Optional: Verify database contents directly
+    conn = sqlite3.connect(initialized_database)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT content FROM card")
+        db_contents = [row[0] for row in cursor.fetchall()]
+        assert test_content.encode() in db_contents, "Card not saved in database"
+    finally:
+        conn.close()
+
+    print("\n--- Test Completed Successfully ---")
+
+if __name__ == "__main__":
+    # Use pytest to run the async test
+    import pytest
+    pytest.main([__file__])

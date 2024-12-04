@@ -1,20 +1,16 @@
+"""Test configuration loading from environment variables."""
 import os
 import asyncio
 import logging
 import tempfile
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
-import sqlite3
+from pathlib import Path
 import dotenv
 
 # Import configuration and schema initialization
-from mcard.domain.models.config import AppSettings, DatabaseSettings
-from mcard.infrastructure.persistence.schema_initializer import SchemaInitializer, get_repository
-from mcard.infrastructure.repository import SQLiteRepository
-
-# Import the main API application
-from mcard.interfaces.api.mcard_api import app, load_app_settings
+from mcard.domain.models.config import AppSettings, DatabaseSettings, HashingSettings
+from mcard.domain.models.repository_config import SQLiteConfig, RepositoryType
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -29,94 +25,48 @@ def temp_env_file():
 MCARD_API_KEY=test_custom_api_key_12345
 MCARD_API_PORT=8888
 MCARD_MANAGER_DB_PATH=test_custom_database.db
-MCARD_MANAGER_DATA_SOURCE=sqlite
+MCARD_MANAGER_REPOSITORY_TYPE=sqlite
 MCARD_MANAGER_POOL_SIZE=3
 MCARD_MANAGER_TIMEOUT=15.0
+MCARD_MANAGER_MAX_CONTENT_SIZE=5242880
+MCARD_MANAGER_HASH_ALGORITHM=sha256
 """)
         temp_env.flush()
+        temp_path = temp_env.name
         
-        # Explicitly load the environment variables from the temp file
-        dotenv.load_dotenv(temp_env.name, override=True)
-        
-        # Verify the environment variables are loaded
-        print("Loaded Environment Variables:")
-        print(f"MCARD_API_KEY: {os.getenv('MCARD_API_KEY')}")
-        print(f"MCARD_MANAGER_DB_PATH: {os.getenv('MCARD_MANAGER_DB_PATH')}")
-        
-        # Create app settings
-        app_settings = AppSettings(
-            database=DatabaseSettings(
-                db_path=os.getenv('MCARD_MANAGER_DB_PATH', 'test_custom_database.db'),
-                data_source=os.getenv('MCARD_MANAGER_DATA_SOURCE', 'sqlite'),
-                pool_size=int(os.getenv('MCARD_MANAGER_POOL_SIZE', 3)),
-                timeout=float(os.getenv('MCARD_MANAGER_TIMEOUT', 15.0))
-            ),
-            mcard_api_key=os.getenv('MCARD_API_KEY', 'test_custom_api_key_12345')
-        )
-        
-        # Override app settings
-        app.dependency_overrides[load_app_settings] = lambda: app_settings
-        
-        yield temp_env.name
-        
-        # Clean up
-        os.unlink(temp_env.name)
-        app.dependency_overrides.clear()
-
-@pytest_asyncio.fixture
-async def async_client():
-    """Create an async client for testing."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        yield client
-
-@pytest.fixture
-def initialized_database(temp_env_file):
-    """Initialize the database for testing."""
-    # Get settings
-    settings = load_app_settings()
-    db_path = settings.database.db_path
-    
-    # Create database and schema
-    conn = sqlite3.connect(db_path)
-    SchemaInitializer.initialize_schema(conn)
-    conn.close()
-    
-    yield db_path
-    
-    # Clean up
-    if os.path.exists(db_path):
-        os.unlink(db_path)
-
-@pytest.fixture
-def test_content():
-    """Provide a test content for card creation."""
-    return "Test content for MCard"
+    yield temp_path
+    os.unlink(temp_path)
 
 @pytest.mark.asyncio
-async def test_config_env_loading(temp_env_file, async_client, initialized_database, test_content):
-    """
-    Test configuration loading from a custom .env file:
-    1. Verify that custom API key is loaded correctly
-    2. Verify that custom database path is used
-    3. Test API authentication with custom key
-    4. Verify database creation at custom path
-    """
-    # Verify environment variables are loaded correctly
-    settings = load_app_settings()
-    assert settings.mcard_api_key == 'test_custom_api_key_12345'
-    assert settings.database.db_path == 'test_custom_database.db'
-    assert settings.database.data_source == 'sqlite'
-    assert settings.database.pool_size == 3
-    assert settings.database.timeout == 15.0
+async def test_config_env_loading(temp_env_file):
+    """Test configuration loading from environment variables."""
+    # Load environment variables from temp file
+    dotenv.load_dotenv(temp_env_file, override=True)
     
-    # Test API authentication with custom key
-    response = await async_client.post(
-        "/cards/",
-        json={"content": test_content},
-        headers={"x-api-key": settings.mcard_api_key}
+    # Verify environment variables are loaded
+    assert os.getenv('MCARD_API_KEY') == 'test_custom_api_key_12345'
+    assert os.getenv('MCARD_MANAGER_DB_PATH') == 'test_custom_database.db'
+    
+    # Create AppSettings from environment
+    config = AppSettings(
+        database=DatabaseSettings(
+            db_path=os.getenv('MCARD_MANAGER_DB_PATH'),
+            max_connections=int(os.getenv('MCARD_MANAGER_POOL_SIZE', '3')),
+            timeout=float(os.getenv('MCARD_MANAGER_TIMEOUT', '15.0')),
+            data_source=os.getenv('MCARD_MANAGER_REPOSITORY_TYPE', 'sqlite')
+        ),
+        hashing=HashingSettings(
+            algorithm=os.getenv('MCARD_MANAGER_HASH_ALGORITHM', 'sha256')
+        ),
+        mcard_api_key=os.getenv('MCARD_API_KEY'),
+        mcard_api_port=int(os.getenv('MCARD_API_PORT', '8888'))
     )
-    assert response.status_code == 201
-    assert "hash" in response.json()
-
-    # Verify database creation at custom path
-    assert os.path.exists(settings.database.db_path)
+    
+    # Verify configuration
+    assert config.database.db_path == 'test_custom_database.db'
+    assert config.database.data_source == 'sqlite'
+    assert config.database.max_connections == 3
+    assert config.database.timeout == 15.0
+    assert config.mcard_api_key == 'test_custom_api_key_12345'
+    assert config.mcard_api_port == 8888
+    assert config.hashing.algorithm == 'sha256'

@@ -1,88 +1,108 @@
 {% extends "base.html" %}
-{% from "hash_display.html" import render_hash %}
 
-{% block title %}MCard CRUD App - View Card{% endblock %}
-
-{% block styles %}
-{{ super() }}
-<style>
-    .svg-container {
-        width: 100%;
-        max-width: 800px;
-        margin: 0 auto;
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.25rem;
-    }
-    .svg-container svg {
-        width: 100%;
-        height: auto;
-        min-height: 200px;
-    }
-    .binary-preview {
-        max-height: 600px;
-        width: auto;
-        margin: 0 auto;
-        display: block;
-    }
-</style>
+{% block head %}
+    <!-- Add PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Set worker path for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 {% endblock %}
 
 {% block content %}
-<div class="content-container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>View Card</h2>
-        <div class="btn-group">
-            <a href="{{ url_for('download_card', content_hash=card['hash']) }}" class="btn btn-primary">
-                <i class="bi bi-download me-1"></i> Download
-            </a>
-            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i> Back
-            </a>
-            <form action="{{ url_for('delete', content_hash=card['hash']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this card?');">
-                <button type="submit" class="btn btn-outline-danger">
-                    <i class="bi bi-trash"></i> Delete
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="card-title mb-0">Hash: {{ render_hash(card['hash']) }}</h5>
-                    <small class="text-muted">
-                        Type: <span class="badge bg-secondary">{{ content_type }}</span>
-                        {% if extension %}<span class="badge bg-info">.{{ extension }}</span>{% endif %}
-                        <span class="badge bg-light text-dark">{{ '{:,}'.format(size) }} bytes</span>
-                    </small>
-                </div>
-                <small class="text-muted">Created: {{ format_time(card['g_time']) }}</small>
-            </div>
-        </div>
-        <div class="card-body">
-            {% if content_type == 'image/svg+xml' %}
-                <div class="svg-container">
-                    {{ content|safe }}
-                </div>
-            {% elif is_binary %}
-                {% if is_image %}
-                    <img src="{{ url_for('get_binary_content', content_hash=card['hash']) }}" alt="Binary content" class="binary-preview img-fluid">
-                {% else %}
-                    <div class="alert alert-info">
-                        <i class="bi bi-file me-2"></i>
-                        Binary content ({{ '{:,}'.format(size) }} bytes)
-                        {% if content_type != 'application/octet-stream' %}
-                        <br>
-                        <small class="text-muted">Detected format: {{ content_type }}</small>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col">
+            <h2>View Card</h2>
+            
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ card.hash }}</h5>
+                    
+                    {% if card.is_image or (card.is_binary and card.content_type.startswith('image/')) %}
+                        {% if card.is_svg and card.svg_content %}
+                            <div class="svg-preview">
+                                {{ card.svg_content|safe }}
+                            </div>
+                        {% else %}
+                            <img src="{{ url_for('get_binary_content', hash=card.hash) }}" 
+                                 class="img-fluid" 
+                                 alt="Card Image"
+                                 onerror="this.onerror=null; this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+                            <div class="binary-preview text-center d-none">
+                                <div class="p-3 text-muted">
+                                    <span class="d-block">{{ card.content_type or 'Unknown Image' }}</span>
+                                    <small>{{ card.content_length or 0 }} bytes</small>
+                                </div>
+                            </div>
                         {% endif %}
+                    {% elif card.content_type == 'application/pdf' %}
+                        <div class="pdf-container">
+                            <object data="{{ url_for('get_binary_content', hash=card.hash) }}" 
+                                    type="application/pdf" 
+                                    width="100%" 
+                                    height="600px"
+                                    onerror="this.onerror=null; this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+                                <div class="text-center py-4">
+                                    <i class="bi bi-file-pdf text-danger" style="font-size: 2.5rem;"></i>
+                                    <div class="mt-2">
+                                        <p class="text-muted mb-1">PDF viewer not available</p>
+                                        <a href="{{ url_for('get_binary_content', hash=card.hash) }}" class="btn btn-primary btn-sm" target="_blank">
+                                            Download PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </object>
+                        </div>
+                    {% elif card.content_type.startswith('text/') %}
+                        <div class="text-preview p-3">
+                            <pre style="white-space: pre-wrap;">{{ card.content }}</pre>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">
+                                <span class="d-block">{{ card.content_type }}</span>
+                                <small>{{ card.content_length | default(0) | filesizeformat }}</small>
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ url_for('get_binary_content', hash=card.hash) }}" class="btn btn-primary btn-sm" target="_blank">
+                                    Download File
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="mt-4">
+                        <h6>Details:</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Content Type:</strong> {{ card.content_type }}</li>
+                            <li><strong>Size:</strong> {{ card.content_length | default(0) | filesizeformat }}</li>
+                            <li><strong>g_time:</strong> {{ card.g_time | datetime }}</li>
+                        </ul>
                     </div>
-                {% endif %}
-            {% else %}
-                <pre class="card-text"><code>{{ content }}</code></pre>
-            {% endif %}
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to List</a>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.querySelector('.language-json')) {
+            try {
+                const jsonElement = document.querySelector('.language-json');
+                const jsonContent = JSON.parse(jsonElement.textContent);
+                jsonElement.textContent = JSON.stringify(jsonContent, null, 2);
+            } catch (e) {
+                console.log('Could not format JSON', e);
+            }
+        }
+    });
+</script>
 {% endblock %}

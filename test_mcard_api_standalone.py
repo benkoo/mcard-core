@@ -9,7 +9,7 @@ from mcard.infrastructure.persistence.sqlite import SQLiteRepository
 logging.basicConfig(level=logging.DEBUG)
 
 # Create an in-memory repository
-shared_repo = SQLiteRepository(db_path=':memory:')
+shared_repo = SQLiteStore(db_path=':memory:')
 
 async def test_mcard_api():
     async with AsyncClient(app=app, base_url="http://test") as client:
