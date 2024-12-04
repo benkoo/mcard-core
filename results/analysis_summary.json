@@ -1,0 +1,18 @@
+{
+  "total_cards": 17,
+  "mime_types": {
+    "text/html": 1,
+    "application/x-empty": 1,
+    "text/plain": 11,
+    "application/pdf": 3,
+    "application/octet-stream": 1
+  },
+  "languages": {
+    "en": 5,
+    "sl": 2,
+    "zh-tw": 1,
+    "ko": 1,
+    "id": 4,
+    "it": 1
+  }
+}

@@ -35,7 +35,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_SIZE
 
 # Configure logging
 logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
+    level=getattr(logging, LOG_LEVEL.upper()),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         RotatingFileHandler(LOG_FILE, maxBytes=1024*1024, backupCount=5),

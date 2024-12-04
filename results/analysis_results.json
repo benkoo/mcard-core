@@ -1,0 +1,410 @@
+[
+  {
+    "title": "\"React Web App Architecture Guidelines: Best Practices for Functional Components, Data Management, Fetching, TailwindCSS, Component Structure, Commenting, TypeScript, Testing, Avoid Monolithic Components, and Configurations\"",
+    "mime_type": "text/html",
+    "languages": [
+      {
+        "lang": "en",
+        "prob": 0.9999959231042634
+      }
+    ],
+    "summary": "The text discusses the guidelines for building a scalable and efficient React web application. Key points include using functional components, managing data with hooks, fetching data efficiently using SWR and Apollo Client, styling with TailwindCSS, wrapping components in a consistent structure, commenting best practices, and general best practices such as using TypeScript for type safety and thoroughly testing components. The importance of consistency across the development team is emphasized to ensure code readability and maintainability.",
+    "mcard": {
+      "content_hash": "b7a82da07558552ed3039d90e9d9dcd94639cc5edd7eac763f829b5496ba4f10",
+      "time_claimed": "2024-11-23T10:01:40.363396+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"Simple File Explorer\"",
+    "mime_type": "application/x-empty",
+    "languages": [],
+    "summary": "I'm sorry, but as an AI language model, I cannot directly view images or other multimedia files. However, if you provide a detailed description of the image in text format, I can help you understand it and answer any questions you might have about it.",
+    "mcard": {
+      "content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "time_claimed": "2024-11-23T10:01:40.363452+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"LangChain's Text Splitting Feature: Improving Comprehension and Processing Efficiency in NLP Technologies\"",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "sl",
+        "prob": 0.9999999999999998
+      }
+    ],
+    "summary": "Text splitting in LangChain is an important feature that helps divide large texts into smaller segments, improving comprehension and processing efficiency. ChatGPT, developed by OpenAI, is a conversational AI model capable of understanding and generating human-like text for dynamic interactions and contextually relevant responses. Integrating ChatGPT with LangChain enables efficient navigation and analysis of vast text data, leading to deeper understanding and more insightful conclusions.",
+    "mcard": {
+      "content_hash": "cfbd4734fdae9c22c564e9a146d6671a4612153d4171317432081c099c8f9339",
+      "time_claimed": "2024-11-23T10:01:40.363521+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "The image you provided is a screenshot of a mathematical proof related to the Pythagorean theorem. This theorem states that in a right-angled triangle, the square of the length of the hypotenuse (the side opposite the right angle) is equal to the sum of the squares of the lengths of the other two sides.\n\nIn this specific screenshot, the proof involves a series of trigonometric equations and identities related to the sine and cosine functions. The text in the image references various sources such as [1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12], [13], [14], [15], [16], and [17] which are likely to be sources of information or inspiration for the proof.\n\nIt is important to note that the image contains mathematical notation and equations, and it may not be fully accessible to everyone without a background in trigonometry and calculus. Additionally, while I can confirm that the text refers to known sources related to trigonometry and mathematics, I cannot verify the accuracy or completeness of the proof presented in the image.",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "sl",
+        "prob": 0.9999946777176381
+      }
+    ],
+    "summary": "I apologize, but I am unable to browse the internet and do not have access to specific websites or articles. However, I can tell you that the Pythagorean theorem is a fundamental principle in Euclidean geometry that relates the lengths of the sides of a right-angled triangle. It states that the square of the length of the hypotenuse (the side opposite the right angle) is equal to the sum of the squares of the lengths of the other two sides. This theorem has been proven using various methods, including geometric proofs, algebraic proofs, and proofs based on axioms.",
+    "mcard": {
+      "content_hash": "9cdca4b7194a7ed0f11ba0d629ebab6de6b8305d8b0eeb179cec3be26136a1d8",
+      "time_claimed": "2024-11-23T10:01:40.363646+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "The ABC curriculum is a comprehensive educational experience that integrates theoretical insights, practical skills, and an adaptive mindset. It emphasizes the principles of freedom and justice, drawing inspiration from the Free Software Movement and the scalability and decentralized nature of the Internet. The curriculum is designed to be replicated easily and enable bootstrapping in resource-constrained environments, with a focus on timely content management and the understanding that data is the foundation of rational thought. It's recommended to start with the foundational course: History of Counting.",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "en",
+        "prob": 0.9999948811742112
+      }
+    ],
+    "summary": "The [[ABC curriculum]] is a comprehensive and order-preserving educational program designed for the Cloud Native era, where computationally intensive processes and interconnected networks are prevalent. The curriculum emphasizes the importance of freedom, justice, and data sovereignty, fostering the emergence of new ideas and life forms. It provides an adaptive mindset crucial for success in the Generative AI era by integrating [[Archetypal Theory]], [[Broadly accessible tools|Broadly Accessible Tools]], and [[Context|Contextualized Applications]]. The curriculum is domain-independent, cross-platform, and encourages open collaboration and continuous learning. To get started, it's recommended to start with the foundational course: [[History of Counting]] and then follow the [[ABC Roadmap]].",
+    "mcard": {
+      "content_hash": "0ebc2a7e7e2ff134548225ed48ff3c577cee84a15ee7b84a5a177d980f66d85d",
+      "time_claimed": "2024-11-23T10:01:40.363720+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\u60a8\u597d\uff01\u5982\u679c\u60a8\u6709\u4efb\u4f55\u95dc\u65bc\u9019\u500b\u5341\u725b\u5716\u6216\u5176\u4ed6\u554f\u984c\u9700\u8981\u5e6b\u52a9\uff0c\u8acb\u96a8\u6642\u544a\u77e5\u6211\u3002\u6211\u6703\u5c3d\u529b\u56de\u7b54\u4e26\u63d0\u4f9b\u76f8\u61c9\u7684\u8cc7\u8a0a\u548c\u6307\u5f15\u3002",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "zh-tw",
+        "prob": 0.8571426444434505
+      },
+      {
+        "lang": "ko",
+        "prob": 0.14285650752396345
+      }
+    ],
+    "summary": "\u975e\u5e38\u611f\u8b1d\u60a8\u63d0\u4f9b\u9019\u500b\u5341\u725b\u5716\u7684\u89e3\u91cb\u548c\u8aaa\u660e\u3002\u5b83\u662f\u4e00\u9996\u4e2d\u570b\u6587\u5316\u88e1\u6700\u8457\u540d\u7684\u5c0f\u8bf4\uff0c\u5176\u4e2d\u5305\u542b\u8a31\u591a\u6df1\u523b\u7684\u6559\u80b2\u5167\u5bb9\u548c\u54f2\u5b78\u601d\u60f3\u3002\u5177\u9ad4\u4f86\u8aaa\uff0c\u9019\u9996\u5c0f\u8bf4\u63cf\u8ff0\u4e86\u4eba\u985e\u5728\u8ffd\u6c42\u751f\u5b58\u3001\u8ca1\u5bcc\u3001\u6b0a\u529b\u7b49\u76ee\u6a19\u6642\u6240\u9762\u81e8\u7684\u56f0\u5883\u548c\u932f\u8aa4\uff0c\u4e26\u63d0\u5230\u4e86\u901a\u904e\u4fee\u884c\u3001\u50f9\u503c\u89c0\u548c\u667a\u6167\u7684\u5718\u7d50\u4f86\u89e3\u6c7a\u9019\u4e9b\u554f\u984c\u3002\n\n\u5728\u8fd9\u4e2a\u5c0f\u8bf4\u4e2d\uff0c\u6709\u4e00\u53ea\u88ab\u7262\u98fe\u8d77\u6765\u7684\u725b\u53eb\u505a\u201c\u5341\u725b\u201d\uff0c\u5b83\u662f\u8fd9\u4e2a\u4e16\u754c\u4e0a\u6700\u91cd\u8981\u7684\u5b58\u5728\u4e4b\u4e00\uff0c\u56e0\u4e3a\u5b83\u4ee3\u8868\u7740\u4eba\u985e\u7684\u667a\u6167\u548c\u50f9\u503c\u89c0\u3002\u5341\u725b\u4e00\u76f4\u8e10\u8457\u81ea\u5df1\u7684\u71df\u696d\u8def\u7dda\uff0c\u4f46\u5176\u5be6\u5b83\u4e26\u6c92\u6709\u771f\u6b63\u8d70\u5230\u4e86\u81ea\u5df1\u60f3\u53bb\u7684\u5730\u65b9\u3002\u6700\u7d42\uff0c\u5341\u725b\u88ab\u6253\u6b7b\u4e86\uff0c\u5b83\u4e5f\u53ea\u662f\u5728\u9019\u500b\u4e16\u754c\u4e0a\u6eff\u8655\u6d88\u5931\u4e86\u3002\n\n\u6b64\u5916\uff0c\u5341\u725b\u7684\u53ec\u559a\u4eba\u7269\u662f\u4e00\u4f4d\u540d\u53eb\u201c\u50e7\u5e08\u201d\u7684\u7d14\u771f\u826f\u5584\u7684\u4eba\u7269\uff0c\u4ed6\u537b\u98c4\u8457\u5bc2\u9759\u3001\u7121\u70ba\u4e4b\u5fc3\uff0c\u4f46\u56e0\u70ba\u9019\u500b\u4e16\u754c\u4e0a\u6c92\u6709\u7406\u89e3\u4ed6\u7684\u672c\u8cea\u548c\u610f\u7fa9\u3002\u6700\u7d42\uff0c\u4ed6\u4e5f\u6b7b\u4e86\u3002\n\n\u9019\u662f\u4e00\u9996\u50b3\u8aaa\u4e2d\u5f88\u7d93\u5178\u7684\u5c0f\u8aaa\uff0c\u5c0d\u65bc\u4eba\u985e\u7684\u667a\u6167\u3001\u50f9\u503c\u89c0\u548c\u9053\u5fb7\u54c1\u8cea\u975e\u5e38\u6709\u555f\u793a\u3002\u5b83\u5011\u662f\u4e00\u500b\u5de8\u5927\u7684\u7bc7\u7ae0\uff0c\u5176\u4e2d\u5305\u542b\u4e86\u5982\u4f55\u770b\u5f85\u751f\u547d\u3001\u7269\u805e\u548c\u4e16\u754c\u7684\u65b9\u6cd5\u4ee5\u53ca\u4eba\u985e\u61c9\u8a72\u53bb\u8ffd\u6c42\u7684\u76ee\u6a19\u3002",
+    "mcard": {
+      "content_hash": "85e5b064d0ccf74d744b4795f6e8aac5cbe408692dbaabc6ef8bee010031e7ae",
+      "time_claimed": "2024-11-23T10:01:40.364299+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"A Beginner's Guide to Learning JavaScript\"",
+    "mime_type": "application/pdf",
+    "languages": [],
+    "summary": "As an AI language model, I'm unable to directly view or describe the contents of a PDF file. However, if you can provide me with some details about the file, such as its title or summary, I might be able to give you more information.",
+    "mcard": {
+      "content_hash": "5dc03906f76e0e0d5ed52d2b8545d01a7fe1c251a3df0a8dd66497a66edcad22",
+      "time_claimed": "2024-11-23T10:01:40.372071+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"Quick Guide to Applying for a Loan\"",
+    "mime_type": "application/pdf",
+    "languages": [],
+    "summary": "I'm sorry, but I am unable to view or interpret the contents of a PDF file. Can you please provide me with more information about the document or specify what you would like me to do?",
+    "mcard": {
+      "content_hash": "2b2bac2e8c008938348934cbb84b43c26545b395f6a3b5f96d817e22629b176d",
+      "time_claimed": "2024-11-23T10:01:40.373887+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"Understanding the Role of Education in Society\"",
+    "mime_type": "application/pdf",
+    "languages": [],
+    "summary": "The image appears to show a document, which is a standard PDF file format. It seems that the content is partially obscured or cut off on the right side of the document, making it difficult to discern the full details of the text within the document. However, I can describe what I see:\n\nThere are visible texts at the top and bottom of the document. The text at the top reads \"APPLICATION\" in bold capital letters, suggesting that this may be the title or heading of the document. At the bottom, there is a paragraph of text that looks like it could be part of an application form, possibly for academic or job purposes. It contains fields with placeholders such as \"Name,\" \"Address,\" and \"Phone number.\"\n\nThe style of the document is formal and seems to be related to some type of application process, which would likely involve filling out the fields provided with personal information or answers to questions posed by the form. The overall layout is simple and organized, typical for official documents designed for printing and completing by hand.",
+    "mcard": {
+      "content_hash": "58bfbafdc46adb29af27c7197b089ae44c03ddd4dc4b9322823832c26857bffc",
+      "time_claimed": "2024-11-23T10:01:40.374708+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"Material Quantities: Perpustakaan & Pabrik Mainan\"",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "id",
+        "prob": 0.9999950977142813
+      }
+    ],
+    "summary": "Berikut adalah summarisi tekst yang Anda berikan:\n\nJudul: Materi Kebutuhan\nId Chunk: c5b2\n\nIsi:\n- Di sebuah perpustakaan, terdapat tiga jenis buku: novel, ensiklopedia, dan buku pelajaran. Jumlah novel adalah 5/12 dari total buku di perpustakaan, sementara ensiklopedia berjumlah 3/8 dari total buku. Sisanya adalah buku pelajaran. Suatu hari, 1/4 dari total novel dipinjam, dan 2/3 dari buku pelajaran digunakan oleh siswa untuk belajar kelompok. Jika ada 30 buku pelajaran yang masih tersisa di rak, berapakah jumlah total buku di perpustakaan? Tentukan juga berapa banyak ak buku yang termasuk kategori novel dan ensiklopedia.\n- Di sebuah pabrik mainan, terdapat tiga jenis mainan: mobil, boneka, dan puzzle. Mobil mainan berjumlah 4/9 dari total produksi, sedangkan boneka berjumlah 1/3 dari total produksi. Sisanya adalah puzzle. Setiap hari, pabrik menjual 1/2 dari jumlah mobil, 3/4 dari jumlah boneka, dan 2/3 dari jumlah puzzle. Setelah penjualan, masih tersisa 60 mobil, 30 boneka, dan",
+    "mcard": {
+      "content_hash": "8072da3fcf848a7cde12ce479b4ed72d3685ee74dd48977025a303ccbad07f73",
+      "time_claimed": "2024-11-23T10:01:40.374841+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"Distribution of Produce in Market\"",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "id",
+        "prob": 0.9999985153018964
+      }
+    ],
+    "summary": "Berikut adalah hasil summarisi dari text yang Anda berikan:\n\n1. Produk yang tersedia di pasar bisa dikenalakan melalui pemilihan yang terhadap kualitas dan harga.\n2. Toko buku menjual tiga jenis buku, yaitu fiksi, non-fiksi, dan majalah, dengan semua buku dijualnya adalah 3/4.\n3. Jika semua buku dibagi ke 125 buku, kalau setiap minggu terjual 100 buku, tersisa 25 buku.\n4. Jika semua buku dibagi ke 125 buku, jika fiksi awalnya berjumlah 300, maka total buku yang dijual pada hari Senin adalah 300 + 100 = 400.\n5. Perusahaan memiliki tiga tim kerja dengan jumlah anggota yang berbeda, dan setiap minggu setiap tim bekerja selama 1/3 dari total jam kerja.\n6. Pasar menjual sayuran, di mana kentang memiliki porsi lebih besar daripada wortel dan sisanya.\n\nMohon maaf banyaknya kesalahan atau kurangnya dari hasil summarisi Anda!",
+    "mcard": {
+      "content_hash": "30a8d163e9308fdd22a78be3e1bcb86445ce82793075de3c0ab449f4d1e7432b",
+      "time_claimed": "2024-11-23T10:01:40.374898+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "Snack Food Production: Types and Proportions of Products Produced Daily",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "id",
+        "prob": 0.9999958726545377
+      }
+    ],
+    "summary": "This text is discussing the types and proportions of products produced daily by a snack food factory. The factory produces 1/2 of the jumlah motor mobil, 3/4 of the jumlah bonetka, and 2/3 of the jumlah puzzle. After the daily sales, there are still 60 cars, 30 dolls, and 40 puzzles left. The text also mentions a snack food factory that produces 1.200 bags of chips per day, with 1/2 of keripik kentang, 3/5 of keripik jagung, and 2/3 of keripik singkong being sold. After the daily sales, there are still 150 bags of chips in the warehouse. Lastly, a bookstore sells three types of books: fiction, non-fiction, and comic books. One third of all the books sold are fiction, one fourth are non-fiction, and the rest are comics.",
+    "mcard": {
+      "content_hash": "28201cd8ec970de0654365ef600f6fc25a427eb60b4b4392b0d2ff79c309b217",
+      "time_claimed": "2024-11-23T10:01:40.374949+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "Title: Library Book Distribution & Usage / Toy Production & Sales Ratio\n\nChunk ID: 3ad5a",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "id",
+        "prob": 0.999995255435029
+      }
+    ],
+    "summary": "The text discusses the distribution of books in a library and the production and sales ratio of toys in a toy factory. For the library, there are three types of books: novel, encyclopedia, and textbook. A novel makes up 5/12 of the total books in the library, an encyclopedia is 3/8 of the total books, and the remaining books are textbooks. On a given day, 1/4 of the novels are borrowed and 2/3 of the textbooks are used by students for learning in groups. If there are 30 textbooks left on the shelf, what is the total number of books in the library? Also, determine how many books belong to the novel and encyclopedia categories.\n\nFor the toy factory, there are three types of toys: cars, dolls, and puzzles. Cars make up 4/9 of the total production, dolls make up 1/3 of the total production, and the remaining toys are puzzles. Every day, the factory sells 1/2 of the cars, 3/4 of the dolls, and 2/3 of the puzzles. After sales, there are still 60 cars, 30 dolls, and",
+    "mcard": {
+      "content_hash": "22f0f5947b15e0f8771c5f1131bc91bbeb942ea767fdb59210024f4821bbef55",
+      "time_claimed": "2024-11-23T10:01:40.374991+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"JPEG Image File\"",
+    "mime_type": "application/octet-stream",
+    "languages": [],
+    "summary": "As an AI language model, I am unable to view or interpret binary files such as application/octet-stream. Could you please provide more context or specify the file type?",
+    "mcard": {
+      "content_hash": "054edec1d0211f624fed0cbca9d4f9400b0e491c43742af2c5b0abebf0c990d8",
+      "time_claimed": "2024-11-23T11:17:11.044306+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"Greeting the world in code\"",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "en",
+        "prob": 0.9999962728296097
+      }
+    ],
+    "summary": "The text says \"Hello, World!\" which is a common phrase used in programming and is often the first line of code written by new programmers. It simply greets the user or the computer system it is being run on.",
+    "mcard": {
+      "content_hash": "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f",
+      "time_claimed": "2024-11-23T11:17:11.044370+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"Deep dive into complex files\"",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "en",
+        "prob": 0.7142839412406159
+      },
+      {
+        "lang": "it",
+        "prob": 0.28571538481642006
+      }
+    ],
+    "summary": "The text discusses the concept of nested file content and its implications. It suggests that when multiple files are combined within a single file, it creates a complex hierarchy which can lead to difficulties in understanding and managing the content. This is because each nested file contains its own set of data, and as files are added or removed from this structure, it can be challenging to keep track of all the different pieces of information. Additionally, the text points out that there may be security concerns if certain users do not have access to some of the nested files, as they could potentially view sensitive data within these files by navigating through the structure. To address these issues, the text recommends adopting a more straightforward and organized approach to file content, such as using clear and descriptive file names, creating a logical hierarchy, and implementing permissions controls to restrict access to certain files.",
+    "mcard": {
+      "content_hash": "9ec9996cfc2274cf0dca6441c40abeb2b89ed270a1e00c6671475c794c62ef53",
+      "time_claimed": "2024-11-23T11:17:11.044471+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  },
+  {
+    "title": "\"Identifying and Handling Duplicate Content\"",
+    "mime_type": "text/plain",
+    "languages": [
+      {
+        "lang": "en",
+        "prob": 0.9999939196580466
+      }
+    ],
+    "summary": "I'm sorry, but as a language model, I do not have the capability to process duplicated content. If you can provide me with the text that you would like me to summarize, I would be happy to help.",
+    "mcard": {
+      "content_hash": "e7febf23ae5b20dbe02aecaf0fe4e415732f3431f786a4c0be1cc1a7d13e3ad3",
+      "time_claimed": "2024-11-23T11:17:11.096833+08:00"
+    },
+    "authors": {
+      "title": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      },
+      "summary": {
+        "host": "http://localhost:11434",
+        "model": "llava"
+      }
+    }
+  }
+]

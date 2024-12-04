@@ -4,6 +4,7 @@ Time service for handling time-related operations.
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo, available_timezones
 from dataclasses import dataclass
+from typing import Union, Optional
 
 @dataclass
 class TimeRange:
@@ -51,7 +52,7 @@ class TimeService:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
 
-    def convert_timezone(self, dt: datetime, target_tz: str | ZoneInfo) -> datetime:
+    def convert_timezone(self, dt: datetime, target_tz: Union[str, ZoneInfo]) -> datetime:
         """Convert datetime to target timezone."""
         if isinstance(target_tz, str):
             try:
@@ -81,7 +82,7 @@ class TimeService:
         return sorted(available_timezones())
 
 # Global time service instance
-_time_service: TimeService | None = None
+_time_service: Optional[TimeService] = None
 
 def get_time_service() -> TimeService:
     """Get the global time service instance."""
@@ -90,7 +91,7 @@ def get_time_service() -> TimeService:
         _time_service = TimeService()
     return _time_service
 
-def set_time_service(service: TimeService | None) -> None:
+def set_time_service(service: Optional[TimeService]) -> None:
     """Set the global time service instance."""
     global _time_service
     _time_service = service
