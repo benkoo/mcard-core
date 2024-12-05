@@ -25,6 +25,7 @@ import uuid
 # Import configuration and forms
 from config import *
 from forms import TextCardForm, FileCardForm, DeleteCardForm, NewCardForm
+from utils import RequestParamHandler
 
 # Configure Flask app
 app = Flask(__name__)
@@ -222,139 +223,202 @@ add_template_filters()
 async def index():
     """Render the index page with paginated cards."""
     try:
-        # Redirect to include per_page in the initial request if not present
-        if 'per_page' not in request.args:
-            return redirect(url_for('index', page=1, per_page=12), code=302)
+        # Ensure parameters are integers
+        page_param = request.args.get('page', '1')
+        per_page_param = request.args.get('per_page', '12')
+        
+        try:
+            page = int(page_param)
+        except (ValueError, TypeError):
+            page = 1
+        
+        try:
+            per_page = int(per_page_param)
+        except (ValueError, TypeError):
+            per_page = 12
+        
+        # Ensure minimum values
+        page = max(1, page)
+        per_page = max(1, per_page)
         
         # Get storage and list cards
         storage = await get_storage()
-        logger.info("Attempting to list cards")
         all_cards = await storage.list()
-        logger.info(f"Retrieved {len(all_cards)} cards from storage")
-        
-        # Ensure page and per_page have default values
-        page = request.args.get('page', 1, type=int) or 1
-        per_page = request.args.get('per_page', 12, type=int) or 12
         
         # Sort cards by g_time (most recent first)
         sorted_cards = sorted(all_cards, key=lambda card: card.g_time or 0, reverse=True)
         
-        # Manual pagination
+        # Paginate cards
+        total_items = len(sorted_cards)
+        total_pages = max(1, (total_items + per_page - 1) // per_page)
+        
+        # Ensure page is within valid range
+        page = max(1, min(page, total_pages))
+        
+        # Calculate start and end indices
         start_index = (page - 1) * per_page
         end_index = start_index + per_page
-        current_page_cards = sorted_cards[start_index:end_index]
         
-        logger.info(f"Total cards retrieved: {len(sorted_cards)}")
-        logger.info(f"Paginating cards from index {start_index} to {end_index}")
-        logger.info(f"Cards on current page: {len(current_page_cards)}")
+        current_page_cards = sorted_cards[start_index:end_index]
         
         # Process cards
         processed_cards = []
         for card in current_page_cards:
             try:
-                # Safely extract content
                 content = card.content or b''
-                
-                # Ensure content is bytes
                 if not isinstance(content, bytes):
                     content = str(content).encode('utf-8') if content is not None else b''
                 
-                # Detect content type
                 try:
                     content_type, _ = ContentTypeInterpreter.detect_content_type(content)
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Content type detection error for card {card.hash}: {e}")
                     content_type = 'application/octet-stream'
                 
                 is_binary = not content_type.startswith('text/')
+                is_image = content_type.startswith('image/')
                 
-                # Prepare content for display
                 display_content = content
                 if not is_binary:
                     try:
                         display_content = content.decode('utf-8').strip()
                     except UnicodeDecodeError:
                         display_content = str(content).strip("b'")
-                    
-                    # Additional cleaning to remove any remaining quotes or b prefix
-                    if display_content.startswith("'") and display_content.endswith("'"):
-                        display_content = display_content[1:-1]
-                    if display_content.startswith('"') and display_content.endswith('"'):
-                        display_content = display_content[1:-1]
-                    if display_content.startswith('b"') or display_content.startswith("b'"):
-                        display_content = display_content[2:-1]
                 
-                # Enhanced image detection
-                is_image = (
-                    content_type.startswith('image/') or 
-                    (is_binary and content_type == 'application/octet-stream' and 
-                        (content.startswith(b'\x89PNG') or 
-                         content.startswith(b'\xff\xd8\xff') or  # JPEG
-                         content.startswith(b'GIF87a') or 
-                         content.startswith(b'GIF89a') or 
-                         content.startswith(b'RIFF') or 
-                         content.startswith(b'WEBP')))
-                )
-                is_svg = content_type == 'image/svg+xml'
-                
-                # Image-specific handling
-                if is_image and content_type.startswith('image/'):
-                    # Ensure consistent image type detection
-                    if content_type == 'image/jpeg' and not content.startswith(b'\xff\xd8\xff'):
-                        is_image = False
-                    elif content_type == 'image/png' and not content.startswith(b'\x89PNG'):
-                        is_image = False
-                    elif content_type == 'image/gif' and not (content.startswith(b'GIF87a') or content.startswith(b'GIF89a')):
-                        is_image = False
-                
-                # SVG content handling
-                svg_content = content.decode('utf-8', errors='ignore') if is_svg else None
-                
-                # Create card dictionary with fallback values
-                card_dict = {
-                    'hash': card.hash or str(uuid.uuid4()),
+                processed_cards.append({
+                    'hash': card.hash,
                     'content': display_content if not is_binary else None,
                     'content_type': content_type,
                     'is_binary': is_binary,
                     'is_image': is_image,
-                    'is_svg': is_svg,
-                    'svg_content': svg_content,
                     'g_time': card.g_time,
+                    'time_claimed': card.g_time,
                     'content_length': len(content)
-                }
-                
-                processed_cards.append(card_dict)
-            except Exception as card_error:
-                logger.error(f"Error processing card {card.hash}: {card_error}", exc_info=True)
-                # Add a minimal card representation to prevent total failure
-                processed_cards.append({
-                    'hash': card.hash or str(uuid.uuid4()),
-                    'content_type': 'application/octet-stream',
-                    'is_binary': True,
-                    'is_image': False,
-                    'is_svg': False,
-                    'g_time': card.g_time,
-                    'content_length': 0,
-                    'error': str(card_error)
                 })
+            except Exception as e:
+                logger.error(f"Error processing card {card.hash}: {e}", exc_info=True)
+                continue
         
-        # Pagination context
-        total_cards = len(sorted_cards)
-        total_pages = (total_cards + per_page - 1) // per_page
-        
-        # Create delete form
-        delete_form = DeleteCardForm()
-        
-        return render_template('index.html', 
-                               cards=processed_cards, 
-                               delete_form=delete_form,
-                               page=page, 
-                               per_page=per_page,
-                               total_pages=total_pages)
+        return render_template(
+            'index.html',
+            cards=processed_cards,
+            page=page,
+            total_pages=total_pages,
+            total_items=total_items,
+            per_page=per_page,
+            delete_form=DeleteCardForm()
+        )
         
     except Exception as e:
-        logger.error(f"Error in index route: {e}", exc_info=True)
-        flash(f"Detailed error: {str(e)}", "error")
-        return render_template('index.html', cards=[], delete_form=DeleteCardForm(), page=1, total_pages=1)
+        logger.error(f"Unexpected error in index view: {e}", exc_info=True)
+        flash(f'An error occurred while loading the index page: {e}', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/grid')
+@async_route
+async def grid_view():
+    """Render the grid view with paginated cards."""
+    try:
+        # Defensive parameter extraction
+        rows_param = request.args.get('rows', '3')
+        cols_param = request.args.get('cols', '4')
+        page_param = request.args.get('page', '1')
+        
+        # Log raw parameters for debugging
+        logger.info(f"Raw rows parameter: {rows_param} (type: {type(rows_param)})")
+        logger.info(f"Raw cols parameter: {cols_param} (type: {type(cols_param)})")
+        logger.info(f"Raw page parameter: {page_param} (type: {type(page_param)})")
+        
+        # Parse grid-specific parameters
+        rows = RequestParamHandler.parse_int_param(
+            rows_param, 
+            default=3, 
+            min_value=1, 
+            max_value=10
+        )
+        cols = RequestParamHandler.parse_int_param(
+            cols_param, 
+            default=4, 
+            min_value=1, 
+            max_value=10
+        )
+        
+        # Calculate per_page based on grid dimensions
+        per_page = rows * cols
+        
+        # Parse page parameter
+        page = RequestParamHandler.parse_int_param(
+            page_param, 
+            default=1, 
+            min_value=1
+        )
+
+        # Get storage and list cards
+        storage = await get_storage()
+        all_cards = await storage.list()
+        
+        # Sort cards by g_time (most recent first)
+        sorted_cards = sorted(all_cards, key=lambda card: card.g_time or 0, reverse=True)
+        
+        # Paginate cards
+        current_page_cards, total_pages, total_items = RequestParamHandler.paginate(
+            sorted_cards, page, per_page
+        )
+        
+        # Process cards
+        processed_cards = []
+        for card in current_page_cards:
+            try:
+                content = card.content or b''
+                if not isinstance(content, bytes):
+                    content = str(content).encode('utf-8') if content is not None else b''
+                
+                try:
+                    content_type, _ = ContentTypeInterpreter.detect_content_type(content)
+                except Exception as e:
+                    logger.warning(f"Content type detection error for card {card.hash}: {e}")
+                    content_type = 'application/octet-stream'
+                
+                is_binary = not content_type.startswith('text/')
+                is_image = content_type.startswith('image/')
+                
+                display_content = content
+                if not is_binary:
+                    try:
+                        display_content = content.decode('utf-8').strip()
+                    except UnicodeDecodeError:
+                        display_content = str(content).strip("b'")
+                
+                processed_cards.append({
+                    'hash': card.hash,
+                    'content': display_content if not is_binary else None,
+                    'content_type': content_type,
+                    'is_binary': is_binary,
+                    'is_image': is_image,
+                    'g_time': card.g_time,
+                    'time_claimed': card.g_time,
+                    'content_length': len(content)
+                })
+            except Exception as e:
+                logger.error(f"Error processing card {card.hash}: {e}", exc_info=True)
+                continue
+        
+        return render_template(
+            'grid.html',
+            cards=processed_cards,
+            page=page,
+            total_pages=total_pages,
+            total_items=total_items,
+            per_page=per_page,
+            rows=rows,
+            cols=cols,
+            delete_form=DeleteCardForm()
+        )
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in grid view: {e}", exc_info=True)
+        flash(f'An error occurred while loading the grid page: {e}', 'error')
+        return redirect(url_for('grid_view'))
 
 @app.route('/new_card', methods=['GET'])
 def new_card():
@@ -449,7 +513,7 @@ async def add_file_card():
                 logger.info(f"Raw content type: {type(content)}")
                 logger.info(f"Raw content length: {len(content) if content is not None else 'N/A'}")
                 
-                # Ensure content is bytes
+                # Ensure content is valid
                 if content is None:
                     logger.error("File content is None")
                     flash("Error: Unable to read file content", 'error')

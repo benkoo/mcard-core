@@ -55,46 +55,19 @@
     }
     
     /* Common styles */
-    .name-cell {
-        width: 150px;
-        max-width: 150px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    
-    .preview-cell {
-        width: 220px;
-        max-width: 220px;
-    }
-    
-    .type-cell {
-        width: 120px;
-        max-width: 120px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    
-    .hash-cell {
-        width: 200px;
+    .name-cell, .preview-cell, .type-cell, .hash-cell, .time-cell, .action-cell {
         max-width: 200px;
-        font-family: monospace;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    
-    .time-cell {
-        width: 150px;
-        max-width: 150px;
-        white-space: nowrap;
-    }
-    
-    .action-cell {
-        width: 120px;
-        max-width: 120px;
-        text-align: center;
+
+    /* Grid styles */
+    #gridView .grid-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        padding: 1rem 0;
     }
 </style>
 {% endblock %}
@@ -107,19 +80,23 @@
             <div class="me-3">
                 <label for="per_page" class="me-2">Items per page:</label>
                 <select id="per_page" class="form-select form-select-sm d-inline-block w-auto" 
-                        onchange="window.location.href='{{ url_for('index') }}?page=1&per_page=' + this.value">
+                        onchange="window.location.href='{{ url_for('index', view=request.args.get('view', 'table')) }}?page=1&per_page=' + this.value">
                     {% for n in [5, 10, 20, 50] %}
                     <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="btn-group" role="group" aria-label="View toggle">
-                <button type="button" class="btn btn-outline-primary active" id="tableViewBtn">
+                <a href="{{ url_for('index', page=page, per_page=per_page, view='table') }}" 
+                   class="btn btn-outline-primary {% if request.args.get('view', 'table') == 'table' %}active{% endif %}" 
+                   id="tableViewBtn">
                     <i class="bi bi-table"></i> Table
-                </button>
-                <button type="button" class="btn btn-outline-primary" id="gridViewBtn">
+                </a>
+                <a href="{{ url_for('index', page=page, per_page=per_page, view='grid') }}" 
+                   class="btn btn-outline-primary {% if request.args.get('view') == 'grid' %}active{% endif %}" 
+                   id="gridViewBtn">
                     <i class="bi bi-grid"></i> Grid
-                </button>
+                </a>
             </div>
             <a href="{{ url_for('new_card') }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg"></i> New Card
@@ -138,7 +115,7 @@
         {% endif %}
     {% endwith %}
 
-    <div id="tableView">
+    <div id="tableView" {% if request.args.get('view') == 'grid' %}style="display: none;"{% endif %}>
         {% if cards %}
             {{ render_table(cards, delete_form) }}
         {% else %}
@@ -155,7 +132,7 @@
         {% endif %}
     </div>
 
-    <div id="gridView" style="display: none;">
+    <div id="gridView" {% if request.args.get('view') != 'grid' %}style="display: none;"{% endif %}>
         {% if cards %}
             {{ render_grid(cards, delete_form) }}
         {% else %}
@@ -186,53 +163,45 @@
         <ul class="pagination justify-content-center">
             {% if page > 1 %}
             <li class="page-item">
-                <a class="page-link" href="{{ url_for('index', page=page-1, per_page=per_page) }}">Previous</a>
+                <a class="page-link" href="{{ url_for('index', page=page-1, per_page=per_page, view=request.args.get('view', 'table')) }}">Previous</a>
             </li>
             {% endif %}
 
             {% for p in range(1, total_pages + 1) %}
             <li class="page-item {% if p == page %}active{% endif %}">
-                <a class="page-link" href="{{ url_for('index', page=p, per_page=per_page) }}">{{ p }}</a>
+                <a class="page-link" href="{{ url_for('index', page=p, per_page=per_page, view=request.args.get('view', 'table')) }}">{{ p }}</a>
             </li>
             {% endfor %}
 
             {% if page < total_pages %}
             <li class="page-item">
-                <a class="page-link" href="{{ url_for('index', page=page+1, per_page=per_page) }}">Next</a>
+                <a class="page-link" href="{{ url_for('index', page=page+1, per_page=per_page, view=request.args.get('view', 'table')) }}">Next</a>
             </li>
             {% endif %}
         </ul>
     </nav>
 </div>
+{% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const tableViewBtn = document.getElementById('tableViewBtn');
-    const gridViewBtn = document.getElementById('gridViewBtn');
-    const tableView = document.getElementById('tableView');
-    const gridView = document.getElementById('gridView');
+    document.addEventListener('DOMContentLoaded', function() {
+        const tableView = document.getElementById('tableView');
+        const gridView = document.getElementById('gridView');
 
-    function showTableView() {
-        tableView.style.display = 'block';
-        gridView.style.display = 'none';
-        tableViewBtn.classList.add('active');
-        gridViewBtn.classList.remove('active');
-    }
+        // Check URL parameter or default view
+        const urlParams = new URLSearchParams(window.location.search);
+        const viewParam = urlParams.get('view');
 
-    function showGridView() {
-        tableView.style.display = 'none';
-        gridView.style.display = 'block';
-        tableViewBtn.classList.remove('active');
-        gridViewBtn.classList.add('active');
-    }
-
-    tableViewBtn.addEventListener('click', showTableView);
-    gridViewBtn.addEventListener('click', showGridView);
-
-    // Initialize with table view
-    showTableView();
-});
+        if (viewParam === 'grid') {
+            tableView.style.display = 'none';
+            gridView.style.display = 'block';
+        } else {
+            // Default to table view
+            tableView.style.display = 'block';
+            gridView.style.display = 'none';
+        }
+    });
 </script>
-{% endblock %}
 {% endblock %}

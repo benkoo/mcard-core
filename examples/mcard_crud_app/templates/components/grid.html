@@ -4,17 +4,20 @@
 <style>
     .grid-container {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 1rem;
-        padding: 1rem;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        padding: 15px 0;
     }
-    
-    .card {
-        border: 1px solid #dee2e6;
-        border-radius: 0.25rem;
-        overflow: hidden;
+
+    .grid-card {
+        height: 100%;
+        transition: transform 0.2s;
     }
-    
+
+    .grid-card:hover {
+        transform: translateY(-2px);
+    }
+
     .card-preview {
         height: 200px;
         display: flex;
@@ -23,100 +26,97 @@
         background-color: #f8f9fa;
         overflow: hidden;
         padding: 1rem;
+        border-bottom: 1px solid rgba(0,0,0,.125);
     }
-    
+
     .card-preview img {
         max-height: 180px;
         max-width: 100%;
         object-fit: contain;
     }
-    
-    .card-preview svg {
-        max-height: 180px;
-        max-width: 100%;
-    }
-    
+
     .text-preview {
-        padding: 1rem;
         width: 100%;
         height: 100%;
         overflow: auto;
-    }
-    
-    .card-info {
         padding: 1rem;
-    }
-    
-    .card-info p {
-        margin: 0;
-        font-size: 0.875rem;
-        color: #6c757d;
-    }
-    
-    .card-actions {
-        padding: 1rem;
-        border-top: 1px solid #dee2e6;
         background-color: #f8f9fa;
+    }
+
+    .text-preview pre {
+        margin: 0;
+        font-size: 0.85rem;
+        max-height: 180px;
+        overflow: auto;
+    }
+
+    .file-preview {
+        text-align: center;
+        padding: 2rem;
+    }
+
+    .file-preview i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
     }
 </style>
 
-{% if cards %}
-    <div class="grid-container">
-        {% for card in cards %}
-        <div class="card">
-            <div class="card-preview">
-                {% if card.is_image or (card.is_binary and card.content_type.startswith('image/')) %}
-                    {% if card.is_svg and card.svg_content %}
-                        <div class="card-img-top svg-preview">
-                            {{ card.svg_content|safe }}
-                        </div>
-                    {% else %}
-                        <img src="{{ url_for('get_binary_content', hash=card.hash) }}" 
-                             class="card-img-top" 
-                             alt="Card Image" 
-                             onerror="this.onerror=null; this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
-                        <div class="card-img-top binary-preview text-center d-none">
-                            <div class="p-3 text-muted">
-                                <span class="d-block">{{ card.content_type or 'Unknown Image' }}</span>
-                                <small>{{ card.content_length or 0 }} bytes</small>
-                            </div>
-                        </div>
-                    {% endif %}
-                {% elif card.content_type.startswith('text/') %}
-                    <div class="card-img-top text-preview p-3">
-                        <pre style="margin: 0; font-size: 0.85rem; max-height: 150px; overflow: hidden;">{{ card.content[:300] }}{% if card.content|length > 300 %}...{% endif %}</pre>
+<div class="grid-container">
+    {% for card in cards %}
+    <div class="card grid-card">
+        <div class="card-preview">
+            {% if card.is_image or (card.is_binary and card.content_type.startswith('image/')) %}
+                {% if card.is_svg and card.svg_content %}
+                    <div class="svg-preview">
+                        {{ card.svg_content|safe }}
                     </div>
                 {% else %}
-                    <div class="text-center py-4">
-                        {% if card.content_type == 'application/pdf' %}
-                            <i class="bi bi-file-pdf text-danger" style="font-size: 2.5rem;"></i>
-                            <div class="mt-2 small text-muted">
-                                {{ card.content_length | default(0) | filesizeformat }}
-                            </div>
-                        {% elif card.is_binary %}
-                            <div class="text-muted">
-                                <span class="d-block">{{ card.content_type }}</span>
-                                <small>{{ card.content_length | default(0) | filesizeformat }}</small>
-                            </div>
-                        {% endif %}
+                    <img src="{{ url_for('get_binary_content', hash=card.hash) }}" 
+                         alt="Card Image" 
+                         class="img-fluid"
+                         onerror="this.onerror=null; this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+                    <div class="binary-preview text-center d-none">
+                        <i class="bi bi-file-earmark"></i>
+                        <span class="d-block mt-2">{{ card.content_type or 'Unknown Image' }}</span>
+                        <small>{{ card.content_length | default(0) | filesizeformat }}</small>
                     </div>
                 {% endif %}
-            </div>
-            <div class="card-info">
-                <p><strong>Type:</strong> {{ card.content_type }}</p>
-                <p><strong>Hash:</strong> <code>{{ card.hash[:8] }}...</code></p>
-            </div>
-            <div class="card-footer text-muted small">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span>{{ card.g_time|datetime if card.g_time else 'Unknown' }}</span>
-                    <div class="btn-group">
-                        {{ render_actions(card, delete_form) }}
-                    </div>
+            {% elif card.content_type.startswith('text/') %}
+                <div class="text-preview">
+                    <pre><code>{{ card.content[:300] }}{% if card.content|length > 300 %}...{% endif %}</code></pre>
                 </div>
+            {% else %}
+                <div class="file-preview">
+                    {% if card.content_type == 'application/pdf' %}
+                        <i class="bi bi-file-pdf text-danger"></i>
+                        <div class="text-muted">
+                            <span class="d-block">PDF Document</span>
+                            <small>{{ card.content_length | default(0) | filesizeformat }}</small>
+                        </div>
+                    {% elif card.is_binary %}
+                        <i class="bi bi-file-earmark"></i>
+                        <div class="text-muted">
+                            <span class="d-block">{{ card.content_type }}</span>
+                            <small>{{ card.content_length | default(0) | filesizeformat }}</small>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="card-text">
+                <p class="mb-1"><strong>Type:</strong> <span class="text-muted">{{ card.content_type }}</span></p>
+                <p class="mb-1"><strong>Hash:</strong> <code>{{ card.hash[:8] }}...</code></p>
+                <p class="mb-0"><strong>Created:</strong> <span class="text-muted">{{ card.g_time|datetime if card.g_time else 'Unknown' }}</span></p>
             </div>
         </div>
-        {% endfor %}
+        <div class="card-footer bg-transparent">
+            {{ render_actions(card, delete_form) }}
+        </div>
     </div>
+    {% endfor %}
+</div>
+{% if cards %}
 {% else %}
     <div class="text-center text-muted">
         <p>No cards found</p>
