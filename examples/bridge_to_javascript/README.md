@@ -1,157 +1,132 @@
-# MCard JavaScript Bridge
+# MCard JavaScript Bridge Server
 
-A FastAPI-based server that provides a RESTful API for the MCard storage system, designed to be used as a bridge for JavaScript applications.
+A robust FastAPI-based server that provides a bridge between JavaScript applications and the MCard system, enabling efficient card creation, retrieval, and management through a RESTful API interface.
 
 ## Features
 
-- RESTful API endpoints for card operations (create, read, delete, list)
-- API key authentication for secure access
-- Robust error handling and validation
-- Comprehensive test suite
-- CORS support for browser-based applications
+- **RESTful API Endpoints**
+  - Create cards with various content types (text, HTML, JavaScript, SQL, binary)
+  - Retrieve cards by hash
+  - List all cards
+  - Delete cards
+  - Health check endpoint
+
+- **Security**
+  - API key authentication
+  - Request validation
+  - Error handling
+
+- **Performance Optimizations**
+  - Batch processing for large-scale operations
+  - Connection pooling
+  - Configurable timeouts and retries
+  - Adaptive delays for system stability
+
+## Requirements
+
+- Python 3.12 or higher
+- FastAPI
+- SQLite database
+- Additional dependencies in `requirements.txt`
+
+## Environment Variables
+
+```bash
+MCARD_API_KEY=your_api_key
+MCARD_STORE_PATH=path_to_database
+MCARD_STORE_MAX_CONNECTIONS=20
+MCARD_STORE_TIMEOUT=30.0
+```
 
 ## Installation
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd mcard-core/examples/bridge_to_javascript
-```
+1. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-2. Create and activate a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+3. Set up environment variables (see above)
 
-4. Create a `.env` file with the following configuration:
-```env
-MCARD_API_KEY=your_secure_api_key
-MCARD_API_PORT=8000
-MCARD_STORE_PATH=./data/mcard.db
-MCARD_STORE_MAX_CONNECTIONS=5
-MCARD_STORE_TIMEOUT=5.0
-```
+## Testing Framework
 
-## Usage
+The project includes a comprehensive test suite that verifies:
 
-1. Start the server:
-```bash
-python src/server.py
-```
+### Basic Operations
+- API key validation
+- Card CRUD operations
+- Error handling
 
-2. The server will be available at `http://localhost:8000` (or the port specified in your `.env` file)
+### Content Type Support
+- HTML content
+- JavaScript code
+- SQL queries
+- Mixed content
+- Base64 encoded images
+- Binary data
+- Large binary content
 
-3. Use the following API endpoints:
+### Performance and Reliability
+- Batch processing (100 cards in groups of 10)
+- Concurrent operations
+- Error recovery with retries
+- System stability under load
 
-### API Endpoints
+### Test Configuration
+- Increased database connections (20)
+- Extended timeouts (30 seconds)
+- Adaptive delays between operations
+- Comprehensive error logging
 
-All endpoints require the `X-API-Key` header with your API key.
+## Running Tests
 
-#### Health Check
-- `GET /health`
-- Returns server health status
-- Response: `{"status": "healthy"}`
-
-#### Create Card
-- `POST /cards`
-- Request body: `{"content": "Your card content"}`
-- Response: Card object with content, hash, and timestamp
-
-#### Get Card
-- `GET /cards/{hash}`
-- Returns a specific card by its hash
-- Response: Card object with content, hash, and timestamp
-
-#### List Cards
-- `GET /cards`
-- Returns a list of all cards
-- Response: Array of card objects
-
-#### Delete Card
-- `DELETE /cards/{hash}`
-- Deletes a specific card by its hash
-- Response: `{"status": "success"}`
-
-### Response Models
-
-Card Response Object:
-```json
-{
-  "content": "string",
-  "hash": "string",
-  "g_time": "string (ISO format)"
-}
-```
-
-## Development
-
-### Project Structure
-
-```
-bridge_to_javascript/
-├── src/
-│   ├── __init__.py
-│   └── server.py
-├── tests/
-│   └── test_server.py
-├── .env
-├── requirements.txt
-└── README.md
-```
-
-### Running Tests
-
-Run the test suite using pytest:
-
+Run all tests:
 ```bash
 pytest -v tests/test_server.py
 ```
 
-The test suite includes:
-- API key validation
-- CRUD operations for cards
-- Error handling scenarios
-- Edge cases (empty content, missing fields, etc.)
+Run specific test:
+```bash
+pytest -v tests/test_server.py::test_name
+```
 
-### Environment Variables
+## Performance Considerations
 
-- `MCARD_API_KEY`: API key for authentication
-- `MCARD_API_PORT`: Port for the FastAPI server
-- `MCARD_STORE_PATH`: Path to the SQLite database file
-- `MCARD_STORE_MAX_CONNECTIONS`: Maximum database connections
-- `MCARD_STORE_TIMEOUT`: Database operation timeout in seconds
+The server implements several strategies to handle high-load scenarios:
 
-### Error Handling
+1. **Batch Processing**
+   - Operations are processed in configurable batch sizes
+   - Default batch size: 10 items
+   - Automatic delays between batches
 
-The API implements proper error handling with appropriate HTTP status codes:
-- 200: Successful operation
-- 400: Bad request (invalid input)
-- 401: Unauthorized (invalid API key)
-- 404: Resource not found
-- 422: Validation error (missing required fields)
-- 500: Internal server error
+2. **Error Handling**
+   - Retry mechanism for failed operations
+   - Exponential backoff
+   - Detailed error logging
 
-## Security
+3. **Database Optimization**
+   - Connection pooling
+   - Configurable timeouts
+   - Transaction management
 
-- API key authentication is required for all endpoints
-- CORS middleware is configured to allow cross-origin requests
-- Environment variables are used for sensitive configuration
-- Database connections are properly managed and cleaned up
+4. **System Stability**
+   - Adaptive delays based on success rates
+   - System recovery periods
+   - Resource monitoring
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Run the test suite
-5. Submit a pull request
+3. Commit your changes with descriptive messages
+4. Push to your branch
+5. Create a Pull Request
 
 ## License
 
-[Your License Here]
+This project is part of the MCard Core system. See the LICENSE file for details.
