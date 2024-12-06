@@ -1,0 +1,17 @@
+{
+  "name": "mcard-node-bridge",
+  "version": "1.0.0",
+  "description": "Node.js bridge for MCard Core using Python FastAPI",
+  "main": "src/example.js",
+  "scripts": {
+    "start": "node src/example.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

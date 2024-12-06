@@ -1,0 +1,13 @@
+{
+    "name": "MCard Demo",
+    "version": "1.0.0",
+    "settings": {
+        "max_size": 1048576,
+        "allowed_types": ["text", "binary", "image"],
+        "features": {
+            "compression": true,
+            "encryption": false,
+            "deduplication": true
+        }
+    }
+}
