@@ -333,6 +333,45 @@ DataEngineConfig.reset()  # Safely resets the entire configuration
 
 The update ensures that configuration resets are more reliable and consistent across different usage scenarios, particularly in testing and dynamic configuration environments.
 
+## Test Suite Organization
+
+The test suite is organized into several logical components to ensure comprehensive coverage and maintainability:
+
+### JavaScript Bridge Tests
+The JavaScript bridge tests are split into three main categories:
+
+1. **Basic Server Operations** (`test_server_basic.py`)
+   - Health checks and server status
+   - Authentication and API key validation
+   - Basic CRUD operations (Create, Read, Update, Delete)
+   - Error handling and edge cases
+   - Empty database scenarios
+
+2. **Content Handling** (`test_server_content.py`)
+   - HTML content creation and retrieval
+   - JavaScript code storage
+   - SQL query storage
+   - Mixed content type handling
+   - Binary and base64 content
+   - Large content handling
+   - Content type detection
+
+3. **Configuration and Performance** (`test_server_config.py`)
+   - Bulk operations testing
+   - Concurrent operation handling
+   - Custom hash configuration
+   - Port configuration
+   - Database connection settings
+   - Performance testing with large datasets
+   - Environment variable management
+
+This organization ensures:
+- Clear separation of concerns
+- Easy maintenance and updates
+- Focused testing of specific functionality
+- Better test failure isolation
+- Improved readability and documentation
+
 ## Testing
 
 ### Running Tests
