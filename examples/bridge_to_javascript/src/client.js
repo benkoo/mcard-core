@@ -195,9 +195,19 @@ class MCardClient {
         let contentToSend = content;
         let metadata = {};
 
-        if (content && typeof content === 'object' && 'content' in content) {
-            contentToSend = content.content;
-            metadata = content.metadata || {};
+        // Handle object input with content and metadata
+        if (content && typeof content === 'object') {
+            if ('content' in content) {
+                contentToSend = content.content;
+                // Preserve metadata exactly as provided
+                if ('metadata' in content) {
+                    metadata = { ...content.metadata };
+                }
+            } else {
+                // If it's an object but doesn't have content property,
+                // assume it's just content data
+                contentToSend = content;
+            }
         }
 
         try {
@@ -206,11 +216,7 @@ class MCardClient {
                 metadata: metadata
             });
 
-            // Ensure we have a hash in the response
-            if (!response || !response.hash) {
-                throw new Error('Server response missing hash');
-            }
-
+            // Return the complete server response
             return response;
         } catch (error) {
             if (error.response && error.response.status === 422) {
@@ -224,8 +230,11 @@ class MCardClient {
         if (!hash) {
             throw new Error('Hash is required');
         }
-        // Return the server response directly to ensure we use server's metadata
-        return await this._makeRequest('GET', `/cards/${hash}`);
+        
+        const response = await this._makeRequest('GET', `/cards/${hash}`);
+        
+        // Return complete response with server metadata
+        return response;
     }
 
     async listCards({ page = 1, pageSize = 10, search = '' } = {}, cancelToken = null) {

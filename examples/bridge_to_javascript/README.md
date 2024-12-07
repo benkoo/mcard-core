@@ -261,85 +261,47 @@ The test suite aims for comprehensive coverage:
 - Functions: >90%
 - Lines: >90%
 
-## Testing
+## Recent Changes
 
-Before running the tests, make sure to start the MCard server:
+### December 2024
+- Automated server management in tests - Python server now starts and stops automatically during test execution
+- Simplified binary content tests to focus on core functionality
+- Added comprehensive mixed content testing (binary and text)
+- Improved test coverage across all operations
+- Enhanced error handling and retry mechanisms
+- Added metrics and monitoring capabilities
 
-1. Start the server (this will also ensure all Python dependencies are up to date):
-```bash
-./setup-and-start.sh
-```
+## Running Tests
 
-2. In a new terminal window, run the tests:
+The test suite now automatically manages the Python server:
+
 ```bash
 npm test
 ```
 
-Note: The tests require a running MCard server instance. If you encounter connection errors, make sure:
-- You are in the correct directory with the `.venv` Python virtual environment
-- The server is running and accessible at the configured port (default: 5320)
-- All required Python dependencies are installed (the script will handle this for you)
+This command will:
+1. Automatically start the Python server
+2. Run all tests
+3. Shut down the server after tests complete
 
-## Setup and Running Tests
+Note: The manual server startup script (`start-server.sh`) is no longer needed for testing.
 
-1. **Environment Setup**
-   ```bash
-   # Install Node.js dependencies
-   npm install
+### Test Coverage
 
-   # Create Python virtual environment
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
+The current test coverage is:
+- Statements: 94.32%
+- Branches: 88.65%
+- Functions: 100%
+- Lines: 94.2%
 
-   # Configure environment
-   cp .env.example .env
-   # Edit .env with your settings
-   ```
-
-2. **Running Tests**
-   ```bash
-   # Start the FastAPI server
-   python src/server.py
-
-   # Run all tests
-   npm test
-
-   # Run specific test categories
-   npm run test:init
-   npm run test:basic
-   npm run test:content
-   npm run test:validation
-   npm run test:errors
-   npm run test:concurrency
-   npm run test:perf
-   npm run test:utils
-
-   # Run tests with coverage
-   npm run test:coverage
-   ```
-
-## Implementation Details
-
-### Client Implementation (client.js)
-- Promise-based API
-- Axios for HTTP requests
-- Automatic retry mechanism
-- Response validation
-- Error classification and handling
-
-### Server Implementation (server.py)
-- FastAPI framework
-- SQLite database backend
-- Async request handling
-- Middleware for authentication
-- Error middleware for consistent error responses
-
-### Type System (types.ts)
-- Interface definitions for all API objects
-- Type guards for runtime checking
-- Strict null checking
-- ReadOnly types for immutable data
+The test suite includes:
+- Basic CRUD operations
+- Text content handling
+- Binary content handling
+- Mixed content operations
+- Error handling and retries
+- Search and pagination
+- Metrics and monitoring
 
 ## Web Framework Integration
 
@@ -623,132 +585,6 @@ Note: The tests require a running MCard server instance. If you encounter connec
    ```
 
 This integration guide demonstrates how to use the MCard JavaScript client and Python server in a modern Astro web application, including setup, basic usage, and advanced features.
-
-## Recent Changes (2024-12-07)
-
-### Enhanced Error Handling and Request Tracking
-
-1. **Improved Retry Attempts Tracking**
-   - Fixed retry attempts counter to only increment when a retry is actually performed
-   - More accurate metrics for failed requests and retry attempts
-   - Better distinction between different types of errors (network, HTTP, etc.)
-
-2. **Request Cancellation Support**
-   - Added proper handling of axios cancellation tokens
-   - Immediate cancellation response without unnecessary retries
-   - Consistent error messages for cancelled requests
-   - Updated all relevant methods to properly pass through cancel tokens
-
-3. **Metrics Accuracy**
-   - Fixed metrics tracking to properly count successful and failed requests
-   - More accurate retry attempt counts
-   - Better tracking of network errors vs other types of errors
-
-### Example Usage with Request Cancellation
-
-```javascript
-const axios = require('axios');
-
-// Create a cancel token
-const source = axios.CancelToken.source();
-
-try {
-    // Use the token in a request
-    await client.checkHealth(source.token);
-    
-    // Cancel the request if needed
-    source.cancel();
-} catch (error) {
-    if (error.message === 'cancelled') {
-        console.log('Request was cancelled');
-    }
-}
-```
-
-### Metrics and Debugging
-
-The client now provides more accurate metrics through `getMetrics()`:
-```javascript
-const metrics = client.getMetrics();
-console.log({
-    totalRequests: metrics.totalRequests,
-    successfulRequests: metrics.successfulRequests,
-    failedRequests: metrics.failedRequests,
-    retryAttempts: metrics.retryAttempts,
-    networkErrors: metrics.networkErrors,
-    otherErrors: metrics.otherErrors
-});
-```
-
-## Testing Approach
-
-The JavaScript client includes a comprehensive test suite that covers various aspects of the client's functionality:
-
-### Test Categories
-
-1. **URL Handling**
-   - Tests different URL formats (with/without trailing slashes)
-   - Validates protocol handling
-   - Tests invalid URL scenarios
-
-2. **Error Handling**
-   - Network error scenarios
-   - Rate limiting and retry behavior
-   - Server error handling with configurable retries
-
-3. **Performance Monitoring**
-   - Request metrics tracking
-   - Success/failure statistics
-   - Response time measurements
-   - Request history logging
-
-4. **Card Operations**
-   - CRUD operations for cards
-   - Validation of card content
-   - Edge cases with non-existent cards
-
-5. **Configuration Testing**
-   - Custom header handling
-   - Timeout configurations
-   - API key validation
-
-6. **Retry Logic**
-   - Network failure retries
-   - Rate limit handling
-   - Configurable retry attempts and delays
-
-### Test Infrastructure
-
-- Uses Jest testing framework
-- Includes a custom `TestEnvironment` utility for setup/teardown
-- Automatic cleanup of test data after each test
-- Configurable test timeouts and retry settings
-- **Real Server Testing**: Tests run against an actual Python-based server instance
-  - No mocks are used to avoid synchronization issues
-  - Server is automatically started in `setup.js` before tests run
-  - Ensures tests reflect real-world behavior and catch actual integration issues
-
-### Running Tests
-
-```bash
-# Run all tests
-npm test
-
-# Run specific test file
-npm test client.consolidated.test.js
-
-# Run tests in watch mode
-npm test -- --watch
-```
-
-## Best Practices
-- Comprehensive error handling
-- Input validation
-- Type safety
-- Test-driven development
-- Consistent code style
-- Documentation
-- Performance optimization
 
 ## Contributing
 1. Fork the repository

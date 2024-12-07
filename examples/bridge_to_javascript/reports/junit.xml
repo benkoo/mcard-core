@@ -1,93 +1,115 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="42" failures="0" errors="0" time="60.271">
-  <testsuite name="tests/client.consolidated.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-07T07:59:37" time="48.415" tests="30">
-    <testcase classname="MCard Client › Basic Operations" name="should create, retrieve, and delete a card" time="3.077">
+<testsuites name="jest tests" tests="53" failures="0" errors="0" time="83.696">
+  <testsuite name="tests/client.consolidated.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-07T08:26:26" time="48.051" tests="30">
+    <testcase classname="MCard Client › Basic Operations" name="should create, retrieve, and delete a card" time="3.085">
     </testcase>
     <testcase classname="MCard Client › Basic Operations" name="should handle text content properly" time="0.023">
     </testcase>
-    <testcase classname="MCard Client › Basic Operations" name="should handle structured content properly" time="0.014">
+    <testcase classname="MCard Client › Basic Operations" name="should handle structured content properly" time="0.017">
     </testcase>
-    <testcase classname="MCard Client › Error Handling" name="should handle invalid content gracefully" time="6.106">
+    <testcase classname="MCard Client › Error Handling" name="should handle invalid content gracefully" time="6.09">
     </testcase>
-    <testcase classname="MCard Client › Error Handling" name="should handle non-existent card access" time="6.11">
+    <testcase classname="MCard Client › Error Handling" name="should handle non-existent card access" time="6.102">
     </testcase>
-    <testcase classname="MCard Client › Error Handling" name="should handle missing hash parameter" time="0.004">
+    <testcase classname="MCard Client › Error Handling" name="should handle missing hash parameter" time="0.002">
     </testcase>
     <testcase classname="MCard Client › Error Handling" name="should handle retry exhaustion" time="0.215">
     </testcase>
-    <testcase classname="MCard Client › Error Handling" name="should handle other HTTP errors" time="3.058">
+    <testcase classname="MCard Client › Error Handling" name="should handle other HTTP errors" time="3.051">
     </testcase>
-    <testcase classname="MCard Client › Error Handling" name="should handle other errors in deleteCard" time="3.044">
+    <testcase classname="MCard Client › Error Handling" name="should handle other errors in deleteCard" time="3.054">
     </testcase>
-    <testcase classname="MCard Client › Error Handling" name="should handle errors with no response data" time="3.031">
+    <testcase classname="MCard Client › Error Handling" name="should handle errors with no response data" time="3.034">
     </testcase>
-    <testcase classname="MCard Client › Error Handling" name="should handle errors with no response status" time="3.431">
+    <testcase classname="MCard Client › Error Handling" name="should handle errors with no response status" time="3.434">
     </testcase>
-    <testcase classname="MCard Client › Search and List Operations" name="should list all cards with pagination" time="6.616">
+    <testcase classname="MCard Client › Search and List Operations" name="should list all cards with pagination" time="6.626">
     </testcase>
-    <testcase classname="MCard Client › Client Configuration" name="should initialize with custom configuration" time="0.008">
+    <testcase classname="MCard Client › Client Configuration" name="should initialize with custom configuration" time="0.003">
     </testcase>
     <testcase classname="MCard Client › Client Configuration" name="should normalize base URLs correctly" time="0.001">
     </testcase>
-    <testcase classname="MCard Client › Error Handling and Retries" name="should handle network errors" time="0.211">
+    <testcase classname="MCard Client › Error Handling and Retries" name="should handle network errors" time="0.209">
     </testcase>
     <testcase classname="MCard Client › Error Handling and Retries" name="should track metrics during errors" time="0.107">
     </testcase>
-    <testcase classname="MCard Client › Metrics and Monitoring" name="should track successful requests" time="0.005">
+    <testcase classname="MCard Client › Metrics and Monitoring" name="should track successful requests" time="0.004">
     </testcase>
-    <testcase classname="MCard Client › Metrics and Monitoring" name="should reset metrics correctly" time="0.005">
+    <testcase classname="MCard Client › Metrics and Monitoring" name="should reset metrics correctly" time="0.004">
     </testcase>
-    <testcase classname="MCard Client › Metrics and Monitoring" name="should maintain request history" time="0.004">
+    <testcase classname="MCard Client › Metrics and Monitoring" name="should maintain request history" time="0.003">
     </testcase>
-    <testcase classname="MCard Client › Metrics and Monitoring" name="should handle request history limits" time="0.021">
+    <testcase classname="MCard Client › Metrics and Monitoring" name="should handle request history limits" time="0.019">
     </testcase>
     <testcase classname="MCard Client › Input Validation" name="should validate pagination parameters" time="0.001">
     </testcase>
-    <testcase classname="MCard Client › Input Validation" name="should validate card parameters" time="0.001">
+    <testcase classname="MCard Client › Input Validation" name="should validate card parameters" time="0">
     </testcase>
     <testcase classname="MCard Client › Metrics and History" name="should track request history with debug mode" time="0.008">
     </testcase>
-    <testcase classname="MCard Client › Metrics and History" name="should handle empty responses" time="3.042">
+    <testcase classname="MCard Client › Metrics and History" name="should handle empty responses" time="3.039">
     </testcase>
-    <testcase classname="MCard Client › Metrics and History" name="should track failed requests in metrics" time="3.029">
+    <testcase classname="MCard Client › Metrics and History" name="should track failed requests in metrics" time="3.024">
     </testcase>
-    <testcase classname="MCard Client › Card Management" name="should get all cards with pagination" time="1.187">
+    <testcase classname="MCard Client › Card Management" name="should get all cards with pagination" time="1.16">
     </testcase>
-    <testcase classname="MCard Client › Card Management" name="should handle empty response in getAllCards" time="0.414">
+    <testcase classname="MCard Client › Card Management" name="should handle empty response in getAllCards" time="0.416">
     </testcase>
-    <testcase classname="MCard Client › Card Management" name="should delete all cards" time="0.632">
+    <testcase classname="MCard Client › Card Management" name="should delete all cards" time="0.627">
     </testcase>
-    <testcase classname="MCard Client › Card Management" name="should handle errors in deleteCards" time="3.241">
+    <testcase classname="MCard Client › Card Management" name="should handle errors in deleteCards" time="3.246">
     </testcase>
-    <testcase classname="MCard Client › URL Normalization" name="should normalize URLs correctly" time="0.002">
+    <testcase classname="MCard Client › URL Normalization" name="should normalize URLs correctly" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="tests/retry_cancellation.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-07T08:00:25" time="4.975" tests="4">
-    <testcase classname="MCard Client Retry and Cancellation" name="should handle retry exhaustion" time="0.234">
+  <testsuite name="tests/client.content.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-07T08:27:14" time="30.644" tests="19">
+    <testcase classname="MCard Client Content Tests › Text Content" name="should handle plain text content" time="0.219">
     </testcase>
-    <testcase classname="MCard Client Retry and Cancellation" name="should handle empty responses" time="3.055">
+    <testcase classname="MCard Client Content Tests › Text Content" name="should handle large text content" time="0.224">
     </testcase>
-    <testcase classname="MCard Client Retry and Cancellation" name="should track failed requests in metrics" time="0.213">
+    <testcase classname="MCard Client Content Tests › Text Content" name="should handle text content with special characters" time="0.234">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle small binary content" time="0.218">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle large binary content" time="0.787">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle PNG image content" time="0.225">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle PDF document content" time="0.222">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle GIF image content" time="0.23">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle binary content with metadata" time="0.222">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle multiple binary files in sequence" time="0.244">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle concurrent binary file uploads" time="0.242">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Mixed Content Operations" name="should handle mixed text and binary content storage" time="0.228">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Mixed Content Operations" name="should handle deletion of mixed content" time="6.319">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Mixed Content Operations" name="should handle concurrent mixed content operations" time="15.512">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Mixed Content Operations" name="should handle listing of mixed content" time="0.23">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Mixed Content Operations" name="should handle search across mixed content" time="0.222">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Card Operations" name="should list all cards with pagination" time="0.219">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Card Operations" name="should delete specific cards" time="3.256">
+    </testcase>
+    <testcase classname="MCard Client Content Tests › Card Operations" name="should handle search functionality" time="0.219">
+    </testcase>
+  </testsuite>
+  <testsuite name="tests/retry_cancellation.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-07T08:27:45" time="4.945" tests="4">
+    <testcase classname="MCard Client Retry and Cancellation" name="should handle retry exhaustion" time="0.223">
+    </testcase>
+    <testcase classname="MCard Client Retry and Cancellation" name="should handle empty responses" time="3.042">
+    </testcase>
+    <testcase classname="MCard Client Retry and Cancellation" name="should track failed requests in metrics" time="0.21">
     </testcase>
     <testcase classname="MCard Client Retry and Cancellation" name="should handle request cancellation" time="0.003">
-    </testcase>
-  </testsuite>
-  <testsuite name="tests/client.content.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-07T08:00:30" time="6.828" tests="8">
-    <testcase classname="MCard Client Content Tests › Text Content" name="should handle plain text content" time="0.233">
-    </testcase>
-    <testcase classname="MCard Client Content Tests › Text Content" name="should handle large text content" time="0.22">
-    </testcase>
-    <testcase classname="MCard Client Content Tests › Text Content" name="should handle text content with special characters" time="0.217">
-    </testcase>
-    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle small binary content" time="0.216">
-    </testcase>
-    <testcase classname="MCard Client Content Tests › Binary Content" name="should handle large binary content" time="0.774">
-    </testcase>
-    <testcase classname="MCard Client Content Tests › Card Operations" name="should list all cards with pagination" time="0.224">
-    </testcase>
-    <testcase classname="MCard Client Content Tests › Card Operations" name="should delete specific cards" time="3.273">
-    </testcase>
-    <testcase classname="MCard Client Content Tests › Card Operations" name="should handle search functionality" time="0.22">
     </testcase>
   </testsuite>
 </testsuites>
