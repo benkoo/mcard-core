@@ -624,6 +624,62 @@ Note: The tests require a running MCard server instance. If you encounter connec
 
 This integration guide demonstrates how to use the MCard JavaScript client and Python server in a modern Astro web application, including setup, basic usage, and advanced features.
 
+## Recent Changes (2024-12-07)
+
+### Enhanced Error Handling and Request Tracking
+
+1. **Improved Retry Attempts Tracking**
+   - Fixed retry attempts counter to only increment when a retry is actually performed
+   - More accurate metrics for failed requests and retry attempts
+   - Better distinction between different types of errors (network, HTTP, etc.)
+
+2. **Request Cancellation Support**
+   - Added proper handling of axios cancellation tokens
+   - Immediate cancellation response without unnecessary retries
+   - Consistent error messages for cancelled requests
+   - Updated all relevant methods to properly pass through cancel tokens
+
+3. **Metrics Accuracy**
+   - Fixed metrics tracking to properly count successful and failed requests
+   - More accurate retry attempt counts
+   - Better tracking of network errors vs other types of errors
+
+### Example Usage with Request Cancellation
+
+```javascript
+const axios = require('axios');
+
+// Create a cancel token
+const source = axios.CancelToken.source();
+
+try {
+    // Use the token in a request
+    await client.checkHealth(source.token);
+    
+    // Cancel the request if needed
+    source.cancel();
+} catch (error) {
+    if (error.message === 'cancelled') {
+        console.log('Request was cancelled');
+    }
+}
+```
+
+### Metrics and Debugging
+
+The client now provides more accurate metrics through `getMetrics()`:
+```javascript
+const metrics = client.getMetrics();
+console.log({
+    totalRequests: metrics.totalRequests,
+    successfulRequests: metrics.successfulRequests,
+    failedRequests: metrics.failedRequests,
+    retryAttempts: metrics.retryAttempts,
+    networkErrors: metrics.networkErrors,
+    otherErrors: metrics.otherErrors
+});
+```
+
 ## Testing Approach
 
 The JavaScript client includes a comprehensive test suite that covers various aspects of the client's functionality:

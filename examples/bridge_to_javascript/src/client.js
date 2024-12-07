@@ -66,7 +66,9 @@ class MCardClient {
             failedRequests: 0,
             retryAttempts: 0,
             totalResponseTime: 0,
-            averageResponseTime: 0
+            averageResponseTime: 0,
+            networkErrors: 0,
+            otherErrors: 0
         };
         this._requestHistory = [];
 
@@ -98,121 +100,132 @@ class MCardClient {
         });
     }
 
-    async _makeRequest(method, url, data = null, retryCount = 0, cancelToken = null) {
-        const startTime = Date.now();
-        if (retryCount === 0) {
-            this._metrics.totalRequests++;
+    async _makeRequest(method, endpoint, data = null, cancelToken = null) {
+        let retryCount = 0;
+        let lastError = null;
+        this._metrics.totalRequests++;
+
+        while (true) {
+            try {
+                const startTime = Date.now();
+                const result = await this._axiosInstance({
+                    method,
+                    url: endpoint,
+                    data,
+                    cancelToken
+                });
+                
+                const duration = Date.now() - startTime;
+                this._metrics.successfulRequests++;
+                this._metrics.totalResponseTime += duration;
+                this._metrics.averageResponseTime = this._metrics.totalResponseTime / this._metrics.totalRequests;
+                
+                // Always track request history, not just in debug mode
+                this._addToRequestHistory({
+                    method,
+                    url: endpoint,
+                    duration,
+                    status: result.status,
+                    success: true,
+                    data: result.data
+                });
+
+                return result.data;
+            } catch (error) {
+                lastError = error;
+                
+                // Handle cancellation immediately
+                if (axios.isCancel(error)) {
+                    this._metrics.failedRequests++;
+                    throw new Error(ERROR_MESSAGES.REQUEST_CANCELLED);
+                }
+
+                // Always track failed requests
+                this._addToRequestHistory({
+                    method,
+                    url: endpoint,
+                    duration: 0,
+                    status: error.response?.status || 0,
+                    error: error.message,
+                    success: false
+                });
+
+                if (retryCount >= this._maxRetries) {
+                    this._metrics.failedRequests++;
+                    
+                    if (error.response) {
+                        const status = error.response.status;
+                        switch (status) {
+                            case 422:
+                                throw new Error('422: Content is invalid');
+                            case 404:
+                                throw new Error('404: Card not found');
+                            case 403:
+                                throw new Error('403: Invalid API key');
+                            default:
+                                throw new Error(`${status}: ${error.response.data.detail || 'Unknown error'}`);
+                        }
+                    } else if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
+                        this._metrics.networkErrors++;
+                        throw new Error('Network error: Unable to reach server');
+                    } else if (error.code === 'ENOTFOUND') {
+                        this._metrics.networkErrors++;
+                        throw new Error('Maximum retry attempts exhausted');
+                    } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+                        this._metrics.networkErrors++;
+                        throw new Error('Maximum retry attempts exhausted');
+                    }
+
+                    this._metrics.otherErrors++;
+                    throw new Error('Maximum retry attempts exhausted');
+                }
+
+                // Only increment retry attempts if we're actually going to retry
+                this._metrics.retryAttempts++;
+                await new Promise(resolve => setTimeout(resolve, this._retryDelay));
+                retryCount++;
+            }
+        }
+    }
+
+    async createCard(content) {
+        if (!content) {
+            throw new Error('422: Content is invalid');
+        }
+        let contentToSend = content;
+        let metadata = {};
+
+        if (content && typeof content === 'object' && 'content' in content) {
+            contentToSend = content.content;
+            metadata = content.metadata || {};
         }
 
         try {
-            const response = await this._axiosInstance({
-                method,
-                url,
-                data,
-                cancelToken
+            const response = await this._makeRequest('POST', '/cards', {
+                content: contentToSend,
+                metadata: metadata
             });
 
-            this._metrics.successfulRequests++;
-            const duration = Date.now() - startTime;
-            this._metrics.averageResponseTime = 
-                (this._metrics.averageResponseTime * (this._metrics.successfulRequests - 1) + duration) / 
-                this._metrics.successfulRequests;
+            // Ensure we have a hash in the response
+            if (!response || !response.hash) {
+                throw new Error('Server response missing hash');
+            }
 
-            this._addToRequestHistory({
-                timestamp: new Date(),
-                method,
-                url,
-                duration,
-                success: true,
-            });
-
-            return response.data;
+            return response;
         } catch (error) {
-            const duration = Date.now() - startTime;
-
-            this._addToRequestHistory({
-                timestamp: new Date(),
-                method,
-                url,
-                duration,
-                success: false,
-                error: error.message
-            });
-
-            // Handle request cancellation first, before any retry logic
-            if (axios.isCancel(error)) {
-                this._metrics.failedRequests++;
-                throw new Error(ERROR_MESSAGES.REQUEST_CANCELLED);
+            if (error.response && error.response.status === 422) {
+                throw new Error('422: Content is invalid');
             }
-
-            // Handle HTTP errors
-            if (error.response) {
-                if (error.response.status === 404) {
-                    if (error.config.url.includes('/cards/')) {
-                        // For GET requests, throw CARD_NOT_FOUND
-                        // For DELETE requests, return null
-                        if (method === 'DELETE') {
-                            return null;
-                        }
-                        this._metrics.failedRequests++;
-                        throw new Error(ERROR_MESSAGES.CARD_NOT_FOUND);
-                    }
-                    throw new Error(ERROR_MESSAGES.NOT_FOUND);
-                }
-
-                // Handle other HTTP errors
-                this._metrics.failedRequests++;
-                throw new Error(`${error.response.status}: ${error.response.data?.detail || 'Unknown error'}`);
-            }
-
-            // Handle DNS resolution errors
-            if (error.code === 'ENOTFOUND') {
-                if (retryCount >= this._maxRetries) {
-                    this._metrics.failedRequests++;
-                    throw new Error(ERROR_MESSAGES.RETRY_EXHAUSTED);
-                }
-                this._metrics.retryAttempts++;
-                await new Promise(resolve => setTimeout(resolve, this._retryDelay));
-                return this._makeRequest(method, url, data, retryCount + 1, cancelToken);
-            }
-
-            // Handle network errors
-            if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ENOTFOUND') {
-                this._metrics.failedRequests++;
-                throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
-            }
-
-            // Check for retry exhaustion for other errors
-            if (retryCount >= this._maxRetries) {
-                this._metrics.failedRequests++;
-                throw new Error(ERROR_MESSAGES.RETRY_EXHAUSTED);
-            }
-
-            // Retry for other errors
-            this._metrics.retryAttempts++;
-            await new Promise(resolve => setTimeout(resolve, this._retryDelay));
-            return this._makeRequest(method, url, data, retryCount + 1, cancelToken);
+            throw error;
         }
     }
 
-    _addToRequestHistory(request) {
-        this._requestHistory.unshift(request);
-        if (this._requestHistory.length > this._maxHistorySize) {
-            this._requestHistory = this._requestHistory.slice(0, this._maxHistorySize);
+    async getCard(hash) {
+        if (!hash) {
+            throw new Error('Hash is required');
         }
-    }
-
-    async createCard(params) {
-        if (!params || (!params.content && typeof params !== 'string')) {
-            throw new Error(ERROR_MESSAGES.CONTENT_INVALID);
-        }
-
-        const cardData = {
-            content: typeof params === 'string' ? params : params.content,
-            metadata: typeof params === 'string' ? {} : params.metadata || {}
-        };
-
-        return this._makeRequest('POST', '/cards', cardData);
+        // Return the server response directly to ensure we use server's metadata
+        return await this._makeRequest('GET', `/cards/${hash}`);
     }
 
     async listCards({ page = 1, pageSize = 10, search = '' } = {}, cancelToken = null) {
@@ -227,17 +240,9 @@ class MCardClient {
             'GET',
             `/cards?page=${page}&page_size=${pageSize}&search=${search}`,
             null,
-            0,
             cancelToken
         );
         return response;
-    }
-
-    async getCard(hash, options = {}) {
-        if (!hash) {
-            throw new Error(ERROR_MESSAGES.HASH_REQUIRED);
-        }
-        return this._makeRequest('GET', `/cards/${hash}`);
     }
 
     async getAllCards() {
@@ -268,7 +273,7 @@ class MCardClient {
         }
 
         try {
-            const response = await this._makeRequest('DELETE', `/cards/${hash}`, null, 0, options.cancelToken);
+            const response = await this._makeRequest('DELETE', `/cards/${hash}`, null, options.cancelToken);
             return response;
         } catch (error) {
             if (error.message === ERROR_MESSAGES.CARD_NOT_FOUND) {
@@ -279,7 +284,14 @@ class MCardClient {
     }
 
     async checkHealth(cancelToken = null) {
-        return this._makeRequest('GET', '/health', null, 0, cancelToken);
+        return this._makeRequest('GET', '/health', null, cancelToken);
+    }
+
+    _addToRequestHistory(request) {
+        this._requestHistory.push(request);
+        if (this._requestHistory.length > this._maxHistorySize) {
+            this._requestHistory.shift();
+        }
     }
 
     _normalizeBaseURL(baseUrl) {
@@ -307,7 +319,7 @@ class MCardClient {
     }
 
     getRequestHistory() {
-        return this._requestHistory;
+        return [...this._requestHistory];
     }
 
     getMetrics() {
@@ -316,7 +328,9 @@ class MCardClient {
             successfulRequests: this._metrics.successfulRequests,
             failedRequests: this._metrics.failedRequests,
             retryAttempts: this._metrics.retryAttempts,
-            averageResponseTime: this._metrics.averageResponseTime
+            averageResponseTime: this._metrics.averageResponseTime,
+            networkErrors: this._metrics.networkErrors,
+            otherErrors: this._metrics.otherErrors
         };
     }
 
@@ -327,7 +341,9 @@ class MCardClient {
             failedRequests: 0,
             retryAttempts: 0,
             totalResponseTime: 0,
-            averageResponseTime: 0
+            averageResponseTime: 0,
+            networkErrors: 0,
+            otherErrors: 0
         };
         this._requestHistory = [];
     }
