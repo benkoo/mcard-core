@@ -1,363 +1,451 @@
-const { 
-    MCardClient, 
-    DEFAULT_HOST, 
-    DEFAULT_PORT, 
-    DEFAULT_BASE_URL,
-    ERROR_MESSAGES 
-} = require('../src/client');
-const { config } = require('./config/test-config');
-const { createTestClient, createInvalidClient } = require('./utils/test-setup');
-const nock = require('nock');
+const { MCardClient, DEFAULT_API_KEY, DEFAULT_BASE_URL, DEFAULT_TIMEOUT, ERROR_MESSAGES } = require('../src/client');
+const { TestEnvironment } = require('./utils/test-utils');
+const fs = require('fs').promises;
+const path = require('path');
+const axios = require('axios');
 
-describe('MCardClient', () => {
+describe('MCard Client', () => {
     let client;
-    let originalEnv;
+    let testEnv;
+
+    beforeAll(async () => {
+        testEnv = await TestEnvironment.getGlobalInstance();
+    });
+
+    afterAll(async () => {
+        await TestEnvironment.cleanupGlobalInstance();
+    });
 
     beforeEach(() => {
-        originalEnv = process.env.MCARD_API_KEY;
-        delete process.env.MCARD_API_KEY;
-        client = createTestClient();
-    });
-
-    afterEach(() => {
-        process.env.MCARD_API_KEY = originalEnv;
-    });
-
-    describe('Client Initialization', () => {
-        it('should throw error when API key is missing', () => {
-            expect(() => {
-                new MCardClient();
-            }).toThrow(ERROR_MESSAGES.API_KEY_REQUIRED);
-        });
-
-        it('should use default port when not specified', () => {
-            const client = new MCardClient({ apiKey: config.server.apiKey });
-            expect(client.baseUrl).toBe(DEFAULT_BASE_URL);
-        });
-
-        it('should use custom port when specified', () => {
-            const customPort = config.server.port;
-            const client = new MCardClient({ 
-                apiKey: config.server.apiKey, 
-                port: customPort 
-            });
-            expect(client.baseUrl).toBe(`${DEFAULT_HOST}:${customPort}`);
-        });
-
-        it('should reject whitespace-only API keys', () => {
-            expect(() => {
-                new MCardClient({ apiKey: '   ' });
-            }).toThrow(ERROR_MESSAGES.API_KEY_REQUIRED);
-        });
-
-        it('should handle API key changes after initialization', async () => {
-            client.setApiKey(config.client.invalidConfig.apiKey);
-            await expect(client.listCards())
-                .rejects
-                .toThrow('403: Invalid API key');
+        client = new MCardClient({
+            apiKey: DEFAULT_API_KEY,
+            baseUrl: DEFAULT_BASE_URL,
+            timeout: DEFAULT_TIMEOUT
         });
     });
 
     describe('Basic Operations', () => {
-        it('should create and retrieve a card with text content', async () => {
-            const content = 'Test content';
-            const card = await client.createCard(content);
-            expect(card).toHaveProperty('hash');
-            expect(card).toHaveProperty('content');
-
-            const retrieved = await client.getCard(card.hash);
-            expect(retrieved.content).toMatch(new RegExp(`^${content}`)); 
-            expect(retrieved.hash).toBe(card.hash);
+        it('should create, retrieve, and delete a card', async () => {
+            // Create a card with unique content
+            const content = { 
+                text: 'Test content', 
+                number: 42,
+                timestamp: new Date().toISOString()
+            };
+            const createResponse = await client.createCard({ content: JSON.stringify(content) });
+            expect(createResponse).toBeDefined();
+            expect(createResponse.hash).toBeDefined();
+            
+            // Retrieve the card
+            const retrievedCard = await client.getCard(createResponse.hash);
+            expect(retrievedCard).toBeDefined();
+            expect(JSON.parse(retrievedCard.content)).toEqual(content);
+            
+            // Delete the card
+            await client.deleteCard(createResponse.hash);
+            
+            // Verify deletion
+            await expect(client.getCard(createResponse.hash)).rejects.toThrow();
         });
 
-        it('should list multiple cards', async () => {
-            const cards = [];
-            for (let i = 0; i < 3; i++) {
-                const card = await client.createCard(`Test content ${i}`);
-                cards.push(card);
-            }
-
-            const listed = await client.listCards();
-            expect(Array.isArray(listed)).toBe(true);
-            expect(listed.length).toBeGreaterThanOrEqual(cards.length);
+        it('should handle text content properly', async () => {
+            const textContent = `Simple text content ${new Date().toISOString()}`;
+            const response = await client.createCard(textContent);
+            expect(response.hash).toBeDefined();
+            
+            const retrieved = await client.getCard(response.hash);
+            expect(retrieved.content).toBe(textContent);
+            
+            await client.deleteCard(response.hash);
         });
 
-        it('should delete a card', async () => {
-            const card = await client.createCard('Test content');
-            await client.deleteCard(card.hash);
-            const response = await client.getCard(card.hash);
-            expect(response.detail).toBe("Card not found");
-        });
-    });
-
-    describe('Content Types', () => {
-        it('should handle HTML content', async () => {
-            const htmlContent = '<div>Test HTML content</div>';
-            const card = await client.createCard(htmlContent);
-            const retrieved = await client.getCard(card.hash);
-            expect(retrieved.content).toMatch(new RegExp(`^${htmlContent}`)); 
-        });
-
-        it('should handle code content', async () => {
-            const codeContent = 'function test() { return true; }';
-            const card = await client.createCard(codeContent);
-            const retrieved = await client.getCard(card.hash);
-            expect(retrieved.content.startsWith(codeContent)).toBe(true);
-        });
-
-        it('should handle large content', async () => {
-            const largeContent = 'x'.repeat(1000); 
-            const card = await client.createCard(largeContent);
-            const retrieved = await client.getCard(card.hash);
-            expect(retrieved.content).toMatch(new RegExp(`^${largeContent}`)); 
+        it('should handle structured content properly', async () => {
+            const structuredContent = {
+                title: 'Test Card',
+                items: [1, 2, 3],
+                metadata: {
+                    author: 'Test User',
+                    timestamp: new Date().toISOString()
+                }
+            };
+            
+            const response = await client.createCard({ content: JSON.stringify(structuredContent) });
+            expect(response.hash).toBeDefined();
+            
+            const retrieved = await client.getCard(response.hash);
+            expect(JSON.parse(retrieved.content)).toEqual(structuredContent);
+            
+            await client.deleteCard(response.hash);
         });
     });
 
     describe('Error Handling', () => {
-        it('should handle invalid API key', async () => {
-            const invalidClient = createInvalidClient();
-            await expect(invalidClient.listCards())
-                .rejects
-                .toThrow(ERROR_MESSAGES.INVALID_API_KEY);
+        it('should handle invalid content gracefully', async () => {
+            await expect(client.createCard()).rejects.toThrow(ERROR_MESSAGES.CONTENT_INVALID);
+            await expect(client.createCard('')).rejects.toThrow(ERROR_MESSAGES.CONTENT_INVALID);
+            await expect(client.createCard(null)).rejects.toThrow(ERROR_MESSAGES.CONTENT_INVALID);
+            await expect(client.createCard({ content: null })).rejects.toThrow(ERROR_MESSAGES.CONTENT_INVALID);
+            await expect(client.createCard({ content: '' })).rejects.toThrow(ERROR_MESSAGES.CONTENT_INVALID);
         });
 
-        it('should handle non-existent card', async () => {
-            const response = await client.getCard('nonexistent');
-            expect(response.detail).toBe("Card not found");
+        it('should handle non-existent card access', async () => {
+            const nonexistentHash = 'nonexistenthash123';
+            await expect(client.getCard(nonexistentHash)).rejects.toThrow(ERROR_MESSAGES.CARD_NOT_FOUND);
+            const response = await client.deleteCard(nonexistentHash);
+            expect(response).toBeNull();
         });
 
-        it('should handle empty content', async () => {
-            await expect(client.createCard(''))
-                .rejects
-                .toThrow(ERROR_MESSAGES.CONTENT_INVALID);
+        it('should handle missing hash parameter', async () => {
+            await expect(client.getCard()).rejects.toThrow(ERROR_MESSAGES.HASH_REQUIRED);
+            await expect(client.getCard('')).rejects.toThrow(ERROR_MESSAGES.HASH_REQUIRED);
+            await expect(client.getCard(null)).rejects.toThrow(ERROR_MESSAGES.HASH_REQUIRED);
+            await expect(client.deleteCard()).rejects.toThrow(ERROR_MESSAGES.HASH_REQUIRED);
+            await expect(client.deleteCard('')).rejects.toThrow(ERROR_MESSAGES.HASH_REQUIRED);
+            await expect(client.deleteCard(null)).rejects.toThrow(ERROR_MESSAGES.HASH_REQUIRED);
         });
 
-        it('should handle network timeouts', async () => {
-            const timeoutClient = new MCardClient({
-                apiKey: config.server.apiKey,
-                timeout: 1
+        it('should handle retry exhaustion', async () => {
+            const badClient = new MCardClient({
+                baseURL: 'http://nonexistent.domain',
+                timeout: 1000,
+                maxRetries: 2,
+                retryDelay: 100
             });
-            await expect(timeoutClient.listCards())
-                .rejects
-                .toThrow(ERROR_MESSAGES.TIMEOUT);
+            await expect(badClient.checkHealth()).rejects.toThrow(ERROR_MESSAGES.RETRY_EXHAUSTED);
+        });
+
+        it('should handle other HTTP errors', async () => {
+            // Create a client with an invalid API key to trigger a 403 error
+            const badClient = new MCardClient({
+                apiKey: 'invalid_key',
+                timeout: 1000
+            });
+            await expect(badClient.checkHealth()).rejects.toThrow('403: Invalid API key');
+        });
+
+        it('should handle other errors in deleteCard', async () => {
+            // Create a client with an invalid API key to trigger a 403 error
+            const badClient = new MCardClient({
+                apiKey: 'invalid_key',
+                timeout: 1000
+            });
+            await expect(badClient.deleteCard('hash123')).rejects.toThrow('403: Invalid API key');
+        });
+
+        it('should handle errors with no response data', async () => {
+            const badClient = new MCardClient({
+                apiKey: 'invalid_key',
+                baseURL: 'http://localhost:1234', // Use a port that's not in use
+                timeout: 100
+            });
+            await expect(badClient.checkHealth()).rejects.toThrow(ERROR_MESSAGES.NETWORK_ERROR);
+        });
+
+        it('should handle errors with no response status', async () => {
+            const badClient = new MCardClient({
+                baseURL: 'http://nonexistent.domain.local',
+                timeout: 100
+            });
+            await expect(badClient.checkHealth()).rejects.toThrow(ERROR_MESSAGES.RETRY_EXHAUSTED);
         });
     });
 
-    describe('Concurrent Operations', () => {
-        it('should handle multiple concurrent card creations', async () => {
-            const operations = [];
-            for (let i = 0; i < 10; i++) {
-                operations.push(client.createCard(`Test content ${i}`));
+    describe('Search and List Operations', () => {
+        let createdCards = [];
+
+        beforeEach(async () => {
+            // Create test cards with unique content
+            const timestamp = new Date().toISOString();
+            const cards = [
+                { content: `First test card with unique content ${timestamp}-1` },
+                { content: `Second test card with similar content ${timestamp}-2` },
+                { content: `Third test card with similar content ${timestamp}-3` }
+            ];
+            
+            for (const card of cards) {
+                const response = await client.createCard(card);
+                createdCards.push(response);
             }
-            const results = await Promise.all(operations);
-            expect(results.length).toBe(10);
-            results.forEach(card => {
-                expect(card).toHaveProperty('hash');
-                expect(card).toHaveProperty('content');
-            });
         });
 
-        it('should handle mixed operations concurrently', async () => {
-            const card1 = await client.createCard('Test content 1');
-            const card2 = await client.createCard('Test content 2');
+        afterEach(async () => {
+            // Cleanup created cards
+            for (const card of createdCards) {
+                try {
+                    await client.deleteCard(card.hash);
+                } catch (error) {
+                    // Ignore errors during cleanup
+                }
+            }
+            createdCards = [];
+        });
 
-            const operations = [
-                client.getCard(card1.hash),
-                client.getCard(card2.hash),
-                client.createCard('Test content 3'),
-                client.listCards()
+        it('should list all cards with pagination', async () => {
+            const result = await client.listCards({ page: 1, pageSize: 10 });
+            expect(result.items).toBeDefined();
+            expect(result.items.length).toBeGreaterThanOrEqual(3);
+            expect(result.total).toBeGreaterThanOrEqual(3);
+            expect(result.page).toBe(1);
+            expect(result.page_size).toBe(10);
+            expect(result.total_pages).toBeDefined();
+            expect(result.has_next).toBeDefined();
+            expect(result.has_previous).toBeDefined();
+        });
+    });
+
+    describe('Client Configuration', () => {
+        it('should initialize with custom configuration', () => {
+            const customConfig = {
+                apiKey: 'custom_key',
+                baseURL: 'http://custom.domain:8080',
+                timeout: 10000,
+                debug: true,
+                headers: { 'Custom-Header': 'value' }
+            };
+            const customClient = new MCardClient(customConfig);
+            
+            expect(customClient.apiKey).toBe(customConfig.apiKey);
+            expect(customClient.debug).toBe(true);
+            expect(customClient.axiosInstance.defaults.baseURL).toBe(customConfig.baseURL);
+            expect(customClient.axiosInstance.defaults.timeout).toBe(customConfig.timeout);
+            expect(customClient.axiosInstance.defaults.headers['Custom-Header']).toBe('value');
+        });
+
+        it('should normalize base URLs correctly', () => {
+            const testCases = [
+                { input: 'localhost:5000', expected: 'http://localhost:5000' },
+                { input: 'https://api.example.com/', expected: 'https://api.example.com' },
+                { input: 'http://test.com', expected: 'http://test.com' }
             ];
 
-            const results = await Promise.all(operations);
-            expect(results.length).toBe(4);
-        });
-
-        it('should maintain consistency under concurrent load', async () => {
-            const cards = [];
-            for (let i = 0; i < 5; i++) {
-                const card = await client.createCard(`Test content ${i}`);
-                cards.push(card);
-            }
-
-            const getOperations = cards.map(card => client.getCard(card.hash));
-            const results = await Promise.all(getOperations);
-
-            results.forEach((result, index) => {
-                expect(result.hash).toBe(cards[index].hash);
-                expect(result.content.startsWith(cards[index].content)).toBe(true);
+            testCases.forEach(({ input, expected }) => {
+                const client = new MCardClient({ baseURL: input });
+                expect(client.axiosInstance.defaults.baseURL).toBe(expected);
             });
         });
     });
 
-    describe('Performance Monitoring', () => {
-        it('should track request metrics', async () => {
-            const client = createTestClient();
-            await client.createCard('Test content');
-            const metrics = client.getMetrics();
-            expect(metrics.totalRequests).toBe(1);
-            expect(metrics.successfulRequests).toBe(1);
-            expect(metrics.failedRequests).toBe(0);
-            expect(metrics.totalDuration).toBeGreaterThan(0);
+    describe('Error Handling and Retries', () => {
+        it('should handle network errors', async () => {
+            const badClient = new MCardClient({
+                baseURL: 'http://nonexistent.domain',
+                timeout: 1000,
+                maxRetries: 2,
+                retryDelay: 100
+            });
+
+            await expect(badClient.checkHealth())
+                .rejects
+                .toThrow(ERROR_MESSAGES.RETRY_EXHAUSTED);
+        });
+
+        it('should track metrics during errors', async () => {
+            const badClient = new MCardClient({
+                baseURL: 'http://nonexistent.domain',
+                timeout: 1000,
+                maxRetries: 1,
+                retryDelay: 100
+            });
+
+            try {
+                await badClient.checkHealth();
+            } catch (error) {
+                const metrics = badClient.getMetrics();
+                expect(metrics.failedRequests).toBe(1);
+                expect(metrics.retryAttempts).toBeGreaterThan(0);
+            }
+        });
+    });
+
+    describe('Metrics and Monitoring', () => {
+        it('should track successful requests', async () => {
+            const startMetrics = client.getMetrics();
+            await client.checkHealth();
+            const endMetrics = client.getMetrics();
+            expect(endMetrics.totalRequests).toBe(startMetrics.totalRequests + 1);
+            expect(endMetrics.successfulRequests).toBe(startMetrics.successfulRequests + 1);
+            expect(endMetrics.failedRequests).toBe(startMetrics.failedRequests);
+            expect(endMetrics.averageResponseTime).toBeGreaterThan(0);
         });
 
         it('should reset metrics correctly', async () => {
-            const client = createTestClient();
-            await client.createCard('Test content');
+            await client.checkHealth();
             client.resetMetrics();
             const metrics = client.getMetrics();
             expect(metrics.totalRequests).toBe(0);
             expect(metrics.successfulRequests).toBe(0);
             expect(metrics.failedRequests).toBe(0);
-            expect(metrics.totalDuration).toBe(0);
+            expect(metrics.averageResponseTime).toBe(0);
         });
 
-        it('should handle base URL changes', () => {
-            const client = createTestClient();
-            const newBaseUrl = 'http://localhost:5321';
-            client.baseUrl = newBaseUrl;
-            expect(client.baseUrl).toBe(newBaseUrl);
+        it('should maintain request history', async () => {
+            client.resetMetrics();
+            await client.checkHealth();
+            const history = client.getRequestHistory();
+            expect(history.length).toBeGreaterThan(0);
+            expect(history[0].method).toBe('GET');
+            expect(history[0].url).toBe('/health');
+            expect(history[0].duration).toBeGreaterThan(0);
+            expect(history[0].success).toBe(true);
         });
 
-        it('should handle invalid base URL format', () => {
-            // Test the constructor's URL formatting
-            const client = new MCardClient({
-                apiKey: 'test_key',
-                baseUrl: 'example.com:8080'
+        it('should handle request history limits', async () => {
+            const maxHistorySize = 5;
+            const testClient = new MCardClient({
+                maxHistorySize
             });
-            expect(client.baseUrl).toBe('http://example.com:8080');
-            
-            // Test direct baseUrl setter (uses axios default behavior)
-            client.baseUrl = 'another.com:8080';
-            expect(client.baseUrl).toBe('another.com:8080');
-        });
 
-        it('should handle network errors without config', async () => {
-            const client = createTestClient();
-            const mockAxios = {
-                request: jest.fn(),
-                interceptors: {
-                    request: { use: jest.fn() },
-                    response: { 
-                        use: jest.fn(),
-                        handlers: []
-                    }
-                }
-            };
+            // Make more requests than the history size
+            for (let i = 0; i < maxHistorySize + 2; i++) {
+                await testClient.checkHealth();
+            }
 
-            client.axiosInstance = mockAxios;
-            client._addInterceptors();
-
-            const errorHandler = mockAxios.interceptors.response.use.mock.calls[0][1];
-            const error = { message: 'Network Error' }; 
-            
-            await expect(errorHandler(error))
-                .rejects
-                .toEqual(error);
-        });
-
-        it('should handle maximum retries exceeded', async () => {
-            const client = createTestClient();
-            const mockAxios = {
-                request: jest.fn(),
-                interceptors: {
-                    request: { use: jest.fn() },
-                    response: { 
-                        use: jest.fn(),
-                        handlers: []
-                    }
-                }
-            };
-
-            client.axiosInstance = mockAxios;
-            client._addInterceptors();
-
-            const errorHandler = mockAxios.interceptors.response.use.mock.calls[0][1];
-            
-            // Call the error handler with max retries exceeded
-            const error = {
-                config: { _retryCount: 3 }, // maxRetries is 3
-                response: { status: 500 }
-            };
-
-            await expect(errorHandler(error))
-                .rejects
-                .toEqual(error);
-        });
-
-        it('should not retry on non-retryable status codes', async () => {
-            const client = createTestClient();
-            const mockAxios = {
-                request: jest.fn(),
-                interceptors: {
-                    request: { use: jest.fn() },
-                    response: { 
-                        use: jest.fn(),
-                        handlers: []
-                    }
-                }
-            };
-
-            client.axiosInstance = mockAxios;
-            client._addInterceptors();
-
-            const errorHandler = mockAxios.interceptors.response.use.mock.calls[0][1];
-            
-            // Call the error handler with a non-retryable status code
-            const error = {
-                config: { _retryCount: 0 },
-                response: { status: 400 } // 400 is not in RETRY_STATUS_CODES
-            };
-
-            await expect(errorHandler(error))
-                .rejects
-                .toEqual(error);
+            const history = testClient.getRequestHistory();
+            expect(history.length).toBe(maxHistorySize);
         });
     });
 
-    describe('Rate Limiting and Server Errors', () => {
-        it('should handle rate limiting', async () => {
-            const operations = Array(100).fill(null).map((_, i) => 
-                client.createCard(`Test content ${i}`)
-            );
+    describe('Input Validation', () => {
+        it('should validate pagination parameters', async () => {
+            await expect(client.listCards({ page: 0 }))
+                .rejects.toThrow(ERROR_MESSAGES.INVALID_PAGE);
             
-            const results = await Promise.allSettled(operations);
-            const errors = results.filter(r => r.status === 'rejected').map(r => r.reason);
+            await expect(client.listCards({ page: 1, pageSize: 0 }))
+                .rejects.toThrow(ERROR_MESSAGES.INVALID_PAGE_SIZE);
             
-            // Either we get rate limited (429) or all requests succeed
-            const hasRateLimitError = errors.some(error => 
-                error && error.message && error.message.includes('429')
-            );
-            const allSucceeded = errors.length === 0;
-            
-            expect(hasRateLimitError || allSucceeded).toBe(true);
+            await expect(client.listCards({ page: 1, pageSize: 101 }))
+                .rejects.toThrow(ERROR_MESSAGES.INVALID_PAGE_SIZE);
         });
 
-        it('should handle server errors gracefully', async () => {
-            nock(client.baseUrl)
-                .post('/cards')
-                .reply(500, { error: 'Internal Server Error' });
-
-            await expect(client.createCard('Test content'))
-                .rejects
-                .toThrow(ERROR_MESSAGES.SERVER_ERROR);
+        it('should validate card parameters', async () => {
+            await expect(client.getCard())
+                .rejects.toThrow(ERROR_MESSAGES.HASH_REQUIRED);
+            
+            await expect(client.deleteCard())
+                .rejects.toThrow(ERROR_MESSAGES.HASH_REQUIRED);
         });
     });
 
-    describe('URL and Base Path', () => {
-        it('should handle trailing slashes in base URL', () => {
-            const client = new MCardClient({
-                apiKey: config.server.apiKey, 
-                baseUrl: `${DEFAULT_HOST}:${config.server.port}/`
+    describe('Metrics and History', () => {
+        it('should track request history with debug mode', async () => {
+            const debugClient = new MCardClient({
+                debug: true
             });
-            expect(client.baseUrl).not.toMatch(/\/$/);
+
+            // Make some requests
+            await debugClient.checkHealth();
+            await debugClient.checkHealth();
+            
+            const history = debugClient.getRequestHistory();
+            expect(history.length).toBe(2);
+            expect(history[0].method).toBe('GET');
+            expect(history[0].url).toBe('/health');
+            expect(history[0].duration).toBeGreaterThan(0);
+            expect(history[0].success).toBe(true);
         });
 
-        it('should handle missing protocol in base URL', () => {
-            const client = new MCardClient({
-                apiKey: config.server.apiKey, 
-                baseUrl: `localhost:${config.server.port}`
+        it('should handle empty responses', async () => {
+            const response = await client.deleteCard('nonexistent');
+            expect(response).toBeNull();
+        });
+
+        it('should track failed requests in metrics', async () => {
+            const badClient = new MCardClient({
+                baseURL: 'http://nonexistent.domain',
+                maxRetries: 0
             });
-            expect(client.baseUrl).toBe(`${DEFAULT_HOST}:${config.server.port}`);
+
+            const startMetrics = badClient.getMetrics();
+            try {
+                await badClient.checkHealth();
+            } catch (error) {
+                const endMetrics = badClient.getMetrics();
+                expect(endMetrics.failedRequests).toBe(startMetrics.failedRequests + 1);
+                expect(endMetrics.totalRequests).toBe(startMetrics.totalRequests + 1);
+                expect(endMetrics.successfulRequests).toBe(startMetrics.successfulRequests);
+            }
+        });
+    });
+
+    describe('Card Management', () => {
+        beforeEach(async () => {
+            // Clean up any existing cards
+            await client.deleteCards();
+            // Wait a bit to ensure server has processed the deletions
+            await new Promise(resolve => setTimeout(resolve, 200));
+        });
+
+        it('should get all cards with pagination', async () => {
+            const timestamp = Date.now();
+
+            // Clean up any existing cards first
+            await client.deleteCards();
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Create test cards
+            const card1 = await client.createCard(`Test card 1 ${timestamp}`);
+            const card2 = await client.createCard(`Test card 2 ${timestamp}`);
+            const card3 = await client.createCard(`Test card 3 ${timestamp}`);
+
+            // Wait longer to ensure server has processed all creations
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const allCards = await client.getAllCards();
+            expect(allCards.length).toBeGreaterThanOrEqual(3);
+
+            // Cleanup
+            await client.deleteCard(card1.hash);
+            await client.deleteCard(card2.hash);
+            await client.deleteCard(card3.hash);
+            await new Promise(resolve => setTimeout(resolve, 200));
+        });
+
+        it('should handle empty response in getAllCards', async () => {
+            // First delete all cards
+            await client.deleteCards();
+            // Wait a bit to ensure server has processed the deletions
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            const allCards = await client.getAllCards();
+            expect(allCards).toHaveLength(0);
+        });
+
+        it('should delete all cards', async () => {
+            // Create multiple cards with unique content
+            const timestamp = Date.now();
+            await client.createCard(`Test card 1 ${timestamp}`);
+            await client.createCard(`Test card 2 ${timestamp}`);
+
+            // Wait a bit to ensure server has processed the creations
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            await client.deleteCards();
+            // Wait a bit to ensure server has processed the deletions
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            const remainingCards = await client.getAllCards();
+            expect(remainingCards).toHaveLength(0);
+        });
+
+        it('should handle errors in deleteCards', async () => {
+            // Create a client with an invalid API key to trigger errors
+            const badClient = new MCardClient({
+                apiKey: 'invalid_key',
+                timeout: 1000
+            });
+
+            await expect(badClient.deleteCards()).rejects.toThrow('403: Invalid API key');
+        });
+    });
+
+    describe('URL Normalization', () => {
+        it('should normalize URLs correctly', () => {
+            const client = new MCardClient();
+            expect(client._normalizeBaseURL('example.com')).toBe('http://example.com');
+            expect(client._normalizeBaseURL('http://example.com/')).toBe('http://example.com');
+            expect(client._normalizeBaseURL('https://example.com')).toBe('https://example.com');
+            expect(client._normalizeBaseURL('')).toBe(DEFAULT_BASE_URL);
+            expect(client._normalizeBaseURL(null)).toBe(DEFAULT_BASE_URL);
         });
     });
 });
