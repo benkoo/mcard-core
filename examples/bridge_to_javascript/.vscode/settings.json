@@ -1,0 +1,46 @@
+{
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    "eslint.validate": ["javascript"],
+    "jest.autoRun": {
+        "watch": false,
+        "onSave": "test-file"
+    },
+    "jest.showCoverageOnLoad": true,
+    "jest.restartJestOnSnapshotUpdate": true,
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 4
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2
+    },
+    "[markdown]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.tabSize": 2
+    },
+    "files.exclude": {
+        "**/.git": true,
+        "**/node_modules": true,
+        "**/coverage": true,
+        "**/reports": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/coverage": true,
+        "**/reports": true
+    },
+    "files.associations": {
+        "*.js": "javascript",
+        ".eslintrc": "jsonc",
+        ".prettierrc": "jsonc",
+        ".huskyrc": "jsonc"
+    }
+}

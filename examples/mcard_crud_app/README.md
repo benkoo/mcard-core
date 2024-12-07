@@ -9,6 +9,7 @@ A comprehensive CRUD (Create, Read, Update, Delete) application for managing MCa
 - Flexible content management
 - Dual view modes: Grid and Table layouts
 - PDF content support with inline viewer
+- A search field for quick card lookup with interactivity
 
 ### Core Functionality
 - Create new MCards with text or file content
@@ -81,7 +82,6 @@ The application uses the `g_time` attribute from MCard to track content creation
 - Python 3.12
 - Flask with async support
 - MCard Library
-- SQLite (Async)
 - PDF.js for PDF viewing
 - Bootstrap 5 for UI
 - Font Awesome icons

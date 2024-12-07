@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="6" failures="0" errors="0" time="4.135">
+  <testsuite name="performance.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-07T00:03:49" time="4.118" tests="6">
+    <testcase classname="Performance Tests › Performance Metrics" name="should track request history and performance metrics" time="0.036">
+    </testcase>
+    <testcase classname="Performance Tests › Performance Metrics" name="should maintain request history within max size limit" time="0.039">
+    </testcase>
+    <testcase classname="Performance Tests › Concurrent Operations" name="should handle concurrent card creation" time="0.064">
+    </testcase>
+    <testcase classname="Performance Tests › Concurrent Operations" name="should handle large content within timeout" time="0.026">
+    </testcase>
+    <testcase classname="Performance Tests › Large Scale Operations" name="should handle hundreds of cards creation and listing with rate limiting" time="0.193">
+    </testcase>
+    <testcase classname="Performance Tests › Large Scale Operations" name="should handle various content types at scale with retries" time="0.331">
+    </testcase>
+  </testsuite>
+</testsuites>

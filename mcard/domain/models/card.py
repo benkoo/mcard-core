@@ -1,7 +1,7 @@
 """MCard model definition."""
 import hashlib
 from datetime import datetime, timezone
-from typing import Union, Optional
+from typing import Union, Optional, Dict, Any
 
 from ..models.exceptions import ValidationError
 from ..services.card_hashing import compute_hash
@@ -9,7 +9,7 @@ from ..services.card_hashing import compute_hash
 class MCard:
     """MCard model."""
 
-    def __init__(self, content: Union[str, bytes], hash: Optional[str] = None, g_time: Optional[str] = None):
+    def __init__(self, content: Union[str, bytes], hash: Optional[str] = None, g_time: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
         """Initialize MCard."""
         if content is None:
             raise ValidationError("Card content cannot be None")
@@ -25,6 +25,7 @@ class MCard:
         # Compute hash if not provided
         self._hash = hash or compute_hash(self._content)
         self._g_time = self._parse_time(g_time) if g_time else datetime.now(timezone.utc)
+        self._metadata = metadata or {}
 
     @property
     def content(self) -> Union[str, bytes]:
@@ -48,6 +49,18 @@ class MCard:
         """Get card global time."""
         return self._g_time.isoformat()
 
+    @property
+    def metadata(self) -> Dict[str, Any]:
+        """Get card metadata."""
+        return self._metadata
+
+    @metadata.setter
+    def metadata(self, value: Dict[str, Any]):
+        """Set card metadata."""
+        if not isinstance(value, dict):
+            raise ValidationError("Metadata must be a dictionary")
+        self._metadata = value
+
     def _parse_time(self, time_str: str) -> datetime:
         """Parse time string to datetime."""
         try:
@@ -67,4 +80,4 @@ class MCard:
 
         if len(content_preview) < len(str(self._content)):
             content_preview += "..."
-        return f"MCard(hash={self.hash}, g_time={self.g_time}, content={content_preview})"
+        return f"MCard(hash={self.hash}, g_time={self.g_time}, content={content_preview}, metadata={self.metadata})"
