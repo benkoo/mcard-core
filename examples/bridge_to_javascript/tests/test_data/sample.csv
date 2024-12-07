@@ -1,0 +1,4 @@
+id,name,type,value
+1,Test CSV,csv,100
+2,Another row,csv,200
+3,Final row,csv,300

@@ -1,0 +1,10 @@
+{
+    "name": "Test JSON",
+    "type": "json",
+    "nested": {
+        "array": [1, 2, 3],
+        "object": {
+            "key": "value"
+        }
+    }
+}

@@ -15,6 +15,7 @@ from mcard.config_constants import (
     DEFAULT_TIMEOUT
 )
 from mcard.domain.models.card import MCard
+from mcard.domain.dependency.interpreter import ContentTypeInterpreter
 from pydantic import BaseModel, ValidationError, field_validator, Field
 import os
 import uvicorn
@@ -24,6 +25,12 @@ from typing import List, Optional
 import asyncio
 from contextlib import asynccontextmanager
 import time
+import xml.etree.ElementTree as ET
+import yaml
+import json
+import base64
+import string
+import copy
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / '.env'
@@ -64,7 +71,9 @@ class CardResponse(BaseModel):
                     "content": "Hello World",
                     "hash": "abc123",
                     "g_time": "2024-12-07T09:59:01+07:00",
-                    "metadata": {}
+                    "metadata": {
+                        "contentType": "text/plain"
+                    }
                 }
             ]
         }
@@ -73,11 +82,13 @@ class CardResponse(BaseModel):
     @classmethod
     def from_mcard(cls, card: MCard):
         """Create a CardResponse from an MCard object."""
+        metadata = card.metadata.copy() if hasattr(card, 'metadata') and card.metadata else {}
+        
         return cls(
             content=card.content,
             hash=card.hash,
             g_time=card.g_time,
-            metadata=card.metadata if hasattr(card, 'metadata') else {}
+            metadata=metadata
         )
 
 class PaginatedCardsResponse(BaseModel):
@@ -139,23 +150,98 @@ async def health_check(api_key: str = Depends(get_api_key)):
     """Health check endpoint."""
     return {"status": "healthy"}
 
-async def store_card(content: str, metadata: Optional[dict] = None) -> MCard:
+async def store_card(content: str, metadata: Optional[dict] = None):
     """Store card content and return its hash."""
     try:
-        card = MCard(content=content, metadata=metadata)
+        # Ensure metadata is a dictionary
+        metadata = metadata.copy() if metadata else {}
+        
+        # Create MCard instance
+        card = MCard(
+            content=content,
+            metadata=metadata,
+            g_time=time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        )
+        
+        # Store the card
         await app.state.setup.storage.save(card)
         return card
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to store card: {str(e)}")
+
+def detect_content_type(content: str) -> tuple[str, dict]:
+    """Detect content type and additional metadata for the content."""
+    try:
+        # Try to parse as JSON
+        json.loads(content)
+        return 'application/json', {'encoding': 'utf-8'}
+    except json.JSONDecodeError:
+        pass
+
+    # Check for XML
+    if content.strip().startswith('<?xml') or (content.strip().startswith('<') and '>' in content):
+        return 'application/xml', {}
+
+    # Check for CSV (simple heuristic)
+    if ',' in content and '\n' in content:
+        lines = content.strip().split('\n')
+        if len(lines) > 1 and all(line.count(',') == lines[0].count(',') for line in lines):
+            return 'text/csv', {'delimiter': ','}
+
+    # Check for YAML
+    if content.strip().startswith(('---', '{', '[')) and ':' in content:
+        try:
+            yaml.safe_load(content)
+            return 'application/yaml', {'version': '1.2'}
+        except yaml.YAMLError:
+            pass
+
+    # Check for Markdown
+    if content.startswith('# ') or '**' in content or '*' in content or '[' in content and '](' in content:
+        return 'text/markdown', {}
+
+    # Check for binary (base64)
+    try:
+        base64.b64decode(content)
+        return 'application/octet-stream', {'encoding': 'base64'}
+    except:
+        pass
+
+    # Default to text/plain
+    return 'text/plain', {}
+
+async def create_card(content: str, metadata: Optional[dict] = None):
+    """Create a new card with the given content and metadata."""
+    try:
+        # Create a deep copy of metadata to avoid modifying the input
+        metadata = copy.deepcopy(metadata) if metadata else {}
+        
+        # Only detect content type if not provided by client
+        if 'contentType' not in metadata:
+            content_type, extra_metadata = detect_content_type(content)
+            metadata['contentType'] = content_type
+            metadata.update(extra_metadata)
+        
+        # Create MCard instance
+        card = MCard(
+            content=content,
+            metadata=metadata,
+            g_time=time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        )
+        
+        # Store the card
+        await app.state.setup.storage.save(card)
+        return card
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create card: {str(e)}")
 
 @app.post("/cards", response_model=CardResponse)
-async def create_card(card: CardRequest, api_key: str = Depends(get_api_key)):
+async def create_card_endpoint(card: CardRequest, api_key: str = Depends(get_api_key)):
     """Create a new card."""
     try:
-        stored_card = await store_card(card.content, card.metadata)
-        return CardResponse.from_mcard(stored_card)
+        # Create card
+        card_instance = await create_card(card.content, card.metadata)
+        return CardResponse.from_mcard(card_instance)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -163,15 +249,27 @@ async def create_card(card: CardRequest, api_key: str = Depends(get_api_key)):
 async def list_cards(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Number of items per page"),
+    search: str = Query("", description="Search term"),
     api_key: str = Depends(get_api_key)
 ):
     """List cards with pagination."""
     try:
-        # Get paginated cards using list method
-        cards, pagination_info = await app.state.setup.storage.list(
-            page=page,
-            page_size=page_size
-        )
+        if search:
+            # If search is provided, use search method
+            cards, pagination_info = await app.state.setup.storage.search(
+                query=search,
+                search_content=True,
+                search_hash=False,
+                search_time=False,
+                page=page,
+                page_size=page_size
+            )
+        else:
+            # Otherwise use list method
+            cards, pagination_info = await app.state.setup.storage.list(
+                page=page,
+                page_size=page_size
+            )
         
         # Convert to response model
         items = [CardResponse.from_mcard(card) for card in cards]
@@ -264,10 +362,11 @@ async def setup_app():
     """Setup app state."""
     if not hasattr(app.state, 'setup'):
         app.state.setup = MCardSetup(
-            persistence_path=os.getenv(ENV_DB_PATH, DEFAULT_DB_PATH),
-            db_timeout=int(os.getenv(ENV_DB_TIMEOUT, DEFAULT_TIMEOUT))
+            db_path=os.getenv(ENV_DB_PATH, DEFAULT_DB_PATH),
+            max_connections=int(os.getenv(ENV_DB_MAX_CONNECTIONS, str(DEFAULT_POOL_SIZE))),
+            timeout=float(os.getenv(ENV_DB_TIMEOUT, str(DEFAULT_TIMEOUT)))
         )
-        await app.state.setup.storage.init()
+        await app.state.setup.initialize()
 
 @app.on_event("shutdown")
 async def shutdown_app():

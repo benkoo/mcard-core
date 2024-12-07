@@ -1,0 +1,16 @@
+name: Test YAML
+type: yaml
+nested:
+  array:
+    - 1
+    - 2
+    - 3
+  object:
+    key: value
+  list:
+    - item1:
+        id: 1
+        value: test
+    - item2:
+        id: 2
+        value: test2

@@ -43,46 +43,23 @@ class TestEnvironment {
         }
     }
 
-    async waitForServer(retries = 30, delay = 1000) {
-        for (let i = 0; i < retries; i++) {
-            if (await this.isServerRunning()) {
-                console.log('✅ Server is ready!');
-                return true;
-            }
-            await new Promise(resolve => setTimeout(resolve, delay));
-            process.stdout.write('.');
-        }
-        throw new Error('Server failed to start within the timeout period');
-    }
-
     async startServer() {
-        if (await this.isServerRunning()) {
-            console.log('Server is already running, restarting...');
-            // Try to kill any existing server process
-            try {
-                const response = await axios.post('http://127.0.0.1:5320/shutdown', null, {
-                    headers: { 'X-API-Key': 'dev_key_123' },
-                    timeout: 1000
-                });
-            } catch (error) {
-                // Ignore errors, server might already be down
-            }
-            // Wait a bit for the server to fully shut down
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+        // Kill any existing server process first
+        await this.stopServer();
 
         console.log('🚀 Starting MCard server...');
         
-        const pythonPath = path.join(this.rootDir, '.venv', 'bin', 'python');
-        const serverScript = path.join(this.rootDir, 'src', 'server.py');
-
-        this.serverProcess = spawn(pythonPath, [serverScript], {
-            env: {
-                ...process.env,
-                PYTHONPATH: this.rootDir
-            }
+        // Use Python from .venv
+        const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python');
+        
+        // Start server with detached mode and its own process group
+        this.serverProcess = spawn(pythonPath, ['src/server.py'], {
+            cwd: process.cwd(),
+            detached: true,
+            stdio: ['ignore', 'pipe', 'pipe']
         });
 
+        // Handle server output
         this.serverProcess.stdout.on('data', (data) => {
             console.log(`Server stdout: ${data}`);
         });
@@ -91,37 +68,49 @@ class TestEnvironment {
             console.error(`Server stderr: ${data}`);
         });
 
-        this.serverProcess.on('error', (error) => {
-            console.error('Failed to start server:', error);
-            throw error;
-        });
-
         console.log('⏳ Waiting for server to start...');
         await this.waitForServer();
     }
 
-    async cleanup() {
+    async stopServer() {
         if (this.serverProcess) {
-            // Try graceful shutdown first
             try {
-                await axios.post('http://127.0.0.1:5320/shutdown', null, {
+                // Try graceful shutdown first
+                await axios.post('http://localhost:5320/shutdown', null, {
                     headers: { 'X-API-Key': 'dev_key_123' },
                     timeout: 1000
-                });
-                // Wait for the server to shut down gracefully
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                }).catch(() => {});
+
+                // Kill process group
+                process.kill(-this.serverProcess.pid);
             } catch (error) {
                 // Ignore errors, server might already be down
             }
 
-            // Force kill if still running
-            if (this.serverProcess) {
-                this.serverProcess.kill('SIGKILL');
-                this.serverProcess = null;
-                // Wait a bit to ensure the port is released
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            this.serverProcess = null;
+            // Wait for port to be released
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+
+    async waitForServer(maxAttempts = 30) {
+        for (let i = 0; i < maxAttempts; i++) {
+            try {
+                await axios.get('http://localhost:5320/health', {
+                    headers: { 'X-API-Key': 'dev_key_123' },
+                    timeout: 1000
+                });
+                console.log('✅ Server is ready!');
+                return;
+            } catch (error) {
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
+        throw new Error('Server failed to start');
+    }
+
+    async cleanup() {
+        await this.stopServer();
     }
 
     static async getGlobalInstance() {

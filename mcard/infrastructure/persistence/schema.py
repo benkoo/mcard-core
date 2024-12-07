@@ -9,6 +9,7 @@ The schema consists of:
   - hash: TEXT - Hash identifier for the card
   - content: BLOB - Card content
   - g_time: TEXT - Global timestamp
+  - metadata: TEXT - JSON-encoded metadata associated with the card
 - An index on g_time for efficient time-based queries
 - An index on hash for efficient hash-based queries
 
@@ -96,6 +97,7 @@ class SchemaManager:
         - hash: TEXT - Hash identifier for the card
         - content: BLOB - The actual card content in binary format
         - g_time: TEXT - Global timestamp with timezone information
+        - metadata: TEXT - JSON-encoded metadata associated with the card
         """
         return {
             "card": TableDefinition(
@@ -128,6 +130,12 @@ class SchemaManager:
                         nullable=False,
                         index=True,
                         comment="Global timestamp in ISO 8601 format with timezone and microsecond precision (e.g., '2023-12-25T13:45:30.123456+00:00')"
+                    ),
+                    ColumnDefinition(
+                        name="metadata",
+                        type=ColumnType.TEXT,
+                        nullable=True,
+                        comment="JSON-encoded metadata associated with the card"
                     )
                 ],
                 indexes={
