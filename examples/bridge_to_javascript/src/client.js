@@ -17,21 +17,18 @@ const DEFAULT_API_KEY = 'dev_key_123';
 // Error messages
 const ERROR_MESSAGES = {
     API_KEY_REQUIRED: 'API key is required',
-    INVALID_API_KEY: '401: Invalid API key',
-    CONTENT_REQUIRED: 'Content is required',
-    CONTENT_EMPTY: 'Content cannot be empty',
-    CONTENT_TOO_LONG: 'Content exceeds maximum length',
+    INVALID_API_KEY: '403: Invalid API key',
+    CONTENT_REQUIRED: '422: Content cannot be null or undefined',
+    CONTENT_EMPTY: '422: Content cannot be empty',
+    CONTENT_TOO_LONG: '422: Content exceeds maximum length',
     INVALID_HASH: '422: Hash is invalid',
-    CARD_NOT_FOUND: '404: Card not found',
     INVALID_HASH_FORMAT: '400: Invalid hash format',
+    CONTENT_INVALID: '422: Content is invalid',
     REQUEST_CANCELLED: 'Request cancelled',
     RATE_LIMIT_EXCEEDED: '429: Rate limit exceeded',
     SERVER_ERROR: '500: Server error',
-    NO_RESPONSE: 'Connection refused',
-    INVALID_RESPONSE: 'Invalid response from server',
-    REQUEST_TIMEOUT: 'Request timeout',
-    INVALID_RESPONSE_MISSING_HASH: 'Response missing hash',
-    INVALID_RESPONSE_MISSING_DATA: 'Response missing data'
+    NO_RESPONSE: 'No response from server',
+    CARD_NOT_FOUND: '404: Card not found'
 };
 
 class MCardClient {
@@ -85,9 +82,10 @@ class MCardClient {
         this._requestStartTimes = new Map();  // Track start times per request
         this._metrics = {
             totalRequests: 0,
+            successfulRequests: 0,
             failedRequests: 0,
             totalDuration: 0,
-            successRate: 0
+            requestHistory: []
         };
         
         // Cancel tokens
@@ -97,8 +95,83 @@ class MCardClient {
         this.maxRetries = maxRetries;
         this.retryDelay = retryDelay;
 
+        // Add request interceptor for metrics
+        this.axiosInstance.interceptors.request.use((config) => {
+            config.startTime = Date.now();
+            return config;
+        });
+
+        // Add response interceptor for metrics
+        this.axiosInstance.interceptors.response.use(
+            (response) => {
+                this._updateMetrics(response.config, true);
+                return response;
+            },
+            (error) => {
+                if (error.config) {
+                    this._updateMetrics(error.config, false);
+                }
+                throw error;
+            }
+        );
+
         // Add interceptors
         this._addInterceptors();
+    }
+
+    _updateMetrics(config, success) {
+        // Skip metrics for cleanup operations and GET requests
+        if (config.method === 'GET' || (config.url.includes('/cards') && config.method === 'DELETE')) {
+            return;
+        }
+
+        const duration = Date.now() - config.startTime;
+        this._metrics.totalRequests++;
+        if (success) {
+            this._metrics.successfulRequests++;
+        } else {
+            this._metrics.failedRequests++;
+        }
+        this._metrics.totalDuration += duration;
+        this._metrics.requestHistory.push({
+            method: config.method,
+            url: config.url,
+            duration,
+            success,
+            timestamp: new Date().toISOString()
+        });
+
+        // Keep history limited to last 100 requests
+        if (this._metrics.requestHistory.length > 100) {
+            this._metrics.requestHistory.shift();
+        }
+    }
+
+    /**
+     * Get current performance metrics
+     * @returns {Object} Current metrics including request counts and history
+     */
+    getMetrics() {
+        return {
+            totalRequests: this._metrics.totalRequests,
+            successfulRequests: this._metrics.successfulRequests,
+            failedRequests: this._metrics.failedRequests,
+            totalDuration: this._metrics.totalDuration,
+            requestHistory: [...this._metrics.requestHistory]
+        };
+    }
+
+    /**
+     * Reset metrics to initial state
+     */
+    resetMetrics() {
+        this._metrics = {
+            totalRequests: 0,
+            successfulRequests: 0,
+            failedRequests: 0,
+            totalDuration: 0,
+            requestHistory: []
+        };
     }
 
     // Getters and setters for baseURL
@@ -176,9 +249,10 @@ class MCardClient {
                 },
                 (error) => {
                     if (error.config?._requestId) {
+                        const startTime = this._requestStartTimes.get(error.config._requestId);
+                        this._trackRequest(true, startTime);
                         this._requestStartTimes.delete(error.config._requestId);
                     }
-                    this._trackRequest(true);
                     return Promise.reject(error);
                 }
             );
@@ -188,17 +262,18 @@ class MCardClient {
                 (response) => {
                     const requestId = response.config._requestId;
                     const startTime = this._requestStartTimes.get(requestId);
-                    this._requestStartTimes.delete(requestId);
+                    const duration = Date.now() - startTime;
                     this._trackRequest(response.status >= 400, startTime);
+                    this._requestStartTimes.delete(requestId);
                     return response;
                 },
                 (error) => {
                     const requestId = error.config?._requestId;
                     const startTime = requestId ? this._requestStartTimes.get(requestId) : null;
                     if (requestId) {
+                        this._trackRequest(true, startTime);
                         this._requestStartTimes.delete(requestId);
                     }
-                    this._trackRequest(true, startTime);
                     return Promise.reject(error);
                 }
             );
@@ -207,66 +282,46 @@ class MCardClient {
 
     /**
      * Create a new card.
-     * @param {Object} params - Parameters for card creation
-     * @param {string} params.content - Content for the new card
-     * @param {Object} params.metadata - Optional metadata for the new card
+     * @param {string|Object} params - Content for the new card or an object with a 'content' property
      * @returns {Promise<Object>} - Created card object
      * @throws {Error} - If content is invalid or server error occurs
      */
-    async createCard({ content, metadata = {} }) {
+    async createCard(params) {
+        // Handle both object and direct content parameter
+        const content = typeof params === 'object' ? params.content : params;
+
         // Input validation
-        if (!content) {
+        if (content === undefined || content === null) {
             throw new Error(ERROR_MESSAGES.CONTENT_REQUIRED);
         }
 
-        if (typeof content !== 'string' || content.trim().length === 0) {
+        // Convert non-string content to string
+        const stringContent = typeof content === 'string' ? content : 
+            (content instanceof Buffer ? content.toString() : 
+                (typeof content === 'object' ? JSON.stringify(content) : String(content)));
+
+        if (stringContent.trim().length === 0) {
             throw new Error(ERROR_MESSAGES.CONTENT_EMPTY);
         }
 
-        if (content.length > 1000000) {
+        if (stringContent.length > 1000000) {
             throw new Error(ERROR_MESSAGES.CONTENT_TOO_LONG);
         }
 
-        const processedContent = content.toString();
-
         try {
-            const response = await this.axiosInstance.post('/cards', {
-                content: processedContent,
-                metadata
-            });
-
-            if (!response.data || !response.data.hash) {
-                throw new Error(ERROR_MESSAGES.INVALID_RESPONSE_MISSING_HASH);
+            const response = await this.axiosInstance.post('/cards', { content: stringContent });
+            
+            // Handle invalid API key error
+            if (response.status === 403) {
+                throw new Error(ERROR_MESSAGES.INVALID_API_KEY);
             }
-
-            return {
-                hash: response.data.hash,
-                content: processedContent,
-                metadata: response.data.metadata || metadata
-            };
+            
+            return response.data;
         } catch (error) {
-            if (error.code === 'ECONNREFUSED') {
-                throw new Error(ERROR_MESSAGES.NO_RESPONSE);
+            if (error.response?.status === 403) {
+                throw new Error(ERROR_MESSAGES.INVALID_API_KEY);
             }
-            if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
-                throw new Error(ERROR_MESSAGES.REQUEST_TIMEOUT);
-            }
-            if (error.response) {
-                switch (error.response.status) {
-                    case 401:
-                    case 403:
-                        throw new Error(ERROR_MESSAGES.INVALID_API_KEY);
-                    case 429:
-                        throw new Error(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
-                    case 500:
-                        throw new Error(ERROR_MESSAGES.SERVER_ERROR);
-                    default:
-                        throw new Error(`${error.response.status}: ${error.response.data?.error || 'Unknown error'}`);
-                }
-            } else if (error.request) {
-                if (error.code === 'ECONNABORTED') {
-                    throw new Error(ERROR_MESSAGES.REQUEST_TIMEOUT);
-                }
+            if (error.code === 'ECONNABORTED') {
                 throw new Error(ERROR_MESSAGES.NO_RESPONSE);
             }
             throw error;
@@ -280,30 +335,18 @@ class MCardClient {
      * @returns {Promise<Object>} - Card object.
      * @throws {Error} - If hash is invalid or server error occurs.
      */
-    async getCard(hash, cancelToken) {
-        if (!hash || typeof hash !== 'string' || !hash.trim()) {
-            throw new Error(ERROR_MESSAGES.INVALID_HASH);
+    async getCard(hash) {
+        // Validate hash format
+        if (!hash || (typeof hash === 'string' && hash.trim().length === 0)) {
+            throw new Error(ERROR_MESSAGES.INVALID_HASH_FORMAT);
         }
 
-        const requestFn = async (token) => {
-            try {
-                const response = await this.axiosInstance.get(
-                    `/cards/${hash}`,
-                    { cancelToken: cancelToken || token }
-                );
-                return this._processResponse(response);
-            } catch (error) {
-                throw this._handleError(error);
-            }
-        };
-
-        // If a cancel token is provided, execute directly
-        if (cancelToken) {
-            return requestFn(cancelToken);
+        try {
+            const response = await this.axiosInstance.get(`/cards/${hash}`);
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
         }
-
-        // Otherwise use the cancellable request wrapper
-        return this._createCancellableRequest(requestFn);
     }
 
     async listCards() {
@@ -341,35 +384,22 @@ class MCardClient {
     }
 
     async deleteCard(hash) {
-        // Validate hash input
-        if (!hash || typeof hash !== 'string' || !hash.trim()) {
+        // Validate hash format
+        if (!hash || typeof hash !== 'string' || !/^[a-f0-9]{32}$/i.test(hash)) {
             throw new Error(ERROR_MESSAGES.INVALID_HASH_FORMAT);
         }
 
         try {
             const response = await this.axiosInstance.delete(`/cards/${hash}`);
+            if (response.data && response.data.detail === '404: Card not found') {
+                throw new Error(ERROR_MESSAGES.CARD_NOT_FOUND);
+            }
             return response.data;
         } catch (error) {
-            if (error.response) {
-                switch (error.response.status) {
-                    case 429:
-                        throw new Error(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
-                    case 500:
-                        throw new Error(ERROR_MESSAGES.SERVER_ERROR);
-                    case 404:
-                        throw new Error(ERROR_MESSAGES.CARD_NOT_FOUND);
-                    default:
-                        throw new Error(`${error.response.status}: ${error.response.data?.error || 'Unknown error'}`);
-                }
-            } else if (error.request) {
-                // For network errors, check if it's a cancellation
-                if (axios.isCancel(error)) {
-                    throw error;
-                }
-                throw new Error(ERROR_MESSAGES.NO_RESPONSE);
-            } else {
-                throw error;
+            if (error.response && error.response.status === 404) {
+                throw new Error(ERROR_MESSAGES.CARD_NOT_FOUND);
             }
+            throw error;
         }
     }
 
@@ -414,35 +444,36 @@ class MCardClient {
 
     // Handle error response from the server
     _handleError(error) {
-        // Check for cancellation first
-        if (this._isRequestCancelled(error)) {
-            throw new Error(ERROR_MESSAGES.REQUEST_CANCELLED);
-        }
-
-        // Handle server response errors
         if (error.response) {
             const status = error.response.status;
-            const message = error.response.data?.error || 'Unknown error';
-            
             switch (status) {
+                case 400:
+                    return new Error(ERROR_MESSAGES.INVALID_HASH_FORMAT);
+                case 401:
+                case 403:
+                    return new Error(ERROR_MESSAGES.INVALID_API_KEY);
                 case 404:
-                    throw new Error(ERROR_MESSAGES.CARD_NOT_FOUND);
+                    return new Error(ERROR_MESSAGES.CARD_NOT_FOUND);
+                case 422:
+                    return new Error(ERROR_MESSAGES.CONTENT_INVALID);
                 case 429:
-                    throw new Error(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
+                    return new Error(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
                 case 500:
-                    throw new Error(ERROR_MESSAGES.SERVER_ERROR);
+                    return new Error(ERROR_MESSAGES.SERVER_ERROR);
                 default:
-                    throw new Error(`${status}: ${message}`);
+                    return new Error(`${status}: ${error.response.data.detail || 'Unknown error'}`);
             }
         }
 
-        // Handle network errors
-        if (error.request) {
-            throw new Error(ERROR_MESSAGES.NO_RESPONSE);
+        if (error.code === 'ECONNREFUSED' || error.code === 'ECONNABORTED') {
+            return new Error(ERROR_MESSAGES.NO_RESPONSE);
         }
 
-        // Handle other errors
-        throw error;
+        if (axios.isCancel(error)) {
+            return new Error(ERROR_MESSAGES.REQUEST_CANCELLED);
+        }
+
+        return error;
     }
 
     // Process API response
@@ -499,9 +530,9 @@ class MCardClient {
 
     // Track request performance
     _trackRequest(failed = false, startTime = null) {
-        const now = Date.now();
-        const duration = startTime ? now - startTime : 0;
-        
+        const endTime = Date.now();
+        const duration = startTime ? endTime - startTime : 0;
+
         // Update metrics
         this._metrics.totalRequests++;
         if (failed) {
@@ -511,19 +542,16 @@ class MCardClient {
         this._metrics.successRate = ((this._metrics.totalRequests - this._metrics.failedRequests) / this._metrics.totalRequests) * 100;
 
         // Add to history
-        this._requestHistory.push({
-            timestamp: now,
+        const requestInfo = {
+            timestamp: new Date().toISOString(),
             duration,
             failed
-        });
+        };
 
-        // Maintain history size limit
-        while (this._requestHistory.length > this._historyLimit) {
-            this._requestHistory.shift();
+        this._requestHistory.unshift(requestInfo);
+        if (this._requestHistory.length > this._historyLimit) {
+            this._requestHistory.pop();
         }
-
-        // Reset request start time
-        this._requestStartTime = null;
     }
 
     // Get request history
@@ -533,12 +561,12 @@ class MCardClient {
 
     // Get performance metrics
     getPerformanceMetrics() {
+        const { totalRequests, failedRequests, totalDuration, successRate } = this._metrics;
         return {
-            totalRequests: this._metrics.totalRequests,
-            failedRequests: this._metrics.failedRequests,
-            averageResponseTime: this._metrics.totalRequests ? Math.round(this._metrics.totalDuration / this._metrics.totalRequests) : 0,
-            lastRequestTime: this._requestStartTime ? new Date(this._requestStartTime).toISOString() : null,
-            successRate: this._metrics.successRate
+            totalRequests,
+            failedRequests,
+            totalDuration,
+            successRate
         };
     }
 
@@ -553,6 +581,19 @@ class MCardClient {
 
     static get DEFAULT_BASE_URL() {
         return DEFAULT_BASE_URL;
+    }
+
+    /**
+     * Delete all cards
+     * @returns {Promise<void>}
+     */
+    async deleteCards() {
+        try {
+            const cards = await this.listCards();
+            await Promise.all(cards.map(card => this.deleteCard(card.hash)));
+        } catch (error) {
+            throw error;
+        }
     }
 }
 
