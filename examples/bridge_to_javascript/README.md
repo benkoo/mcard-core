@@ -26,7 +26,7 @@ cd mcard-core/examples/bridge_to_javascript
 npm install
 ```
 
-3. Copy the example environment file and configure it:
+3. Copy the .env.example file and configure it:
 ```bash
 cp .env.example .env
 # Edit .env with your settings
@@ -614,4 +614,3 @@ npm run format
 
 ```bash
 npm run lint
-```

@@ -9,10 +9,15 @@
   "dependencies": {},
   "devDependencies": {
     "jest": "^29.0.0",
+    "jest-junit": "^16.0.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3",
+    "@types/jest": "^29.5.11",
     "axios": "^1.0.0"
   },
   "jest": {
     "testEnvironment": "node",
-    "testPathPattern": ["/tests/"]
+    "testPathPattern": ["/tests/"],
+    "reporters": ["default", "jest-junit"]
   }
 }

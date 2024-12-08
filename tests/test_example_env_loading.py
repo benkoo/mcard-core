@@ -22,8 +22,8 @@ class TestExampleEnvLoading(unittest.TestCase):
             if key in os.environ:
                 del os.environ[key]
                 
-        # Load environment variables from example.env
-        load_dotenv(dotenv_path='example.env', override=True)
+        # Load environment variables from .env.example
+        load_dotenv(dotenv_path='.env.example', override=True)
 
     def tearDown(self):
         # Restore original environment variables

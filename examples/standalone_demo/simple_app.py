@@ -111,9 +111,9 @@ async def main():
         # Load environment variables from the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
         env_path = os.path.join(script_dir, '.env')
-        example_env_path = os.path.join(script_dir, 'example.env')
+        example_env_path = os.path.join(script_dir, '.env.example')
         
-        # Try .env first, then example.env
+        # Try .env first, then .env.example
         if os.path.exists(env_path):
             logger.info(f"Loading environment from: {env_path}")
             load_dotenv(env_path, override=True)
@@ -121,7 +121,7 @@ async def main():
             logger.info(f"Loading environment from: {example_env_path}")
             load_dotenv(example_env_path, override=True)
         else:
-            logger.warning("No .env or example.env file found")
+            logger.warning("No .env or .env.example file found")
 
         # Get configuration from environment
         db_path = os.getenv('MCARD_DB_PATH')

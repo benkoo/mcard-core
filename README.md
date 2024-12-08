@@ -113,7 +113,7 @@ The `config_constants.py` file serves as a centralized repository for managing c
 
 The values defined in `config_constants.py` are illustrated and utilized in various environment files, including:
 
-- **`example.env`**: Serves as a template showcasing the default and recommended environment variable settings for the application. It provides examples of how to configure the environment variables defined in `config_constants.py`.
+- **`.env.example`**: Serves as a template showcasing the default and recommended environment variable settings for the application. It provides examples of how to configure the environment variables defined in `config_constants.py`.
 - **`.env`**: Used in the development environment to load the actual environment variables. It should contain the real values that the application will use during development.
 - **`.env.test`**: Specifically configured for testing purposes, ensuring that the test environment is isolated and controlled. It mirrors the structure of `.env` but may contain different values to facilitate testing scenarios.
 
@@ -154,7 +154,7 @@ To set up the project, follow these steps:
    ```
 
 4. Configure your environment:
-   - Copy `examples/standalone_demo/example.env` to create your own `.env` file
+   - Copy `examples/standalone_demo/.env.example` to create your own `.env` file
    - The default configuration uses:
      - Database path: `data/db/mcard_demo.db`
      - Hash algorithm: SHA-256
@@ -332,6 +332,34 @@ DataEngineConfig.reset()  # Safely resets the entire configuration
 ```
 
 The update ensures that configuration resets are more reliable and consistent across different usage scenarios, particularly in testing and dynamic configuration environments.
+
+## Data and Logging Management
+
+### Git Ignored Files
+The following patterns are ignored by Git to keep the repository clean:
+- Log files (`*.log` and `*.log.*`)
+- Application data directory (`examples/mcard_crud_app/data/`)
+- Database files (`db.sqlite3` and `db.sqlite3-journal`)
+- Local settings (`local_settings.py`)
+- Environment files (`.env`)
+
+These patterns ensure that:
+1. Application logs don't clutter version control
+2. User data remains private and local
+3. Database files are maintained separately
+4. Local configurations stay machine-specific
+
+### Data Storage
+The application maintains a local data directory (`examples/mcard_crud_app/data/`) for:
+- Persistent storage of cards
+- Database files
+- Runtime data
+
+This directory is excluded from version control to:
+- Prevent accidental commits of user data
+- Keep the repository size manageable
+- Maintain data privacy
+- Allow for machine-specific data storage
 
 ## Test Suite Organization
 

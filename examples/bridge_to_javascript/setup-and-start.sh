@@ -32,9 +32,23 @@ EOL
 echo "🔌 Activating virtual environment..."
 source .venv/bin/activate
 
-# Install or upgrade required packages
-echo "📦 Installing/upgrading required packages..."
-pip install -U fastapi uvicorn python-dotenv mcard
+# Upgrade pip first
+echo "📦 Upgrading pip..."
+pip install --upgrade pip
+
+# Install required packages from requirements.txt
+echo "📦 Installing required packages from requirements.txt..."
+pip install -r requirements.txt
+
+# Install local mcard package in development mode
+echo "📦 Installing local mcard package..."
+cd ../..
+pip install -e .
+cd examples/bridge_to_javascript
+
+# Create data directory if it doesn't exist
+echo "📁 Creating data directory..."
+mkdir -p data
 
 # Start the server
 echo "🚀 Starting MCard server..."
@@ -49,14 +63,14 @@ for i in {1..30}; do
         echo "✅ Server is ready!"
         break
     fi
-    sleep 1
     if [ $i -eq 30 ]; then
         echo "❌ Server failed to start within 30 seconds"
         kill $SERVER_PID
         exit 1
     fi
-    echo -n "."
+    sleep 1
 done
 
 # Keep the script running
+echo "🔄 Server is running. Press Ctrl+C to stop."
 wait $SERVER_PID

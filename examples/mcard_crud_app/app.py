@@ -37,13 +37,17 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_SIZE
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper()),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         RotatingFileHandler(LOG_FILE, maxBytes=1024*1024, backupCount=5),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Don't log binary data and sensitive info
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+logging.getLogger('flask').setLevel(logging.WARNING)
 
 # Initialize CSRF protection
 csrf = CSRFProtect(app)
@@ -243,10 +247,10 @@ async def index():
         
         # Get storage and list cards
         storage = await get_storage()
-        all_cards = await storage.list()
+        all_cards, _ = await storage.list()
         
         # Sort cards by g_time (most recent first)
-        sorted_cards = sorted(all_cards, key=lambda card: card.g_time or 0, reverse=True)
+        sorted_cards = sorted(all_cards, key=lambda card: getattr(card, 'g_time', 0) or 0, reverse=True)
         
         # Paginate cards
         total_items = len(sorted_cards)
@@ -324,11 +328,6 @@ async def grid_view():
         cols_param = request.args.get('cols', '4')
         page_param = request.args.get('page', '1')
         
-        # Log raw parameters for debugging
-        logger.info(f"Raw rows parameter: {rows_param} (type: {type(rows_param)})")
-        logger.info(f"Raw cols parameter: {cols_param} (type: {type(cols_param)})")
-        logger.info(f"Raw page parameter: {page_param} (type: {type(page_param)})")
-        
         # Parse grid-specific parameters
         rows = RequestParamHandler.parse_int_param(
             rows_param, 
@@ -355,10 +354,10 @@ async def grid_view():
 
         # Get storage and list cards
         storage = await get_storage()
-        all_cards = await storage.list()
+        all_cards, _ = await storage.list()
         
         # Sort cards by g_time (most recent first)
-        sorted_cards = sorted(all_cards, key=lambda card: card.g_time or 0, reverse=True)
+        sorted_cards = sorted(all_cards, key=lambda card: getattr(card, 'g_time', 0) or 0, reverse=True)
         
         # Paginate cards
         current_page_cards, total_pages, total_items = RequestParamHandler.paginate(
@@ -574,7 +573,7 @@ async def view_card(hash):
         
         # Fetch all cards to find the specific card
         try:
-            all_cards = await storage.list()
+            all_cards, _ = await storage.list()
             logger.info(f"Retrieved {len(all_cards)} cards from storage")
         except Exception as list_error:
             logger.error(f"Error listing cards: {list_error}")
@@ -812,7 +811,7 @@ async def serve_thumbnail(hash):
     storage = await get_storage()
     try:
         # Retrieve the card
-        all_cards = await storage.list()
+        all_cards, _ = await storage.list()
         card = next((c for c in all_cards if c.hash == hash), None)
         
         if not card or not isinstance(card.content, bytes):
