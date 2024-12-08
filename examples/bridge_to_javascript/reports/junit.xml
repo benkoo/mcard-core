@@ -1,79 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="34" failures="0" errors="0" time="6.152">
-  <testsuite name="tests/content.types.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-08T10:36:28" time="1.835" tests="19">
-    <testcase classname="MCard Client Content Types › Text Content" name="should handle plain text" time="0.019">
+<testsuites name="jest tests" tests="22" failures="0" errors="0" time="0.234">
+  <testsuite name="tests/enhanced-client.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-08T15:52:16" time="0.215" tests="22">
+    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw ValidationError for empty content" time="0.013">
     </testcase>
-    <testcase classname="MCard Client Content Types › Text Content" name="should handle long text" time="0.013">
+    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw ValidationError for extremely long content" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Content Types › Text Content" name="should handle special characters" time="0.012">
+    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw NotFoundError for non-existent card" time="0.056">
     </testcase>
-    <testcase classname="MCard Client Content Types › Text Content" name="should handle multi-language text" time="0.016">
+    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw AuthorizationError for invalid API key" time="0.003">
     </testcase>
-    <testcase classname="MCard Client Content Types › Structured Content" name="should handle JSON objects" time="0.05">
+    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw NetworkError for network connectivity issues" time="0.003">
     </testcase>
-    <testcase classname="MCard Client Content Types › Structured Content" name="should handle complex nested structures" time="0.013">
+    <testcase classname="Enhanced MCard Client › Error Handling" name="should handle unexpected server errors" time="0.005">
     </testcase>
-    <testcase classname="MCard Client Content Types › Structured Content" name="should handle arrays of mixed types" time="0.01">
+    <testcase classname="Enhanced MCard Client › Content Validation" name="should validate content length" time="0">
     </testcase>
-    <testcase classname="MCard Client Content Types › Structured Content" name="should handle deeply nested objects" time="0.011">
+    <testcase classname="Enhanced MCard Client › Content Validation" name="should allow custom content validators" time="0.002">
     </testcase>
-    <testcase classname="MCard Client Content Types › Binary Content" name="should handle base64 encoded binary" time="0.012">
+    <testcase classname="Enhanced MCard Client › Content Validation" name="should validate content with special characters" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Content Types › Binary Content" name="should handle large base64 encoded files" time="0.079">
+    <testcase classname="Enhanced MCard Client › Metrics Tracking" name="should track successful requests" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Content Types › Binary Content" name="should handle multiple binary files" time="0.016">
+    <testcase classname="Enhanced MCard Client › Metrics Tracking" name="should track failed requests" time="0.002">
     </testcase>
-    <testcase classname="MCard Client Content Types › Edge Case Content" name="should handle null content" time="0.01">
+    <testcase classname="Enhanced MCard Client › Metrics Tracking" name="should track multiple requests" time="0.003">
     </testcase>
-    <testcase classname="MCard Client Content Types › Edge Case Content" name="should handle undefined content" time="0.004">
+    <testcase classname="Enhanced MCard Client › Metrics Tracking" name="should reset metrics" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Content Types › Edge Case Content" name="should handle circular references" time="0.003">
+    <testcase classname="Enhanced MCard Client › Logging" name="should log debug information when debug is enabled" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Content Types › Edge Case Content" name="should handle whitespace-only content" time="0.003">
+    <testcase classname="Enhanced MCard Client › Logging" name="should not log debug information when debug is disabled" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Content Types › Edge Case Content" name="should handle numeric content" time="0.009">
+    <testcase classname="Enhanced MCard Client › Client Configuration" name="should allow custom base URL" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Content Types › Edge Case Content" name="should handle boolean content" time="0.01">
+    <testcase classname="Enhanced MCard Client › Client Configuration" name="should use default configuration when no options provided" time="0.003">
     </testcase>
-    <testcase classname="MCard Client Content Types › Error Handling" name="should reject empty string content" time="0.003">
+    <testcase classname="Enhanced MCard Client › Client Configuration" name="should allow custom timeout configuration" time="0">
     </testcase>
-    <testcase classname="MCard Client Content Types › Error Handling" name="should handle content with special characters and escaping" time="0.009">
+    <testcase classname="Enhanced MCard Client › Card Operations" name="should create a card successfully" time="0.001">
     </testcase>
-  </testsuite>
-  <testsuite name="tests/error-handling.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-08T10:36:30" time="1.421" tests="4">
-    <testcase classname="MCard Client Error Handling › Input Validation" name="should reject null or undefined content" time="0.011">
+    <testcase classname="Enhanced MCard Client › Card Operations" name="should get a card successfully" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Error Handling › Input Validation" name="should validate hash parameter" time="0.004">
+    <testcase classname="Enhanced MCard Client › Card Operations" name="should delete a card successfully" time="0.001">
     </testcase>
-    <testcase classname="MCard Client Error Handling › Network Errors" name="should handle connection failures" time="0.008">
-    </testcase>
-    <testcase classname="MCard Client Error Handling › HTTP Status Errors" name="should handle 404 errors" time="0.006">
-    </testcase>
-  </testsuite>
-  <testsuite name="tests/client.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-08T10:36:31" time="1.419" tests="6">
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should track total requests" time="0.008">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should track successful and failed requests" time="0.005">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should track response times" time="0.003">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should reset metrics correctly" time="0.001">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should maintain request history in debug mode" time="0.008">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Retry and Failure Handling" name="should handle failed requests and track metrics correctly" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="tests/metrics.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-08T10:36:33" time="1.416" tests="5">
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should track total requests" time="0.003">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should track successful and failed requests" time="0.011">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should track response times" time="0.003">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should reset metrics correctly" time="0.001">
-    </testcase>
-    <testcase classname="MCard Client Metrics › Metrics Tracking" name="should maintain request history in debug mode" time="0.007">
+    <testcase classname="Enhanced MCard Client › Card Operations" name="should create a card with metadata" time="0.001">
     </testcase>
   </testsuite>
 </testsuites>

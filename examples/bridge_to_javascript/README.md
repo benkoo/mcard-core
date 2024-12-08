@@ -90,6 +90,86 @@ const metrics = client.getMetrics();
 console.log(metrics.totalRequests);
 console.log(metrics.successfulRequests);
 
+## Enhanced MCard Client Design
+
+### Overview
+The `EnhancedMCardClient` is a sophisticated JavaScript client for interacting with the MCard service, providing advanced features beyond basic HTTP requests.
+
+### Key Design Principles
+
+#### 1. Error Handling
+- Implements custom error classes for granular error tracking:
+  - `ValidationError`: For input validation failures
+  - `AuthorizationError`: For authentication-related issues
+  - `NetworkError`: For connection problems
+  - `NotFoundError`: For resource not found scenarios
+  - `MCardError`: Generic server-side errors
+
+#### 2. Metrics Tracking
+- Built-in metrics collection system to monitor:
+  - Total number of requests
+  - Successful and failed request counts
+  - Detailed error type breakdown
+- Supports request history tracking in debug mode
+- Provides methods to reset metrics
+
+#### 3. Content Validation
+- Flexible content validation mechanism
+  - Default validators for content length
+  - Supports custom validator functions
+  - Prevents invalid content from being submitted
+
+#### 4. Logging and Debugging
+- Configurable logging levels
+- Debug mode for detailed request/response tracking
+- Customizable console logging
+
+#### 5. Configuration Flexibility
+- Supports custom configuration options:
+  - Base URL
+  - API Key
+  - Timeout settings
+  - Debug mode
+  - Custom content validators
+
+### Usage Example
+
+```javascript
+const client = new EnhancedMCardClient({
+    baseURL: 'http://localhost:5320',
+    apiKey: 'your-api-key',
+    debug: true,
+    contentValidators: [
+        (content) => {
+            if (content.includes('forbidden')) {
+                throw new ValidationError('Forbidden content');
+            }
+        }
+    ]
+});
+
+// Create a card
+const cardHash = await client.createCard('My content');
+
+// Get metrics
+const metrics = client.getMetrics();
+console.log(metrics.totalRequests); // Number of total requests
+```
+
+### Error Handling Strategy
+- Automatically throws specific error types based on HTTP status codes
+- Provides detailed error information for debugging
+- Supports catching and handling specific error types
+
+### Performance Considerations
+- Lightweight wrapper around Axios
+- Minimal overhead for metrics and validation
+- Configurable timeout to prevent long-running requests
+
+### Extensibility
+- Open for extension through custom validators
+- Easily mockable for testing
+- Supports different content types and validation strategies
 
 API Methods
 createCard(content): Create a new card

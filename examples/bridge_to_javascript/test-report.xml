@@ -1,45 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testExecutions version="1">
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/content.types.test.js">
-    <testCase name="MCard Client Content Types Text Content should handle plain text" duration="19"/>
-    <testCase name="MCard Client Content Types Text Content should handle long text" duration="13"/>
-    <testCase name="MCard Client Content Types Text Content should handle special characters" duration="12"/>
-    <testCase name="MCard Client Content Types Text Content should handle multi-language text" duration="16"/>
-    <testCase name="MCard Client Content Types Structured Content should handle JSON objects" duration="50"/>
-    <testCase name="MCard Client Content Types Structured Content should handle complex nested structures" duration="13"/>
-    <testCase name="MCard Client Content Types Structured Content should handle arrays of mixed types" duration="10"/>
-    <testCase name="MCard Client Content Types Structured Content should handle deeply nested objects" duration="11"/>
-    <testCase name="MCard Client Content Types Binary Content should handle base64 encoded binary" duration="12"/>
-    <testCase name="MCard Client Content Types Binary Content should handle large base64 encoded files" duration="79"/>
-    <testCase name="MCard Client Content Types Binary Content should handle multiple binary files" duration="16"/>
-    <testCase name="MCard Client Content Types Edge Case Content should handle null content" duration="10"/>
-    <testCase name="MCard Client Content Types Edge Case Content should handle undefined content" duration="4"/>
-    <testCase name="MCard Client Content Types Edge Case Content should handle circular references" duration="3"/>
-    <testCase name="MCard Client Content Types Edge Case Content should handle whitespace-only content" duration="3"/>
-    <testCase name="MCard Client Content Types Edge Case Content should handle numeric content" duration="9"/>
-    <testCase name="MCard Client Content Types Edge Case Content should handle boolean content" duration="10"/>
-    <testCase name="MCard Client Content Types Error Handling should reject empty string content" duration="3"/>
-    <testCase name="MCard Client Content Types Error Handling should handle content with special characters and escaping" duration="9"/>
-  </file>
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/error-handling.test.js">
-    <testCase name="MCard Client Error Handling Input Validation should reject null or undefined content" duration="11"/>
-    <testCase name="MCard Client Error Handling Input Validation should validate hash parameter" duration="4"/>
-    <testCase name="MCard Client Error Handling Network Errors should handle connection failures" duration="8"/>
-    <testCase name="MCard Client Error Handling HTTP Status Errors should handle 404 errors" duration="6"/>
-  </file>
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/client.test.js">
-    <testCase name="MCard Client Metrics Metrics Tracking should track total requests" duration="8"/>
-    <testCase name="MCard Client Metrics Metrics Tracking should track successful and failed requests" duration="5"/>
-    <testCase name="MCard Client Metrics Metrics Tracking should track response times" duration="3"/>
-    <testCase name="MCard Client Metrics Metrics Tracking should reset metrics correctly" duration="1"/>
-    <testCase name="MCard Client Metrics Metrics Tracking should maintain request history in debug mode" duration="8"/>
-    <testCase name="MCard Client Metrics Retry and Failure Handling should handle failed requests and track metrics correctly" duration="1"/>
-  </file>
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/metrics.test.js">
-    <testCase name="MCard Client Metrics Metrics Tracking should track total requests" duration="3"/>
-    <testCase name="MCard Client Metrics Metrics Tracking should track successful and failed requests" duration="11"/>
-    <testCase name="MCard Client Metrics Metrics Tracking should track response times" duration="3"/>
-    <testCase name="MCard Client Metrics Metrics Tracking should reset metrics correctly" duration="1"/>
-    <testCase name="MCard Client Metrics Metrics Tracking should maintain request history in debug mode" duration="7"/>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/enhanced-client.test.js">
+    <testCase name="Enhanced MCard Client Error Handling should throw ValidationError for empty content" duration="13"/>
+    <testCase name="Enhanced MCard Client Error Handling should throw ValidationError for extremely long content" duration="1"/>
+    <testCase name="Enhanced MCard Client Error Handling should throw NotFoundError for non-existent card" duration="56"/>
+    <testCase name="Enhanced MCard Client Error Handling should throw AuthorizationError for invalid API key" duration="3"/>
+    <testCase name="Enhanced MCard Client Error Handling should throw NetworkError for network connectivity issues" duration="3"/>
+    <testCase name="Enhanced MCard Client Error Handling should handle unexpected server errors" duration="5"/>
+    <testCase name="Enhanced MCard Client Content Validation should validate content length" duration="0"/>
+    <testCase name="Enhanced MCard Client Content Validation should allow custom content validators" duration="2"/>
+    <testCase name="Enhanced MCard Client Content Validation should validate content with special characters" duration="1"/>
+    <testCase name="Enhanced MCard Client Metrics Tracking should track successful requests" duration="1"/>
+    <testCase name="Enhanced MCard Client Metrics Tracking should track failed requests" duration="2"/>
+    <testCase name="Enhanced MCard Client Metrics Tracking should track multiple requests" duration="3"/>
+    <testCase name="Enhanced MCard Client Metrics Tracking should reset metrics" duration="1"/>
+    <testCase name="Enhanced MCard Client Logging should log debug information when debug is enabled" duration="1"/>
+    <testCase name="Enhanced MCard Client Logging should not log debug information when debug is disabled" duration="1"/>
+    <testCase name="Enhanced MCard Client Client Configuration should allow custom base URL" duration="1"/>
+    <testCase name="Enhanced MCard Client Client Configuration should use default configuration when no options provided" duration="3"/>
+    <testCase name="Enhanced MCard Client Client Configuration should allow custom timeout configuration" duration="0"/>
+    <testCase name="Enhanced MCard Client Card Operations should create a card successfully" duration="1"/>
+    <testCase name="Enhanced MCard Client Card Operations should get a card successfully" duration="1"/>
+    <testCase name="Enhanced MCard Client Card Operations should delete a card successfully" duration="1"/>
+    <testCase name="Enhanced MCard Client Card Operations should create a card with metadata" duration="1"/>
   </file>
 </testExecutions>
