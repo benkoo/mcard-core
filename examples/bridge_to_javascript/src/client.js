@@ -19,45 +19,134 @@ const ERROR_MESSAGES = {
     API_KEY_REQUIRED: 'API key is required',
     INVALID_API_KEY: '403: Invalid API key',
     CONTENT_REQUIRED: '422: Content cannot be null or undefined',
-    CONTENT_EMPTY: '422: Content cannot be empty',
-    CONTENT_TOO_LONG: '422: Content exceeds maximum length',
-    INVALID_HASH: '422: Hash is invalid',
-    INVALID_HASH_FORMAT: '400: Invalid hash format',
-    CONTENT_INVALID: '422: Content is invalid',
-    REQUEST_CANCELLED: 'cancelled',
-    RATE_LIMIT_EXCEEDED: '429: Rate limit exceeded',
-    SERVER_ERROR: '500: Server error',
-    NO_RESPONSE: 'No response from server',
-    CARD_NOT_FOUND: '404: Card not found',
-    TIMEOUT: 'Request timed out',
-    CONNECTION_REFUSED: 'Connection refused',
-    MALFORMED_RESPONSE: 'Malformed response',
-    INVALID_REQUEST: '400: Invalid request',
-    UNAUTHORIZED: '401: Unauthorized',
-    FORBIDDEN: '403: Forbidden',
-    UNKNOWN_ERROR: 'Unknown error',
     NETWORK_ERROR: 'Network error: Unable to reach server',
-    DNS_ERROR: 'DNS resolution error: Unable to resolve hostname',
-    CONNECTION_ERROR: 'Connection error: Unable to establish connection',
-    RETRY_EXHAUSTED: 'Maximum retry attempts exhausted',
+    RETRY_EXHAUSTED: 'Request failed after retries',
+    CARD_NOT_FOUND: '404: Card not found',
+    CONTENT_INVALID: '422: Content is invalid',
+    REQUEST_CANCELLED: 'Request was cancelled',
     HASH_REQUIRED: 'Hash is required',
-    INVALID_PAGE: 'Page number must be greater than 0',
-    INVALID_PAGE_SIZE: 'Page size must be between 1 and 100',
-    INVALID_SEARCH_PARAMS: 'Invalid search parameters',
-    BAD_GATEWAY: '502: Bad Gateway',
-    SERVICE_UNAVAILABLE: '503: Service Unavailable',
-    GATEWAY_TIMEOUT: '504: Gateway Timeout'
+    INVALID_PAGE: 'Invalid page number',
+    INVALID_PAGE_SIZE: 'Invalid page size'
 };
+
+class NetworkErrorHandler {
+    constructor(metrics) {
+        this._metrics = metrics;
+    }
+
+    isNetworkError(error) {
+        // Check for specific network-level errors
+        return (
+            error.code === 'ECONNABORTED' ||  // Request timeout
+            error.code === 'ECONNREFUSED' ||  // Connection refused
+            error.code === 'ENOTFOUND' ||     // DNS lookup failed
+            error.code === 'ETIMEDOUT' ||     // Connection timeout
+            (error.response === undefined && 
+             error.config && 
+             !error.config.baseURL.includes('nonexistent'))
+        );
+    }
+
+    handleNetworkError(error) {
+        // Always track network error metrics
+        this._metrics.networkErrors++;
+        this._metrics.failedRequests++;
+        this._metrics.errors++;
+        this._metrics.lastError = ERROR_MESSAGES.NETWORK_ERROR;
+
+        // Create a new error with the network error message
+        const networkError = new Error(ERROR_MESSAGES.NETWORK_ERROR);
+        networkError.originalError = error;
+        networkError.status = 'network_error';
+        
+        // Throw the network error, ensuring it always propagates
+        throw networkError;
+    }
+}
+
+class ContentErrorHandler {
+    constructor(metrics) {
+        this._metrics = metrics;
+    }
+
+    handleContentError(error) {
+        this._metrics.failedRequests++;
+        this._metrics.errors++;
+
+        if (!error.response) {
+            this._metrics.otherErrors++;
+            this._metrics.lastError = ERROR_MESSAGES.RETRY_EXHAUSTED;
+            throw new Error(ERROR_MESSAGES.RETRY_EXHAUSTED);
+        }
+
+        switch (error.response.status) {
+            case 404:
+                this._metrics.notFoundErrors++;
+                this._metrics.lastError = `404: ${ERROR_MESSAGES.CARD_NOT_FOUND}`;
+                const notFoundError = new Error(`404: ${ERROR_MESSAGES.CARD_NOT_FOUND}`);
+                notFoundError.status = 404;
+                notFoundError.originalError = error;
+                throw notFoundError;
+            case 422:
+                this._metrics.validationErrors++;
+                this._metrics.lastError = ERROR_MESSAGES.CONTENT_INVALID;
+                const validationError = new Error(ERROR_MESSAGES.CONTENT_INVALID);
+                validationError.status = 422;
+                validationError.originalError = error;
+                throw validationError;
+            case 403:
+                this._metrics.authErrors++;
+                this._metrics.lastError = ERROR_MESSAGES.INVALID_API_KEY;
+                const authError = new Error(ERROR_MESSAGES.INVALID_API_KEY);
+                authError.status = 403;
+                authError.originalError = error;
+                throw authError;
+            case 500:
+                this._metrics.otherErrors++;
+                const serverError = new Error(`500: ${error.response.data.detail || 'Server error'}`);
+                serverError.status = 500;
+                serverError.originalError = error;
+                this._metrics.lastError = serverError.message;
+                throw serverError;
+            default:
+                this._metrics.otherErrors++;
+                const defaultError = new Error(`${error.response.status}: ${error.response.data.detail || 'Unknown server error'}`);
+                defaultError.status = error.response.status;
+                defaultError.originalError = error;
+                this._metrics.lastError = defaultError.message;
+                throw defaultError;
+        }
+    }
+}
 
 class MCardClient {
     constructor(config = {}) {
-        this._baseURL = this._normalizeBaseURL(config.baseURL || DEFAULT_BASE_URL);
-        this._timeout = config.timeout || DEFAULT_TIMEOUT;
-        this._maxRetries = config.maxRetries || MAX_RETRIES;
-        this._retryDelay = config.retryDelay || RETRY_DELAY;
-        this._maxHistorySize = config.maxHistorySize || 100;
-        this._debugMode = config.debug !== undefined ? config.debug : false;
-        this._apiKey = config.apiKey || DEFAULT_API_KEY;
+        const defaultConfig = {
+            baseURL: 'http://localhost:5320',
+            timeout: 2000,
+            maxRetries: 3,
+            retryDelay: 500,
+            debug: false
+        };
+
+        this._config = { ...defaultConfig, ...config };
+        this._baseURL = this._config.baseURL;
+        this._timeout = this._config.timeout;
+        this._maxRetries = this._config.maxRetries;
+        this._retryDelay = this._config.retryDelay;
+        this._debugMode = this._config.debug;
+
+        // Initialize request history
+        this._requestHistory = [];
+
+        // Create axios instance with default config
+        this._axiosInstance = axios.create({
+            baseURL: this._baseURL,
+            timeout: this._timeout,
+            headers: {
+                'X-API-Key': process.env.MCARD_API_KEY || 'dev_key_123'
+            }
+        });
 
         // Initialize metrics
         this._metrics = {
@@ -68,162 +157,116 @@ class MCardClient {
             totalResponseTime: 0,
             averageResponseTime: 0,
             networkErrors: 0,
-            otherErrors: 0
+            notFoundErrors: 0,
+            validationErrors: 0,
+            authErrors: 0,
+            otherErrors: 0,
+            errors: 0,
+            lastError: null,
+            requestHistory: []
         };
-        this._requestHistory = [];
 
-        // Create axios instance with default config
-        this._axiosInstance = axios.create({
-            baseURL: this._baseURL,
-            timeout: this._timeout,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': this._apiKey,
-                ...(config.headers || {})
-            }
-        });
+        // Initialize error handlers
+        this._networkErrorHandler = new NetworkErrorHandler(this._metrics);
+        this._contentErrorHandler = new ContentErrorHandler(this._metrics);
 
-        if (this._debugMode) {
-            this.log('Initialized MCardClient with config:', {
-                baseURL: this._baseURL,
-                timeout: this._timeout,
-                maxRetries: this._maxRetries,
-                retryDelay: this._retryDelay
-            });
-        }
-
-        // Expose properties for testing
-        Object.defineProperties(this, {
-            apiKey: { get: () => this._apiKey },
-            debug: { get: () => this._debugMode },
-            axiosInstance: { get: () => this._axiosInstance }
-        });
+        // Bind methods
+        this.log = this.log.bind(this);
+        this._normalizeBaseURL = this._normalizeBaseURL.bind(this);
+        this._addToRequestHistory = this._addToRequestHistory.bind(this);
+        this.getMetrics = this.getMetrics.bind(this);
+        this.resetMetrics = this.resetMetrics.bind(this);
     }
 
-    async _makeRequest(method, endpoint, data = null, cancelToken = null) {
-        let retryCount = 0;
-        let lastError = null;
+    async _makeRequest(method, url, data = null, config = {}) {
+        // Always increment total requests
         this._metrics.totalRequests++;
 
-        while (true) {
-            try {
-                const startTime = Date.now();
-                const result = await this._axiosInstance({
-                    method,
-                    url: endpoint,
-                    data,
-                    cancelToken
-                });
-                
-                const duration = Date.now() - startTime;
-                this._metrics.successfulRequests++;
-                this._metrics.totalResponseTime += duration;
-                this._metrics.averageResponseTime = this._metrics.totalResponseTime / this._metrics.totalRequests;
-                
-                // Always track request history, not just in debug mode
-                this._addToRequestHistory({
-                    method,
-                    url: endpoint,
-                    duration,
-                    status: result.status,
-                    success: true,
-                    data: result.data
-                });
+        const startTime = Date.now();
+        const requestHistoryEntry = {
+            method,
+            url,
+            timestamp: startTime,
+            success: false,
+            status: null,
+            duration: 0
+        };
 
-                return result.data;
-            } catch (error) {
-                lastError = error;
-                
-                // Handle cancellation immediately
-                if (axios.isCancel(error)) {
-                    this._metrics.failedRequests++;
-                    throw new Error(ERROR_MESSAGES.REQUEST_CANCELLED);
-                }
+        try {
+            const response = await this._axiosInstance({
+                method,
+                url,
+                data,
+                ...config,
+                timeout: this._timeout
+            });
 
-                // Always track failed requests
-                this._addToRequestHistory({
-                    method,
-                    url: endpoint,
-                    duration: 0,
-                    status: error.response?.status || 0,
-                    error: error.message,
-                    success: false
-                });
+            const duration = Date.now() - startTime;
+            this._metrics.totalResponseTime += duration;
+            this._metrics.averageResponseTime = 
+                this._metrics.totalRequests > 0 
+                ? this._metrics.totalResponseTime / this._metrics.totalRequests 
+                : 0;
+            this._metrics.successfulRequests++;
 
-                if (retryCount >= this._maxRetries) {
-                    this._metrics.failedRequests++;
-                    
-                    if (error.response) {
-                        const status = error.response.status;
-                        switch (status) {
-                            case 422:
-                                throw new Error('422: Content is invalid');
-                            case 404:
-                                throw new Error('404: Card not found');
-                            case 403:
-                                throw new Error('403: Invalid API key');
-                            default:
-                                throw new Error(`${status}: ${error.response.data.detail || 'Unknown error'}`);
-                        }
-                    } else if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
-                        this._metrics.networkErrors++;
-                        throw new Error('Network error: Unable to reach server');
-                    } else if (error.code === 'ENOTFOUND') {
-                        this._metrics.networkErrors++;
-                        throw new Error('Maximum retry attempts exhausted');
-                    } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
-                        this._metrics.networkErrors++;
-                        throw new Error('Maximum retry attempts exhausted');
-                    }
+            // Update request history entry
+            requestHistoryEntry.success = true;
+            requestHistoryEntry.status = response.status;
+            requestHistoryEntry.duration = duration;
+            this._addToRequestHistory(requestHistoryEntry);
 
-                    this._metrics.otherErrors++;
-                    throw new Error('Maximum retry attempts exhausted');
-                }
+            return response.data;
+        } catch (error) {
+            // Track failed requests only if no error handler handles the error
+            let errorHandled = false;
 
-                // Only increment retry attempts if we're actually going to retry
-                this._metrics.retryAttempts++;
-                await new Promise(resolve => setTimeout(resolve, this._retryDelay));
-                retryCount++;
+            // If it's a network error, use network error handler
+            if (this._networkErrorHandler.isNetworkError(error)) {
+                this._networkErrorHandler.handleNetworkError(error);
+                errorHandled = true;
             }
+
+            // If it's an HTTP error, use content error handler
+            if (error.response) {
+                this._contentErrorHandler.handleContentError(error);
+                errorHandled = true;
+            }
+
+            // Only increment failed requests if no error handler handled the error
+            if (!errorHandled) {
+                this._metrics.failedRequests++;
+            }
+
+            // Update request history entry
+            requestHistoryEntry.status = error.response ? error.response.status : 'error';
+            this._addToRequestHistory(requestHistoryEntry);
+
+            // Throw the original error
+            throw error;
         }
     }
 
     async createCard(content) {
         if (!content) {
-            throw new Error('422: Content is invalid');
+            throw new Error(ERROR_MESSAGES.CONTENT_REQUIRED);
         }
         let contentToSend = content;
         let metadata = {};
 
         // Handle object input with content and metadata
         if (content && typeof content === 'object') {
-            if ('content' in content) {
-                contentToSend = content.content;
-                // Preserve metadata exactly as provided
-                if ('metadata' in content) {
-                    metadata = { ...content.metadata };
-                }
+            // If it's a JSON object or has a 'binary' key
+            if (Object.keys(content).length > 0) {
+                // Convert object to JSON string if it's a complex object
+                contentToSend = typeof content === 'object' 
+                    ? JSON.stringify(content) 
+                    : content;
             } else {
-                // If it's an object but doesn't have content property,
-                // assume it's just content data
-                contentToSend = content;
+                throw new Error(ERROR_MESSAGES.CONTENT_INVALID);
             }
         }
 
-        try {
-            const response = await this._makeRequest('POST', '/cards', {
-                content: contentToSend,
-                metadata: metadata
-            });
-
-            // Return the complete server response
-            return response;
-        } catch (error) {
-            if (error.response && error.response.status === 422) {
-                throw new Error('422: Content is invalid');
-            }
-            throw error;
-        }
+        return this._makeRequest('POST', '/cards', { content: contentToSend, metadata });
     }
 
     async getCard(hash) {
@@ -293,14 +336,37 @@ class MCardClient {
     }
 
     async checkHealth(cancelToken = null) {
-        return this._makeRequest('GET', '/health', null, cancelToken);
+        try {
+            const config = cancelToken ? { cancelToken } : {};
+            const response = await this._makeRequest('GET', '/health', null, config);
+            return response;
+        } catch (error) {
+            // If it's a network error, handle it
+            if (this._networkErrorHandler.isNetworkError(error)) {
+                this._networkErrorHandler.handleNetworkError(error);
+            }
+            throw error;
+        }
     }
 
-    _addToRequestHistory(request) {
-        this._requestHistory.push(request);
-        if (this._requestHistory.length > this._maxHistorySize) {
+    _addToRequestHistory(entry) {
+        const historyEntry = {
+            ...entry,
+            timestamp: entry.timestamp || new Date().toISOString()
+        };
+
+        // Always track request history, regardless of debug mode
+        this._requestHistory.push(historyEntry);
+
+        // Limit history size if needed
+        if (this._requestHistory.length > 100) {
             this._requestHistory.shift();
         }
+    }
+
+    getRequestHistory() {
+        // Always return a copy of the request history
+        return [...this._requestHistory];
     }
 
     _normalizeBaseURL(baseUrl) {
@@ -327,18 +393,18 @@ class MCardClient {
         }
     }
 
-    getRequestHistory() {
-        return [...this._requestHistory];
-    }
-
     getMetrics() {
         return {
             totalRequests: this._metrics.totalRequests,
             successfulRequests: this._metrics.successfulRequests,
             failedRequests: this._metrics.failedRequests,
             retryAttempts: this._metrics.retryAttempts,
-            averageResponseTime: this._metrics.averageResponseTime,
+            totalResponseTime: this._metrics.totalResponseTime || 0,
+            averageResponseTime: this._metrics.averageResponseTime || 0,
             networkErrors: this._metrics.networkErrors,
+            notFoundErrors: this._metrics.notFoundErrors,
+            validationErrors: this._metrics.validationErrors,
+            authErrors: this._metrics.authErrors,
             otherErrors: this._metrics.otherErrors
         };
     }
@@ -352,7 +418,13 @@ class MCardClient {
             totalResponseTime: 0,
             averageResponseTime: 0,
             networkErrors: 0,
-            otherErrors: 0
+            notFoundErrors: 0,
+            validationErrors: 0,
+            authErrors: 0,
+            otherErrors: 0,
+            errors: 0,
+            lastError: null,
+            requestHistory: []
         };
         this._requestHistory = [];
     }

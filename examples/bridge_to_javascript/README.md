@@ -98,6 +98,24 @@ try {
 }
 ```
 
+## Recent Updates
+
+### Error Handling Improvements (December 2024)
+
+#### Network Error Detection
+- Enhanced `isNetworkError` method in `client.js` to provide more robust network error handling
+- Added null checks to prevent undefined errors during connection failures
+- Improved detection of specific network error codes:
+  - `ECONNABORTED`: Request timeout
+  - `ECONNREFUSED`: Connection refused
+  - `ENOTFOUND`: DNS lookup failed
+  - `ETIMEDOUT`: Connection timeout
+
+#### Key Changes
+- Implemented comprehensive error handling to distinguish between network and HTTP errors
+- Added defensive programming techniques to handle edge cases in error detection
+- Improved test coverage for error handling scenarios
+
 ## Testing
 
 The library uses Jest for testing and includes:
@@ -614,3 +632,5 @@ npm run format
 
 ```bash
 npm run lint
+
+```

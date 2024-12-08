@@ -1,62 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testExecutions version="1">
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/client.consolidated.test.js">
-    <testCase name="MCard Client Basic Operations should create, retrieve, and delete a card" duration="3054"/>
-    <testCase name="MCard Client Basic Operations should handle text content properly" duration="13"/>
-    <testCase name="MCard Client Basic Operations should handle structured content properly" duration="10"/>
-    <testCase name="MCard Client Error Handling should handle invalid content gracefully" duration="6065"/>
-    <testCase name="MCard Client Error Handling should handle non-existent card access" duration="6063"/>
-    <testCase name="MCard Client Error Handling should handle missing hash parameter" duration="2"/>
-    <testCase name="MCard Client Error Handling should handle retry exhaustion" duration="310"/>
-    <testCase name="MCard Client Error Handling should handle other HTTP errors" duration="3032"/>
-    <testCase name="MCard Client Error Handling should handle other errors in deleteCard" duration="3039"/>
-    <testCase name="MCard Client Error Handling should handle errors with no response data" duration="3041"/>
-    <testCase name="MCard Client Error Handling should handle errors with no response status" duration="3431"/>
-    <testCase name="MCard Client Search and List Operations should list all cards with pagination" duration="6606"/>
-    <testCase name="MCard Client Client Configuration should initialize with custom configuration" duration="3"/>
-    <testCase name="MCard Client Client Configuration should normalize base URLs correctly" duration="1"/>
-    <testCase name="MCard Client Error Handling and Retries should handle network errors" duration="222"/>
-    <testCase name="MCard Client Error Handling and Retries should track metrics during errors" duration="110"/>
-    <testCase name="MCard Client Metrics and Monitoring should track successful requests" duration="3"/>
-    <testCase name="MCard Client Metrics and Monitoring should reset metrics correctly" duration="4"/>
-    <testCase name="MCard Client Metrics and Monitoring should maintain request history" duration="4"/>
-    <testCase name="MCard Client Metrics and Monitoring should handle request history limits" duration="19"/>
-    <testCase name="MCard Client Input Validation should validate pagination parameters" duration="1"/>
-    <testCase name="MCard Client Input Validation should validate card parameters" duration="1"/>
-    <testCase name="MCard Client Metrics and History should track request history with debug mode" duration="10"/>
-    <testCase name="MCard Client Metrics and History should handle empty responses" duration="3028"/>
-    <testCase name="MCard Client Metrics and History should track failed requests in metrics" duration="3026"/>
-    <testCase name="MCard Client Card Management should get all cards with pagination" duration="1149"/>
-    <testCase name="MCard Client Card Management should handle empty response in getAllCards" duration="424"/>
-    <testCase name="MCard Client Card Management should delete all cards" duration="646"/>
-    <testCase name="MCard Client Card Management should handle errors in deleteCards" duration="3234"/>
-    <testCase name="MCard Client URL Normalization should normalize URLs correctly" duration="1"/>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/error-handling.test.js">
+    <testCase name="MCard Client Error Handling Input Validation should reject null or undefined content" duration="22"/>
+    <testCase name="MCard Client Error Handling Input Validation should validate hash parameter" duration="6"/>
+    <testCase name="MCard Client Error Handling Network Errors should handle connection failures" duration="9"/>
+    <testCase name="MCard Client Error Handling HTTP Status Errors should handle 404 errors" duration="8"/>
   </file>
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/client.content.test.js">
-    <testCase name="MCard Client Content Tests Text Content should handle plain text content" duration="219"/>
-    <testCase name="MCard Client Content Tests Text Content should handle large text content" duration="219"/>
-    <testCase name="MCard Client Content Tests Text Content should handle text content with special characters" duration="222"/>
-    <testCase name="MCard Client Content Tests Binary Content should handle small binary content" duration="223"/>
-    <testCase name="MCard Client Content Tests Binary Content should handle large binary content" duration="785"/>
-    <testCase name="MCard Client Content Tests Binary Content should handle PNG image content" duration="229"/>
-    <testCase name="MCard Client Content Tests Binary Content should handle PDF document content" duration="232"/>
-    <testCase name="MCard Client Content Tests Binary Content should handle GIF image content" duration="226"/>
-    <testCase name="MCard Client Content Tests Binary Content should handle binary content with metadata" duration="223"/>
-    <testCase name="MCard Client Content Tests Binary Content should handle multiple binary files in sequence" duration="245"/>
-    <testCase name="MCard Client Content Tests Binary Content should handle concurrent binary file uploads" duration="244"/>
-    <testCase name="MCard Client Content Tests Mixed Content Operations should handle mixed text and binary content storage" duration="229"/>
-    <testCase name="MCard Client Content Tests Mixed Content Operations should handle deletion of mixed content" duration="6301"/>
-    <testCase name="MCard Client Content Tests Mixed Content Operations should handle concurrent mixed content operations" duration="15393"/>
-    <testCase name="MCard Client Content Tests Mixed Content Operations should handle listing of mixed content" duration="235"/>
-    <testCase name="MCard Client Content Tests Mixed Content Operations should handle search across mixed content" duration="230"/>
-    <testCase name="MCard Client Content Tests Card Operations should list all cards with pagination" duration="230"/>
-    <testCase name="MCard Client Content Tests Card Operations should delete specific cards" duration="3255"/>
-    <testCase name="MCard Client Content Tests Card Operations should handle search functionality" duration="224"/>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/content.types.test.js">
+    <testCase name="MCard Client Content Types Text Content should handle plain text" duration="12"/>
+    <testCase name="MCard Client Content Types Text Content should handle long text" duration="14"/>
+    <testCase name="MCard Client Content Types Text Content should handle special characters" duration="12"/>
+    <testCase name="MCard Client Content Types Structured Content should handle JSON objects" duration="15"/>
+    <testCase name="MCard Client Content Types Structured Content should handle complex nested structures" duration="13"/>
+    <testCase name="MCard Client Content Types Binary Content should handle base64 encoded binary" duration="13"/>
   </file>
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/retry_cancellation.test.js">
-    <testCase name="MCard Client Retry and Cancellation should handle retry exhaustion" duration="233"/>
-    <testCase name="MCard Client Retry and Cancellation should handle empty responses" duration="3033"/>
-    <testCase name="MCard Client Retry and Cancellation should track failed requests in metrics" duration="220"/>
-    <testCase name="MCard Client Retry and Cancellation should handle request cancellation" duration="3"/>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/metrics.test.js">
+    <testCase name="MCard Client Metrics Metrics Tracking should track total requests" duration="3"/>
+    <testCase name="MCard Client Metrics Metrics Tracking should track successful and failed requests" duration="9"/>
+    <testCase name="MCard Client Metrics Metrics Tracking should track response times" duration="4"/>
+    <testCase name="MCard Client Metrics Metrics Tracking should reset metrics correctly" duration="1"/>
+    <testCase name="MCard Client Metrics Metrics Tracking should maintain request history in debug mode" duration="9"/>
+  </file>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/client.test.js">
+    <testCase name="MCard Client Metrics Metrics Tracking should track total requests" duration="4"/>
+    <testCase name="MCard Client Metrics Metrics Tracking should track successful and failed requests" duration="9"/>
+    <testCase name="MCard Client Metrics Metrics Tracking should track response times" duration="4"/>
+    <testCase name="MCard Client Metrics Metrics Tracking should reset metrics correctly" duration="0"/>
+    <testCase name="MCard Client Metrics Metrics Tracking should maintain request history in debug mode" duration="8"/>
   </file>
 </testExecutions>
