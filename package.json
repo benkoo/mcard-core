@@ -16,8 +16,6 @@
     "axios": "^1.0.0"
   },
   "jest": {
-    "testEnvironment": "node",
-    "testPathPattern": ["/tests/"],
-    "reporters": ["default", "jest-junit"]
+    "testEnvironment": "node"
   }
 }
