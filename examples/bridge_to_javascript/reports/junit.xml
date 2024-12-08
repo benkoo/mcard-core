@@ -1,49 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="22" failures="0" errors="0" time="0.234">
-  <testsuite name="tests/enhanced-client.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-08T15:52:16" time="0.215" tests="22">
-    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw ValidationError for empty content" time="0.013">
+<testsuites name="jest tests" tests="27" failures="0" errors="0" time="3.503">
+  <testsuite name="tests/client.test.js" errors="0" failures="0" skipped="0" timestamp="2024-12-08T19:31:39" time="3.481" tests="27">
+    <testcase classname="MCard Client › Error Handling" name="should throw ValidationError for empty content" time="0.021">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw ValidationError for extremely long content" time="0.001">
+    <testcase classname="MCard Client › Error Handling" name="should throw ValidationError for extremely long content" time="0.005">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw NotFoundError for non-existent card" time="0.056">
+    <testcase classname="MCard Client › Content Validation" name="should validate content length" time="0.048">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw AuthorizationError for invalid API key" time="0.003">
+    <testcase classname="MCard Client › Content Validation" name="should allow creating card with special characters" time="0.007">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Error Handling" name="should throw NetworkError for network connectivity issues" time="0.003">
+    <testcase classname="MCard Client › Advanced Content Validation" name="should handle object content validation" time="0.006">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Error Handling" name="should handle unexpected server errors" time="0.005">
+    <testcase classname="MCard Client › Logging" name="should log debug information when debug is enabled" time="0.001">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Content Validation" name="should validate content length" time="0">
+    <testcase classname="MCard Client › Logging" name="should log at different levels" time="0.001">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Content Validation" name="should allow custom content validators" time="0.002">
+    <testcase classname="MCard Client › Logging" name="should respect log level" time="0">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Content Validation" name="should validate content with special characters" time="0.001">
+    <testcase classname="MCard Client › Advanced Error Handling" name="should throw specific error types" time="0.037">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Metrics Tracking" name="should track successful requests" time="0.001">
+    <testcase classname="MCard Client › Advanced Error Handling" name="should throw NotFoundError when retrieving non-existent card" time="0.008">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Metrics Tracking" name="should track failed requests" time="0.002">
+    <testcase classname="MCard Client › Advanced Configuration" name="should allow custom base URL and timeout" time="0">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Metrics Tracking" name="should track multiple requests" time="0.003">
+    <testcase classname="MCard Client › Advanced Configuration" name="should handle missing or invalid configuration" time="0">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Metrics Tracking" name="should reset metrics" time="0.001">
+    <testcase classname="MCard Client › Advanced Configuration" name="should allow custom logger" time="0.001">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Logging" name="should log debug information when debug is enabled" time="0.001">
+    <testcase classname="MCard Client › Client Configuration" name="should allow custom base URL" time="0">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Logging" name="should not log debug information when debug is disabled" time="0.001">
+    <testcase classname="MCard Client › Client Configuration" name="should use default configuration when no options provided" time="0.001">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Client Configuration" name="should allow custom base URL" time="0.001">
+    <testcase classname="MCard Client › Card Operations" name="should create a card successfully" time="0.009">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Client Configuration" name="should use default configuration when no options provided" time="0.003">
+    <testcase classname="MCard Client › Card Operations" name="should get a card successfully" time="0.014">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Client Configuration" name="should allow custom timeout configuration" time="0">
+    <testcase classname="MCard Client › Card Operations" name="should delete a card successfully" time="0.026">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Card Operations" name="should create a card successfully" time="0.001">
+    <testcase classname="MCard Client › Card Operations" name="should return true when deleting a non-existent card" time="0.008">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Card Operations" name="should get a card successfully" time="0.001">
+    <testcase classname="MCard Client › List and Search Cards" name="should list cards with default parameters" time="0.025">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Card Operations" name="should delete a card successfully" time="0.001">
+    <testcase classname="MCard Client › List and Search Cards" name="should search cards by content" time="0.018">
     </testcase>
-    <testcase classname="Enhanced MCard Client › Card Operations" name="should create a card with metadata" time="0.001">
+    <testcase classname="MCard Client › List and Search Cards" name="should search cards by hash" time="0.021">
+    </testcase>
+    <testcase classname="MCard Client › List and Search Cards" name="should search cards by time" time="0.017">
+    </testcase>
+    <testcase classname="MCard Client › List and Search Cards" name="should handle pagination" time="0.016">
+    </testcase>
+    <testcase classname="MCard Client › MCard Client Advanced Content Tests" name="should create cards with various binary content types" time="0.01">
+    </testcase>
+    <testcase classname="MCard Client › MCard Client Advanced Content Tests" name="should handle complex nested content" time="0.004">
+    </testcase>
+    <testcase classname="MCard Client › MCard Client Advanced Content Tests" name="should handle large content near size limits" time="0.025">
     </testcase>
   </testsuite>
 </testsuites>

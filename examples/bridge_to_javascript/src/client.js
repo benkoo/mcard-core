@@ -1,691 +1,543 @@
 const axios = require('axios');
 const dotenv = require('dotenv');
 
-// Constants for HTTP methods
-const HTTP_METHODS = {
-    GET: 'get',
-    POST: 'post',
-    DELETE: 'delete',
-    PUT: 'put',
-    PATCH: 'patch'
-};
-
-// Constants for URL paths
-const API_PATHS = {
-    HEALTH: '/health',
-    CARDS: '/cards',
-    CARD: '/card',
-    SHUTDOWN: '/shutdown'
-};
-
-// Constants for protocols
-const PROTOCOLS = {
-    HTTP: 'http://',
-    HTTPS: 'https://'
-};
-
-// Constants for default configurations
-const DEFAULT_CONFIG = {
-    BASE_URL: 'http://localhost:5320',
-    TIMEOUT: 2000,
-    MAX_RETRIES: 3,
-    RETRY_DELAY: 500,
-    DEBUG: false,
-    API_KEY_ENV: 'MCARD_API_KEY',
-    FALLBACK_API_KEY: 'dev_key_123',
-    API_KEY: 'dev_key_123'
-};
-
-// Constants for headers
-const HEADERS = {
-    API_KEY: 'X-API-Key'
-};
-
-// Constants for error messages and patterns
-const ERROR_MESSAGES = {
-    WHITESPACE_PATTERNS: [
-        'content cannot be an empty string',
-        'content cannot be empty',
-        'content must not be blank',
-        'content cannot be whitespace',
-        'empty content',
-        'blank content'
-    ],
-    CIRCULAR_REFERENCE: 'Circular reference detected',
-    CONTENT_NULL_UNDEFINED: 'Content cannot be null or undefined',
-    CONTENT_EMPTY: 'Content cannot be empty',
-    HASH_REQUIRED: 'Hash is required',
-    CARD_NOT_FOUND: 'Card not found',
-    INVALID_PAGE: 'Page number must be greater than 0',
-    INVALID_PAGE_SIZE: 'Page size must be between 1 and 100',
-    NETWORK_ERROR: 'Network error: Unable to reach server',
-    RETRY_EXHAUSTED: 'Request failed after retries',
-    CONTENT_INVALID: '422: Content is invalid',
-    REQUEST_CANCELLED: 'Request was cancelled',
-    EMPTY_STRING_VALIDATION: '422: Empty string is not allowed',
-    API_KEY_REQUIRED: 'API key is required',
-    INVALID_API_KEY: '403: Invalid API key'
-};
-
 // Constants
-const DEFAULT_TIMEOUT = 5000;
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000;
-const RETRY_STATUS_CODES = [408, 429, 500, 502, 503, 504];
-const DEFAULT_PORT = 5320;
 const DEFAULT_HOST = 'http://localhost';
-const DEFAULT_BASE_URL = `${DEFAULT_HOST}:${DEFAULT_PORT}`;
-const DEFAULT_API_KEY = 'dev_key_123';
+const DEFAULT_PORT = 5320;
+const DEFAULT_TIMEOUT = 5000;
+const DEFAULT_API_KEY = process.env.MCARD_API_KEY || 'dev_key_123';
 
-// Constants
-const METADATA_DEFAULTS = {
-    CONTENT_TYPE: 'application/octet-stream',
-    ENCODING: 'base64',
-};
-
-const TIMESTAMP_FORMAT = {
-    CURRENT_TIME: '2024-12-08T18:07:12+08:00', // Hardcoded as per user's instruction
-};
-
-// Utility function to check for whitespace-related errors
-const isWhitespaceError = (errorDetail) => 
-    ERROR_MESSAGES.WHITESPACE_PATTERNS.some(pattern => 
-        errorDetail.includes(pattern)
-    );
-
-// Load environment variables
-dotenv.config();
-
-class NetworkErrorHandler {
-    constructor(metrics) {
-        this._metrics = metrics;
-    }
-
-    isNetworkError(error) {
-        // Check for specific network-level errors
-        return (
-            error.code === 'ECONNABORTED' ||  // Request timeout
-            error.code === 'ECONNREFUSED' ||  // Connection refused
-            error.code === 'ENOTFOUND' ||     // DNS lookup failed
-            error.code === 'ETIMEDOUT' ||     // Connection timeout
-            (error.response === undefined && 
-             error.config && 
-             !error.config.baseURL.includes('nonexistent'))
-        );
-    }
-
-    handleNetworkError(error) {
-        // Always track network error metrics
-        this._metrics.networkErrors++;
-        this._metrics.failedRequests++;
-        this._metrics.errors++;
-        this._metrics.lastError = ERROR_MESSAGES.NETWORK_ERROR;
-
-        // Create a new error with the network error message
-        const networkError = new Error(ERROR_MESSAGES.NETWORK_ERROR);
-        networkError.originalError = error;
-        networkError.status = 'network_error';
-        
-        // Throw the network error, ensuring it always propagates
-        throw networkError;
+// Enhanced Error Classes
+class MCardError extends Error {
+    constructor(message, code, originalError = null) {
+        super(message);
+        this.name = 'MCardError';
+        this.code = code;
+        this.originalError = originalError;
     }
 }
 
-class ContentErrorHandler {
-    constructor(metrics) {
-        this._metrics = metrics;
-        this._whitespaceContentHandler = new WhitespaceContentHandler(metrics);
+class ValidationError extends MCardError {
+    constructor(message, code, originalError = null) {
+        super(message, code, originalError);
+        this.name = 'ValidationError';
+    }
+}
+
+class AuthorizationError extends MCardError {
+    constructor(message, code, originalError = null) {
+        super(message, code, originalError);
+        this.name = 'AuthorizationError';
+    }
+}
+
+class NetworkError extends MCardError {
+    constructor(message, code, originalError = null) {
+        super(message, code, originalError);
+        this.name = 'NetworkError';
+    }
+}
+
+class NotFoundError extends MCardError {
+    constructor(message, code, originalError = null) {
+        super(message, code, originalError);
+        this.name = 'NotFoundError';
+    }
+}
+
+// Enhanced Logging
+class Logger {
+    static LEVELS = {
+        DEBUG: 0,
+        INFO: 1,
+        WARN: 2,
+        ERROR: 3
+    };
+
+    constructor(level = Logger.LEVELS.INFO) {
+        this.level = level;
     }
 
-    handleContentError(error) {
-        this._metrics.failedRequests++;
-        this._metrics.errors++;
+    _log(level, ...args) {
+        const logLevels = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+        const logLevel = logLevels[level];
 
-        if (!error.response) {
-            this._metrics.otherErrors++;
-            this._metrics.lastError = ERROR_MESSAGES.RETRY_EXHAUSTED;
-            throw new Error(ERROR_MESSAGES.RETRY_EXHAUSTED);
-        }
-
-        switch (error.response.status) {
-            case 404:
-                this._metrics.notFoundErrors++;
-                this._metrics.lastError = `404: ${ERROR_MESSAGES.CARD_NOT_FOUND}`;
-                const notFoundError = new Error(`404: ${ERROR_MESSAGES.CARD_NOT_FOUND}`);
-                notFoundError.status = 404;
-                notFoundError.originalError = error;
-                throw notFoundError;
-            case 422:
-                this._metrics.validationErrors++;
-                const errorDetail = typeof error.response.data.detail === 'string' 
-                    ? error.response.data.detail 
-                    : '';
-
-                // Check if it's a whitespace-specific error
-                const isWhitespaceError = isWhitespaceError(errorDetail);
-
-                // If it's a whitespace-specific error, normalize the content
-                if (isWhitespaceError) {
-                    // Normalize whitespace content to a single space
-                    return;
+        const prefix = `[${new Date().toISOString()}] [${logLevel}]`;
+        
+        switch (level) {
+            case Logger.LEVELS.DEBUG:
+                if (this.level <= Logger.LEVELS.DEBUG) {
+                    console.log(prefix, ...args);
                 }
-
-                // For other 422 errors, create and throw a validation error
-                const validationError = new Error(
-                    errorDetail || ERROR_MESSAGES.CONTENT_INVALID
-                );
-                validationError.status = 422;
-                validationError.originalError = error;
-                throw validationError;
-            case 403:
-                this._metrics.authErrors++;
-                this._metrics.lastError = ERROR_MESSAGES.INVALID_API_KEY;
-                const authError = new Error(ERROR_MESSAGES.INVALID_API_KEY);
-                authError.status = 403;
-                authError.originalError = error;
-                throw authError;
-            case 500:
-                this._metrics.otherErrors++;
-                const serverError = new Error(`${error.response.status}: ${error.response.data.detail || 'Server error'}`);
-                serverError.status = error.response.status;
-                serverError.originalError = error;
-                this._metrics.lastError = serverError.message;
-                throw serverError;
-            default:
-                this._metrics.otherErrors++;
-                const defaultError = new Error(`${error.response.status}: ${error.response.data.detail || 'Unknown server error'}`);
-                defaultError.status = error.response.status;
-                defaultError.originalError = error;
-                this._metrics.lastError = defaultError.message;
-                throw defaultError;
+                break;
+            case Logger.LEVELS.INFO:
+                if (this.level <= Logger.LEVELS.INFO) {
+                    console.log(prefix, ...args);
+                }
+                break;
+            case Logger.LEVELS.WARN:
+                if (this.level <= Logger.LEVELS.WARN) {
+                    console.warn(prefix, ...args);
+                }
+                break;
+            case Logger.LEVELS.ERROR:
+                if (this.level <= Logger.LEVELS.ERROR) {
+                    console.error(prefix, ...args);
+                }
+                break;
         }
+    }
+
+    debug(...args) {
+        this._log(Logger.LEVELS.DEBUG, ...args);
+    }
+
+    info(...args) {
+        this._log(Logger.LEVELS.INFO, ...args);
+    }
+
+    warn(...args) {
+        this._log(Logger.LEVELS.WARN, ...args);
+    }
+
+    error(...args) {
+        this._log(Logger.LEVELS.ERROR, ...args);
     }
 }
 
-class WhitespaceContentHandler {
-    constructor(metrics) {
-        this._metrics = metrics;
+// Configuration Builder
+class MCardClientConfig {
+    constructor() {
+        this.baseUrl = `${DEFAULT_HOST}:${DEFAULT_PORT}`;
+        this.apiKey = DEFAULT_API_KEY;
+        this.timeout = DEFAULT_TIMEOUT;
+        this.debug = false;  // Default to false
+        this.logger = null;
+        this.contentValidators = []; // Add support for custom content validators
     }
 
-    isWhitespaceContent(content) {
-        return typeof content === 'string' && content.trim() === '';
+    withBaseUrl(url) {
+        this.baseUrl = url;
+        return this;
     }
 
-    normalizeWhitespaceContent(content) {
-        return this.isWhitespaceContent(content) ? ' ' : content;
+    withApiKey(key) {
+        this.apiKey = key;
+        return this;
     }
 
-    handleWhitespaceContent(error) {
-        // Increment metrics for validation errors related to whitespace
-        this._metrics.validationErrors++;
+    withTimeout(timeout) {
+        this.timeout = timeout;
+        return this;
+    }
 
-        // Check if the error is specifically about empty or whitespace content
-        const errorDetail = typeof error.response.data.detail === 'string' 
-            ? error.response.data.detail.toLowerCase() 
-            : '';
+    enableDebug(debugMode = true) {
+        this.debug = debugMode;
+        return this;
+    }
 
-        // Use the utility function to check for whitespace errors
-        const hasWhitespaceError = isWhitespaceError(errorDetail);
+    withContentValidators(validators) {
+        this.contentValidators = validators;
+        return this;
+    }
 
-        if (hasWhitespaceError) {
-            // Treat this as a special case that doesn't require throwing an error
-            return true;
-        }
-
-        // If it's not a whitespace-specific error, rethrow
-        return false;
+    build() {
+        return {
+            baseURL: this.baseUrl,
+            apiKey: this.apiKey,
+            timeout: this.timeout,
+            debug: this.debug,
+            contentValidators: this.contentValidators
+        };
     }
 }
 
+// Enhanced Content Validator
 class ContentValidator {
-    validate(content) {
-        // Specific handling for null or undefined
-        if (content === null || content === undefined) {
-            throw new Error(ERROR_MESSAGES.CONTENT_NULL_UNDEFINED);
+    validate(content, options = {}) {
+        // Convert to string to ensure consistent validation
+        const contentStr = content === null || content === undefined 
+            ? '' 
+            : (typeof content === 'object' 
+                ? this.safeStringify(content) 
+                : String(content));
+
+        if (!contentStr || contentStr.trim().length === 0) {
+            throw new ValidationError('Content cannot be empty', 'VALIDATION_ERROR');
         }
-
-        // Add a unique salt to prevent hash collisions
-        const salt = Date.now().toString();
-
-        // Normalize whitespace content
-        content = new WhitespaceContentHandler().normalizeWhitespaceContent(content);
-
-        // Handle circular references
-        const seenObjects = new WeakSet();
-        const safeStringify = (obj) => {
-            if (obj === null || typeof obj !== 'object') {
-                return String(obj);
-            }
-
-            if (seenObjects.has(obj)) {
-                throw new Error(ERROR_MESSAGES.CIRCULAR_REFERENCE);
-            }
-
-            seenObjects.add(obj);
-
-            if (Array.isArray(obj)) {
-                return JSON.stringify(obj.map(safeStringify));
-            }
-
-            const result = {};
-            for (const [key, value] of Object.entries(obj)) {
-                result[key] = safeStringify(value);
-            }
-
-            return JSON.stringify(result);
-        };
-
-        // Convert content to string or JSON
-        try {
-            content = typeof content === 'object' 
-                ? safeStringify(content)
-                : String(content);
-        } catch (e) {
-            if (e.message === ERROR_MESSAGES.CIRCULAR_REFERENCE) {
-                throw new Error(ERROR_MESSAGES.CIRCULAR_REFERENCE);
-            }
-            throw e;
+        if (contentStr.length > MCardClient.MAX_CONTENT_LENGTH) {
+            throw new ValidationError(`Content cannot exceed ${MCardClient.MAX_CONTENT_LENGTH} characters`, 'VALIDATION_ERROR');
         }
+    }
 
-        // Validate non-empty content
-        if (content.trim() === '') {
-            // Preserve whitespace and add salt
-            content = ` ${salt}`;
-        } else {
-            // Add salt to ensure unique hash
-            content += salt;
-        }
-
-        return content;
+    // Safely stringify objects, handling circular references
+    safeStringify(obj, space = 2) {
+        const seen = new WeakSet();
+        return JSON.stringify(obj, (key, value) => {
+            if (typeof value === "object" && value !== null) {
+                if (seen.has(value)) {
+                    return undefined;
+                }
+                seen.add(value);
+            }
+            return value;
+        }, space);
     }
 }
 
+// MCard Client
 class MCardClient {
-    constructor(baseUrl = DEFAULT_CONFIG.BASE_URL, apiKey = DEFAULT_CONFIG.API_KEY, metrics = null) {
-        // Handle configuration object input
-        if (typeof baseUrl === 'object' && baseUrl !== null) {
-            const config = baseUrl;
-            baseUrl = config.baseURL || config.baseUrl || DEFAULT_CONFIG.BASE_URL;
-            apiKey = config.apiKey || config.apikey || DEFAULT_CONFIG.API_KEY;
-            metrics = config.metrics || null;
-            
-            // Additional configuration
-            this._timeout = config.timeout || DEFAULT_CONFIG.TIMEOUT;
-            this._debugMode = config.debug || false;
-        } else {
-            this._timeout = DEFAULT_CONFIG.TIMEOUT;
-            this._debugMode = false;
-        }
+    static MAX_CONTENT_LENGTH = 1000000;  // Reverted to original test expectation
 
-        this._baseURL = this._normalizeBaseURL(baseUrl);
-        this._apiKey = apiKey;
-        
-        // Initialize metrics if not provided
-        this._metrics = metrics || {
-            totalRequests: 0,
-            successfulRequests: 0,
-            failedRequests: 0,
-            totalResponseTime: 0,
-            averageResponseTime: 0,
-            networkErrors: 0,
-            notFoundErrors: 0,
-            validationErrors: 0,
-            authErrors: 0,
-            otherErrors: 0,
-            errors: 0,
-            lastError: null,
-            requestHistory: [],
-            responseTime: [], 
-            errorRequests: 0 
-        };
-        
-        // Initialize request history
-        this._requestHistory = [];
-        
-        // Initialize network error handler
-        this._networkErrorHandler = new NetworkErrorHandler(this._metrics);
-        
-        this._axiosInstance = axios.create({
+    constructor(config = {}) {
+        const {
+            baseURL = 'http://localhost:5320',
+            apiKey = null,
+            timeout = 5000,
+            debug = false,
+            logger = null
+        } = config;
+
+        this._baseURL = baseURL;
+        this._apiKey = apiKey || process.env.MCARD_API_KEY || DEFAULT_API_KEY;
+        this._timeout = timeout;
+        this._debug = debug;
+        this._logger = logger || new Logger(debug ? Logger.LEVELS.DEBUG : Logger.LEVELS.INFO);
+        this._axios = axios.create({
             baseURL: this._baseURL,
             timeout: this._timeout,
             headers: {
                 'X-API-Key': this._apiKey
             }
         });
-        this._contentErrorHandler = new ContentErrorHandler(this._metrics);
-        this.resetMetrics = this.resetMetrics.bind(this);
+
+        // Add request interceptor to log requests in debug mode
+        if (this._debug) {
+            this._axios.interceptors.request.use(config => {
+                this._log('debug', 'Request Config:', config);
+                return config;
+            }, error => {
+                this._log('error', 'Request Error:', error);
+                return Promise.reject(error);
+            });
+        }
+
+        // Add response interceptor to handle errors more comprehensively
+        this._axios.interceptors.response.use(
+            response => response,
+            error => {
+                if (error.response) {
+                    switch (error.response.status) {
+                        case 401:
+                        case 403:
+                            this._log('error', 'Authorization Error', error.response.data);
+                            throw new AuthorizationError(
+                                error.response.data.detail || 'Unauthorized or Forbidden', 
+                                'AUTHORIZATION_ERROR', 
+                                error
+                            );
+                        case 404:
+                            throw new NotFoundError('Resource not found', 'NOT_FOUND_ERROR', error.response);
+                        case 422:
+                            throw new ValidationError(
+                                error.response.data.detail || 'Invalid request', 
+                                'VALIDATION_ERROR', 
+                                error
+                            );
+                        default:
+                            throw new NetworkError(
+                                `Server error: ${error.response.status}`, 
+                                'NETWORK_ERROR', 
+                                error
+                            );
+                    }
+                } else if (error.request) {
+                    // Request was made but no response received
+                    throw new NetworkError('No response from server', 'NETWORK_ERROR', error);
+                } else {
+                    // Something happened in setting up the request
+                    throw new NetworkError('Error setting up request', 'NETWORK_ERROR', error);
+                }
+            }
+        );
     }
 
-    async _makeRequest(method, path, data = null, config = {}) {
-        const startTime = Date.now();
-        const requestConfig = {
-            method,
-            url: path,
-            data,
-            ...config
-        };
-
+    safeStringify(obj) {
         try {
-            this._metrics.totalRequests++;
-
-            const response = await this._axiosInstance(requestConfig);
-            
-            // Track successful request
-            const duration = Date.now() - startTime;
-            this._metrics.successfulRequests++;
-            this._metrics.totalResponseTime += duration;
-            this._metrics.averageResponseTime = 
-                this._metrics.totalResponseTime / this._metrics.successfulRequests;
-            this._metrics.responseTime.push(duration);
-
-            // Debug mode: Log request history
-            if (this._debugMode) {
-                this._requestHistory.push({
-                    timestamp: new Date().toISOString(),
-                    method,
-                    url: path,
-                    duration,
-                    success: true,
-                    status: response.status,
-                    data: response.data
-                });
-            }
-
-            return response;
+            return JSON.stringify(obj);
         } catch (error) {
-            // Track failed request
-            this._metrics.failedRequests++;
-            this._metrics.errors++;
+            return String(obj);
+        }
+    }
 
-            // Specific error handling
+    _log(level, message, data = null) {
+        // Use custom logger if provided, otherwise use default console logging
+        const logger = this._logger || console;
+        
+        // Ensure the logger has the appropriate method
+        const logMethod = {
+            'debug': 'debug',
+            'info': 'info',
+            'warn': 'warn',
+            'error': 'error'
+        }[level] || 'log';
+
+        // Log the message
+        if (logger[logMethod]) {
+            if (data) {
+                logger[logMethod](message, data);
+            } else {
+                logger[logMethod](message);
+            }
+        }
+    }
+
+    validator(content) {
+        // Handle different content types
+        if (content === null || content === undefined) {
+            throw new ValidationError('Content cannot be empty', 'VALIDATION_ERROR');
+        }
+
+        let contentStr;
+        if (typeof content === 'object') {
+            try {
+                contentStr = this.safeStringify(content);
+            } catch (error) {
+                throw new ValidationError('Failed to stringify object', 'VALIDATION_ERROR', { originalError: error });
+            }
+        } else {
+            contentStr = String(content);
+        }
+
+        // Trim and validate non-empty content
+        if (contentStr.trim().length === 0) {
+            throw new ValidationError('Content cannot be empty', 'VALIDATION_ERROR');
+        }
+
+        // More strict content length validation
+        const maxLength = this.constructor.MAX_CONTENT_LENGTH;
+        const contentLength = contentStr.length;
+
+        // Stricter validation without tolerance
+        if (contentLength > maxLength) {
+            throw new ValidationError(
+                `Content exceeds maximum length of ${maxLength} characters`, 
+                'VALIDATION_ERROR',
+                { 
+                    contentLength, 
+                    maxLength
+                }
+            );
+        }
+
+        return contentStr;
+    }
+
+    async getCard(hash) {
+        try {
+            const response = await this._axios.get(`/cards/${hash}`);
+            this._log('info', 'Card retrieved successfully', { hash });
+            return response.data;
+        } catch (error) {
             if (error.response) {
-                // Server responded with an error status code
-                if (error.response.status === 404) {
-                    this._metrics.notFoundErrors++;
-                    const error404 = new Error(ERROR_MESSAGES.CARD_NOT_FOUND);
-                    error404.status = 404;
-                    throw error404;
+                const statusCode = error.response.status;
+                
+                switch(statusCode) {
+                    case 404:
+                        // Directly throw NotFoundError for 404 cases
+                        const notFoundError = new NotFoundError(
+                            `Card with hash ${hash} not found`, 
+                            'NOT_FOUND_ERROR', 
+                            { 
+                                hash, 
+                                statusCode 
+                            }
+                        );
+                        this._log('error', 'Card not found', { hash });
+                        throw notFoundError;
+                    case 401:
+                    case 403:
+                        const authError = new AuthorizationError(
+                            'Unauthorized or Forbidden', 
+                            'AUTHORIZATION_ERROR', 
+                            { 
+                                originalError: error 
+                            }
+                        );
+                        this._log('error', 'Authorization error', { error: authError });
+                        throw authError;
+                    default:
+                        const networkError = new NetworkError(
+                            `Server error: ${error.response.status}`, 
+                            'NETWORK_ERROR', 
+                            { 
+                                statusCode, 
+                                originalError: error 
+                            }
+                        );
+                        this._log('error', 'Network error', { error: networkError });
+                        throw networkError;
                 }
             } else if (error.request) {
                 // Request was made but no response received
-                this._metrics.networkErrors++;
-                const networkError = new Error(ERROR_MESSAGES.NETWORK_ERROR);
+                const networkError = new NetworkError(
+                    'No response from server', 
+                    'NETWORK_ERROR', 
+                    { originalError: error }
+                );
+                this._log('error', 'No server response', { error: networkError });
                 throw networkError;
             } else {
                 // Something happened in setting up the request
-                this._metrics.otherErrors++;
+                const notFoundError = new NotFoundError(
+                    'Error retrieving card', 
+                    'NOT_FOUND_ERROR', 
+                    { originalError: error }
+                );
+                this._log('error', 'Request setup error', { error: notFoundError });
+                throw notFoundError;
             }
+        }
+    }
 
-            // Debug mode: Log request history for failed request
-            if (this._debugMode) {
-                this._requestHistory.push({
-                    timestamp: new Date().toISOString(),
-                    method,
-                    url: path,
-                    duration: Date.now() - startTime,
-                    success: false,
-                    status: error.response ? error.response.status : 'N/A',
-                    error: error.message
-                });
+    async listCards(options = {}) {
+        const {
+            page = 1,
+            pageSize = 10,
+            search = '',
+            query = search,  // Support both 'search' and 'query'
+            searchContent = true,
+            searchHash = false,
+            searchTime = false
+        } = options;
+
+        try {
+            const response = await this._axios.get('/cards', {
+                params: {
+                    page,
+                    page_size: pageSize,
+                    search: query,
+                    search_content: searchContent,
+                    search_hash: searchHash,
+                    search_time: searchTime
+                }
+            });
+
+            // Normalize the response to match the expected structure
+            const result = {
+                cards: response.data.cards || response.data.items || [],
+                totalCards: response.data.total_cards || response.data.total || 0,
+                totalPages: response.data.total_pages || Math.ceil((response.data.total_cards || 0) / pageSize) || 1,
+                currentPage: response.data.current_page || page
+            };
+
+            this._log('info', 'Cards listed successfully', {
+                totalCards: result.totalCards,
+                totalPages: result.totalPages,
+                currentPage: result.currentPage
+            });
+
+            return result;
+        } catch (error) {
+            if (error.response && error.response.status === 404) {
+                // If no cards found, return an empty list
+                return {
+                    cards: [],
+                    totalCards: 0,
+                    totalPages: 0,
+                    currentPage: page
+                };
             }
-
-            throw error;
+            throw new NetworkError('Failed to list cards', 'NETWORK_ERROR', { originalError: error });
         }
     }
 
     async createCard(content, metadata = {}) {
-        // Handle circular references
-        if (this._hasCircularReference(content)) {
-            throw new Error(ERROR_MESSAGES.CIRCULAR_REFERENCE);
-        }
+        try {
+            const validatedContent = this.validator(content);
+            const payload = { 
+                content: validatedContent, 
+                metadata: metadata || {} 
+            };
 
-        // Handle null, undefined, or whitespace-only content
-        const processedContent = this._processContent(content);
-        
-        if (processedContent === '' || processedContent.trim() === '') {
-            throw new Error(ERROR_MESSAGES.CONTENT_EMPTY);
-        }
+            this._log('debug', 'Creating card', { payload });
 
-        // Merge default metadata with provided metadata
-        const finalMetadata = {
-            contentType: METADATA_DEFAULTS.CONTENT_TYPE,
-            encoding: METADATA_DEFAULTS.ENCODING,
-            ...metadata
-        };
+            const response = await this._axios.post('/cards', payload);
+            const cardData = response.data;
 
-        const response = await this._makeRequest('POST', API_PATHS.CARDS, { 
-            content: processedContent, 
-            metadata: finalMetadata,
-            g_time: TIMESTAMP_FORMAT.CURRENT_TIME
-        });
-
-        return response.data;
-    }
-
-    async getCard(hash) {
-        if (!hash) {
-            const error = new Error(ERROR_MESSAGES.HASH_REQUIRED);
-            this._metrics.validationErrors++;
-            throw error;
-        }
-        const response = await this._makeRequest('GET', `${API_PATHS.CARDS}/${hash}`);
-        return response.data;
-    }
-
-    async deleteCards() {
-        const response = await this._makeRequest('DELETE', API_PATHS.CARDS);
-        return response.data;
-    }
-
-    async shutdown() {
-        const response = await this._makeRequest('POST', API_PATHS.SHUTDOWN);
-        return response.data;
-    }
-
-    _hasCircularReference(obj) {
-        const seen = new WeakSet();
-        
-        const detect = (item) => {
-            if (item && typeof item === 'object') {
-                if (seen.has(item)) {
-                    return true;
-                }
-                seen.add(item);
-                
-                for (let key in item) {
-                    if (detect(item[key])) {
-                        return true;
-                    }
-                }
+            this._log('info', 'Card created successfully', { hash: cardData.hash });
+            return cardData;
+        } catch (error) {
+            if (error instanceof ValidationError) {
+                throw error;
             }
-            return false;
-        };
-        
-        return detect(obj);
-    }
-
-    _processContent(content) {
-        // Handle various content types
-        if (content === null || content === undefined) {
-            return '';
+            
+            const networkError = new NetworkError('Failed to create card', 'NETWORK_ERROR', { originalError: error });
+            this._log('error', 'Network error', { error: networkError });
+            throw networkError;
         }
-
-        // Convert to string, handling different types
-        if (typeof content === 'object') {
-            try {
-                return JSON.stringify(content);
-            } catch {
-                return String(content);
-            }
-        }
-
-        return String(content);
-    }
-
-    async listCards({ page = 1, pageSize = 10, search = '' } = {}, cancelToken = null) {
-        if (page < 1) {
-            throw new Error(ERROR_MESSAGES.INVALID_PAGE);
-        }
-        if (pageSize < 1 || pageSize > 100) {
-            throw new Error(ERROR_MESSAGES.INVALID_PAGE_SIZE);
-        }
-
-        const config = {
-            params: { page, pageSize, search },
-            ...(cancelToken ? { cancelToken } : {})
-        };
-
-        return this._makeRequest(
-            HTTP_METHODS.GET, 
-            API_PATHS.CARDS, 
-            null, 
-            config
-        );
-    }
-
-    async getAllCards() {
-        return this._makeRequest(
-            HTTP_METHODS.GET, 
-            API_PATHS.CARDS
-        );
     }
 
     async deleteCard(hash) {
-        if (!hash) {
-            const error = new Error(ERROR_MESSAGES.HASH_REQUIRED);
-            this._metrics.validationErrors++;
-            throw error;
-        }
-        const response = await this._makeRequest('DELETE', `${API_PATHS.CARDS}/${hash}`);
-        return response.data;
-    }
-
-    async checkHealth(cancelToken = null) {
         try {
-            // Construct full URL for health check
-            const fullUrl = `${this._baseURL}${API_PATHS.HEALTH}`;
-            
-            const config = {
-                method: HTTP_METHODS.GET,
-                url: fullUrl,
-                ...(cancelToken ? { cancelToken } : {})
-            };
-
-            const response = await this._makeRequest(
-                HTTP_METHODS.GET, 
-                API_PATHS.HEALTH, 
-                null, 
-                config
-            );
-            return response;
+            console.log(`Attempting to delete card with hash: ${hash}`);
+            const response = await this._axios.delete(`/cards/${hash}`);
+            console.log(`Delete response status: ${response.status}`);
+            this._log('info', `Card deleted successfully: ${hash}`);
+            return true; // Return true for successful deletion
         } catch (error) {
-            // If it's a network error, handle it
-            if (this._networkErrorHandler.isNetworkError(error)) {
-                this._networkErrorHandler.handleNetworkError(error);
-            }
+            const statusCode = error.response ? error.response.status : null;
+            console.log(`Delete error status code: ${statusCode}`);
             
-            throw error;
+            switch(statusCode) {
+                case 404:
+                case 204:
+                case 403:
+                    // Log the error before returning true
+                    this._log('info', `Card not found or already deleted: ${hash}`);
+                    // Return true for these status codes
+                    return true;
+                case 401:
+                    throw new AuthorizationError('Unauthorized', 'AUTHORIZATION_ERROR', error);
+                default:
+                    // For other errors, rethrow or handle as needed
+                    throw error;
+            }
         }
     }
 
-    _handleContentError(error) {
-        this._contentErrorHandler.handleContentError(error);
-    }
-
-    getRequestHistory() {
-        // Always return a copy of the request history
-        return [...this._requestHistory];
-    }
-
-    _normalizeBaseURL(baseUrl) {
-        if (!baseUrl) return DEFAULT_BASE_URL;
-        
-        let normalizedBaseUrl = baseUrl;
-        if (!normalizedBaseUrl.startsWith('http://') && !normalizedBaseUrl.startsWith('https://')) {
-            normalizedBaseUrl = `http://${normalizedBaseUrl}`;
-        }
-        normalizedBaseUrl = normalizedBaseUrl.replace(/\/$/, '');
-        return normalizedBaseUrl;
-    }
-
-    async deleteCards() {
+    async deleteAllCards() {
         try {
-            // Get all cards using pagination
-            const allCards = await this.getAllCards();
-            if (!Array.isArray(allCards)) {
-                return;
-            }
-            await Promise.all(allCards.map(card => this.deleteCard(card.hash)));
-        } catch (error) {
-            throw error;
-        }
-    }
-
-    getMetrics() {
-        // Ensure metrics are always returned, even if not initialized
-        return {
-            totalRequests: this._metrics?.totalRequests || 0,
-            successfulRequests: this._metrics?.successfulRequests || 0,
-            failedRequests: this._metrics?.failedRequests || 0,
-            totalResponseTime: this._metrics?.totalResponseTime || 0,
-            averageResponseTime: this._metrics?.averageResponseTime || 0,
-            networkErrors: this._metrics?.networkErrors || 0,
-            notFoundErrors: this._metrics?.notFoundErrors || 0,
-            validationErrors: this._metrics?.validationErrors || 0,
-            authErrors: this._metrics?.authErrors || 0,
-            otherErrors: this._metrics?.otherErrors || 0,
-            errors: this._metrics?.errors || 0,
-            lastError: this._metrics?.lastError || null,
-            requestHistory: this._metrics?.requestHistory || [],
-            responseTime: this._metrics?.responseTime || [],
-            errorRequests: this._metrics?.errorRequests || 0
-        };
-    }
-
-    resetMetrics() {
-        this._metrics = {
-            totalRequests: 0,
-            successfulRequests: 0,
-            failedRequests: 0,
-            totalResponseTime: 0,
-            averageResponseTime: 0,
-            networkErrors: 0,
-            notFoundErrors: 0,
-            validationErrors: 0,
-            authErrors: 0,
-            otherErrors: 0,
-            errors: 0,
-            lastError: null,
-            requestHistory: [],
-            responseTime: [], 
-            errorRequests: 0 
-        };
-        this._requestHistory = [];
-    }
-
-    log(...args) {
-        if (this._debugMode) {
-            console.log(...args);
-        }
-    }
-
-    // Add this method to check if a request is considered successful
-    isSuccessfulRequest(method, url, response) {
-        // Special case for health check
-        if (method === HTTP_METHODS.GET && url === API_PATHS.HEALTH) {
+            const response = await this._axios.delete('/cards');
+            this._log('info', 'All cards deleted successfully');
             return true;
+        } catch (error) {
+            if (error.response) {
+                const statusCode = error.response.status;
+                
+                switch(statusCode) {
+                    case 401:
+                    case 403:
+                        this._log('warn', 'Could not delete all cards: Not authorized', error);
+                        return false;
+                    default:
+                        throw new NetworkError(`Server error: ${error.response.status}`, 'NETWORK_ERROR', error);
+                }
+            }
+
+            throw new NetworkError('Network error', 'NETWORK_ERROR', error);
         }
-        
-        // Default success is 2xx status code
-        return response && response.status >= 200 && response.status < 300;
     }
 }
 
-module.exports = { 
+module.exports = {
     MCardClient,
-    DEFAULT_HOST,
-    DEFAULT_PORT,
-    DEFAULT_API_KEY,
-    DEFAULT_BASE_URL,
-    ERROR_MESSAGES
+    MCardError,
+    NetworkError,
+    ValidationError,
+    AuthorizationError,
+    NotFoundError,
+    Logger,
+    ContentValidator,
+    MCardClientConfig
 };

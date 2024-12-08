@@ -4,181 +4,151 @@ A lightweight Node.js client library for interacting with the MCard Core content
 
 ## Features
 
-- Simple and intuitive API
 - Promise-based async/await interface
 - Robust input validation
 - Comprehensive error handling
-- Basic metrics tracking
+- Advanced logging and debugging
+- Flexible configuration
+- Specific error types for different scenarios
 
 ## Installation
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/mcard-core.git
-cd mcard-core/examples/bridge_to_javascript
+npm install mcard-js-bridge
+```
 
-2. Install dependencies:
-
-```bash
-npm install
-
-3. Usage
-The library provides a straightforward client for interacting with the MCard Core server:
-
-const { MCardClient } = require('./src/client');
-
-// Initialize client with server URL
-const client = new MCardClient('http://localhost:5320');
-
-// Create a card
-const card = await client.createCard({ 
-    content: 'Hello, World!',
-    metadata: { type: 'greeting' }
-});
-
-// Get a card by hash (requires hash)
-const retrievedCard = await client.getCard(card.hash);
-
-// Delete a card (requires hash)
-await client.deleteCard(card.hash);
-
-4. Error Handling
-The client includes robust error handling:
-
-Mandatory input validation for getCard and deleteCard
-Specific error messages for different scenarios
-Throws "Hash is required" when no hash is provided
-Provides clear 404 error messages for non-existent cards
-Tracks network and validation errors via metrics
-Example of input validation:
-
-
-```js
-try {
-    await client.getCard();  // Throws an error
-} catch (error) {
-    console.error(error.message); // "Hash is required"
-}
-
-5. Testing
-The test suite uses Jest and covers:
-
-Error handling scenarios
-Input validation
-Metrics tracking
-Client method functionality
-
-Run tests with:
-
-```bash
-# Run all tests
-npm test
-
-# Generate coverage report
-npm test -- --coverage
-
-6. Metrics
-The client provides basic request metrics:
-
-Total number of requests
-Successful requests
-Failed requests
-Retrieve metrics:
-
-```js
-const metrics = client.getMetrics();
-console.log(metrics.totalRequests);
-console.log(metrics.successfulRequests);
-
-## Enhanced MCard Client Design
-
-### Overview
-The `EnhancedMCardClient` is a sophisticated JavaScript client for interacting with the MCard service, providing advanced features beyond basic HTTP requests.
-
-### Key Design Principles
-
-#### 1. Error Handling
-- Implements custom error classes for granular error tracking:
-  - `ValidationError`: For input validation failures
-  - `AuthorizationError`: For authentication-related issues
-  - `NetworkError`: For connection problems
-  - `NotFoundError`: For resource not found scenarios
-  - `MCardError`: Generic server-side errors
-
-#### 2. Metrics Tracking
-- Built-in metrics collection system to monitor:
-  - Total number of requests
-  - Successful and failed request counts
-  - Detailed error type breakdown
-- Supports request history tracking in debug mode
-- Provides methods to reset metrics
-
-#### 3. Content Validation
-- Flexible content validation mechanism
-  - Default validators for content length
-  - Supports custom validator functions
-  - Prevents invalid content from being submitted
-
-#### 4. Logging and Debugging
-- Configurable logging levels
-- Debug mode for detailed request/response tracking
-- Customizable console logging
-
-#### 5. Configuration Flexibility
-- Supports custom configuration options:
-  - Base URL
-  - API Key
-  - Timeout settings
-  - Debug mode
-  - Custom content validators
-
-### Usage Example
+## Quick Start
 
 ```javascript
-const client = new EnhancedMCardClient({
+const { MCardClient } = require('mcard-js-bridge');
+
+// Initialize client with default configuration
+const client = new MCardClient({
     baseURL: 'http://localhost:5320',
-    apiKey: 'your-api-key',
-    debug: true,
-    contentValidators: [
+    debug: true
+});
+
+// Create a card
+const card = await client.createCard('Hello, World!');
+console.log(card.hash);
+
+// Retrieve a card
+const retrievedCard = await client.getCard(card.hash);
+
+// Delete a card
+await client.deleteCard(card.hash);
+```
+
+## Advanced Configuration
+
+### Client Initialization
+
+```javascript
+const client = new MCardClient({
+    baseURL: 'http://localhost:5320',    // Custom server URL
+    apiKey: 'your-api-key',              // Optional API key
+    timeout: 5000,                       // Request timeout (ms)
+    debug: true,                         // Enable debug logging
+    contentValidators: [                 // Optional custom validators
         (content) => {
-            if (content.includes('forbidden')) {
-                throw new ValidationError('Forbidden content');
+            if (content.length > 1000000) {
+                throw new ValidationError('Content too long');
             }
         }
     ]
 });
-
-// Create a card
-const cardHash = await client.createCard('My content');
-
-// Get metrics
-const metrics = client.getMetrics();
-console.log(metrics.totalRequests); // Number of total requests
 ```
 
-### Error Handling Strategy
-- Automatically throws specific error types based on HTTP status codes
-- Provides detailed error information for debugging
-- Supports catching and handling specific error types
+## Error Handling
 
-### Performance Considerations
-- Lightweight wrapper around Axios
-- Minimal overhead for metrics and validation
-- Configurable timeout to prevent long-running requests
+The MCard client provides comprehensive error handling with specific error types:
 
-### Extensibility
-- Open for extension through custom validators
-- Easily mockable for testing
-- Supports different content types and validation strategies
+- `ValidationError`: Input validation failures
+- `AuthorizationError`: Authentication issues
+- `NetworkError`: Connection problems
+- `NotFoundError`: Resource not found scenarios
 
-API Methods
-createCard(content): Create a new card
-getCard(hash): Retrieve a card (requires hash)
-deleteCard(hash): Delete a card (requires hash)
-getMetrics(): Get request metrics
-Key Design Principles
-Single request attempt per method call
-No automatic retries
-Comprehensive input validation
-Transparent error reporting
-Lightweight metrics tracking
+### Error Handling Example
+
+```javascript
+try {
+    await client.createCard(''); // Empty content
+} catch (error) {
+    if (error instanceof ValidationError) {
+        console.error('Invalid content:', error.message);
+    }
+}
+```
+
+## Logging and Debugging
+
+The client supports configurable logging levels:
+
+```javascript
+const client = new MCardClient({
+    debug: true  // Enables detailed logging
+});
+```
+
+## API Methods
+
+### `createCard(content, metadata = {})`
+- Creates a new card with given content and optional metadata
+- Returns card hash
+- Throws `ValidationError` for invalid content
+
+### `getCard(hash)`
+- Retrieves a card by its hash
+- Throws `NotFoundError` if card doesn't exist
+
+### `deleteCard(hash)`
+- Deletes a card by its hash
+- Returns `true` if successful
+- Handles non-existent cards gracefully
+
+### `deleteAllCards()`
+- Deletes all cards in the database
+- Use with caution
+
+## Content Validation
+
+- Maximum content length: 1,000,000 characters
+- Supports various content types (strings, objects)
+- Automatic content stringification
+- Custom validator support
+
+## Testing
+
+```bash
+# Run tests
+npm test
+
+# Generate coverage report
+npm test -- --coverage
+```
+
+## Error Hierarchy
+
+- `MCardError` (Base Error)
+  - `ValidationError`
+  - `AuthorizationError`
+  - `NetworkError`
+  - `NotFoundError`
+
+## Performance Considerations
+
+- Lightweight Axios-based implementation
+- Configurable request timeout
+- Minimal overhead for validation and logging
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+MIT License

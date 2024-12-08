@@ -44,19 +44,54 @@ class TestEnvironment {
     }
 
     async startServer() {
+        console.log('🚀 Attempting to start MCard server...');
+        
         // Kill any existing server process first
         await this.stopServer();
 
-        console.log('🚀 Starting MCard server...');
-        
-        // Use Python from .venv
-        const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python');
-        
+        // Try multiple Python paths
+        const pythonPaths = [
+            'python3',
+            'python',
+            '/usr/local/bin/python3',
+            '/usr/bin/python3',
+            path.join(process.cwd(), '.venv', 'bin', 'python')
+        ];
+
+        let pythonPath = null;
+        for (const tryPath of pythonPaths) {
+            try {
+                const { stdout } = await this.execShell(`which ${tryPath}`);
+                if (stdout.trim()) {
+                    pythonPath = tryPath;
+                    break;
+                }
+            } catch (error) {
+                console.log(`Path ${tryPath} not found`);
+                continue;
+            }
+        }
+
+        if (!pythonPath) {
+            throw new Error('No suitable Python interpreter found');
+        }
+
+        console.log(`Using Python interpreter: ${pythonPath}`);
+
+        // Create data directory if it doesn't exist
+        const dataDir = path.join(process.cwd(), 'data');
+        try {
+            await fs.mkdir(dataDir, { recursive: true });
+        } catch (error) {
+            console.warn('Could not create data directory:', error);
+        }
+
         // Start server with detached mode and its own process group
         this.serverProcess = spawn(pythonPath, ['src/server.py'], {
             cwd: process.cwd(),
             detached: true,
-            stdio: ['ignore', 'pipe', 'pipe']
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, PYTHONUNBUFFERED: '1' }
         });
 
         // Handle server output
@@ -68,45 +103,71 @@ class TestEnvironment {
             console.error(`Server stderr: ${data}`);
         });
 
-        console.log('⏳ Waiting for server to start...');
-        await this.waitForServer();
+        // Set a timeout for server startup
+        const startupTimeout = new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(new Error('Server startup timeout'));
+            }, 30000); // 30 seconds timeout
+        });
+
+        try {
+            // Race between server startup and timeout
+            await Promise.race([
+                this.waitForServer(),
+                startupTimeout
+            ]);
+        } catch (error) {
+            console.error('Server startup failed:', error);
+            await this.stopServer();
+            throw error;
+        }
     }
 
     async stopServer() {
+        console.log('🛑 Attempting to stop server...');
         if (this.serverProcess) {
             try {
                 // Try graceful shutdown first
                 await axios.post('http://localhost:5320/shutdown', null, {
                     headers: { 'X-API-Key': 'dev_key_123' },
-                    timeout: 1000
+                    timeout: 2000
                 }).catch(() => {});
 
                 // Kill process group
                 process.kill(-this.serverProcess.pid);
             } catch (error) {
-                // Ignore errors, server might already be down
+                console.warn('Error during server stop:', error);
             }
 
             this.serverProcess = null;
             // Wait for port to be released
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
 
     async waitForServer(maxAttempts = 30) {
+        console.log('🕒 Waiting for server to start...');
         for (let i = 0; i < maxAttempts; i++) {
             try {
-                await axios.get('http://localhost:5320/health', {
+                console.log(`Attempt ${i + 1}: Checking server health...`);
+                const response = await axios.get('http://localhost:5320/health', {
                     headers: { 'X-API-Key': 'dev_key_123' },
-                    timeout: 1000
+                    timeout: 2000
                 });
-                console.log('✅ Server is ready!');
-                return;
+                
+                if (response.status === 200) {
+                    console.log('✅ Server is running successfully!');
+                    return true;
+                }
             } catch (error) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                console.log(`Attempt ${i + 1} failed:`, error.message);
+                // Wait a bit before next attempt
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-        throw new Error('Server failed to start');
+        
+        console.error('❌ Server failed to start after maximum attempts');
+        throw new Error('Server did not start within the expected time');
     }
 
     async cleanup() {
@@ -136,6 +197,20 @@ class TestEnvironment {
             await TestEnvironment.instance.cleanup();
             TestEnvironment.instance = null;
         }
+    }
+
+    // Add a helper method to execute shell commands
+    execShell(cmd) {
+        return new Promise((resolve, reject) => {
+            const { exec } = require('child_process');
+            exec(cmd, (error, stdout, stderr) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve({ stdout, stderr });
+                }
+            });
+        });
     }
 }
 
