@@ -34,8 +34,7 @@ describe('MCard Client Error Handling', () => {
         it('should handle connection failures', async () => {
             const badClient = new MCardClient({
                 baseURL: 'http://nonexistent.domain',
-                timeout: 500,
-                maxRetries: 1
+                timeout: 500
             });
 
             // Simulate network error by using a non-existent domain
@@ -46,11 +45,9 @@ describe('MCard Client Error Handling', () => {
 
     describe('HTTP Status Errors', () => {
         it('should handle 404 errors', async () => {
-            const client = new MCardClient();
-
             // Attempt to get a non-existent card
             await expect(client.getCard('nonexistent-hash'))
-                .rejects.toThrow(`404: ${ERROR_MESSAGES.CARD_NOT_FOUND}`);
+                .rejects.toThrow(ERROR_MESSAGES.CARD_NOT_FOUND);
         });
     });
 });

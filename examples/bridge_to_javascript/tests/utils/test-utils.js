@@ -110,6 +110,16 @@ class TestEnvironment {
     }
 
     async cleanup() {
+        // Delete all cards before stopping the server
+        try {
+            await axios.delete('http://localhost:5320/cards', {
+                headers: { 'X-API-Key': 'dev_key_123' },
+                timeout: 1000
+            });
+        } catch (error) {
+            console.warn('Failed to delete cards during cleanup:', error.message);
+        }
+
         await this.stopServer();
     }
 

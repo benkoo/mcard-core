@@ -16,8 +16,6 @@ describe('MCard Client Metrics', () => {
     beforeEach(async () => {
         client = new MCardClient({
             timeout: 2000,
-            maxRetries: 3,
-            retryDelay: 500,
             debug: true
         });
     });
@@ -42,8 +40,7 @@ describe('MCard Client Metrics', () => {
             // Simulate failed request
             const failedClient = new MCardClient({
                 baseURL: 'http://nonexistent.domain',
-                timeout: 500,
-                maxRetries: 1
+                timeout: 500
             });
 
             try {
@@ -54,6 +51,7 @@ describe('MCard Client Metrics', () => {
 
             const failedMetrics = failedClient.getMetrics();
             expect(failedMetrics.failedRequests).toBe(1);
+            expect(failedMetrics.successfulRequests).toBe(0);
         });
 
         it('should track response times', async () => {

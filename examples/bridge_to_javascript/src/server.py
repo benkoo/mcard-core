@@ -44,7 +44,7 @@ class CardRequest(BaseModel):
     @field_validator('content')
     def validate_content(cls, v):
         """Validate content field."""
-        if not v:
+        if v is None or (isinstance(v, str) and v.strip() == ''):
             raise ValueError("Content cannot be empty")
         return v
 
@@ -232,6 +232,8 @@ async def create_card(content: str, metadata: Optional[dict] = None):
         # Store the card
         await app.state.setup.storage.save(card)
         return card
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create card: {str(e)}")
 
@@ -243,6 +245,9 @@ async def create_card_endpoint(card: CardRequest, api_key: str = Depends(get_api
         card_instance = await create_card(card.content, card.metadata)
         return CardResponse.from_mcard(card_instance)
     except Exception as e:
+        # Specifically handle empty string case with 422 error
+        if str(e) == "Failed to create card: Content cannot be empty":
+            raise HTTPException(status_code=422, detail="Content cannot be an empty string")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/cards", response_model=PaginatedCardsResponse)
