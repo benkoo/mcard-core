@@ -1,209 +1,143 @@
 # MCard JavaScript Bridge
 
-A lightweight Node.js client library for interacting with the MCard Core content-addressable storage system.
+## Overview
 
-## Features
+This module provides a robust bridge between Python's MCard backend and JavaScript clients, enabling seamless integration and communication across different runtime environments.
 
-- Promise-based async/await interface
-- Robust content validation
-- Comprehensive error handling
-- Specific error types for different scenarios
-- Advanced logging and debugging
-- Flexible configuration
+## Key Design Principles
 
-## Installation
+### Dynamic Port Management
 
-```bash
-npm install mcard-js-bridge
+The JavaScript bridge implements a sophisticated dynamic port management system to ensure flexible and conflict-free server startup:
+
+1. **Port Source Hierarchy**:
+   - Primary source: Environment variable `MCARD_API_PORT`
+   - Fallback: `DEFAULT_API_PORT` (5320) from `mcard/config_constants.py`
+   - Automatic port discovery if primary sources are unavailable
+
+2. **Port Selection Strategy**:
+   - Attempt to use specified port
+   - If port is unavailable or set to 0, dynamically find an open port
+   - Systematically search for available ports starting from the default
+
+### Server Startup Workflow
+
+```mermaid
+graph TD
+    A[Start Server Initialization] --> B{Check MCARD_API_PORT}
+    B --> |Port Specified| C[Attempt to Use Specified Port]
+    B --> |Port = 0 or Unset| D[Use DEFAULT_API_PORT]
+    D --> E[Find First Available Port]
+    C --> F{Port Available?}
+    E --> G[Bind to Available Port]
+    F --> |Yes| G
+    F --> |No| E
+    G --> H[Set Environment Variables]
+    H --> I[Start Server]
+    I --> J[Print Server Configuration]
 ```
 
-## Quick Start
+### Key Components
 
-```javascript
-const { MCardClient } = require('mcard-js-bridge');
+- **`server.py`**: Python FastAPI server with dynamic port management
+- **`mcard_service_proxy.js`**: JavaScript proxy for server communication
+- **`test_server_startup.js`**: Startup and connection test script
 
-// Initialize client with default configuration
-const client = new MCardClient({
-    baseURL: 'http://localhost:5320',
-    apiKey: 'your_api_key'
-});
+## Environment Configuration
 
-// Create a card
-const cardHash = await client.createCard('Hello, World!');
-console.log(cardHash);
+### Required Environment Variables
 
-// Retrieve a card
-const retrievedCard = await client.getCard(cardHash);
+- `MCARD_API_PORT`: Preferred server port (optional)
+- `MCARD_SERVER_HOST`: Server host address (default: localhost)
+- `MCARD_API_KEY`: Authentication key for server access
 
-// Delete a card
-await client.deleteCard(cardHash);
-```
+## Startup Process
 
-## Advanced Configuration
-
-### Client Initialization
-
-```javascript
-const client = new MCardClient({
-    baseURL: 'http://localhost:5320',    // Custom server URL
-    apiKey: 'your-api-key',              // Optional API key
-    timeout: 5000,                       // Request timeout (ms)
-    contentValidators: [                 // Optional custom validators
-        (content) => {
-            // Custom validation logic
-        }
-    ]
-});
-```
-
-## Content Validation
-
-The client provides robust content validation:
-
-- Detects binary vs. text content
-- Limits content length to 1,000,000 characters
-- Supports custom validation through `contentValidators`
+1. Server attempts to use specified or default port
+2. Dynamically finds an available port if needed
+3. Sets `PORT` and `MCARD_API_PORT` environment variables
+4. Prints server configuration
+5. Starts Uvicorn server
 
 ## Error Handling
 
-The MCard client offers comprehensive error handling with specific error types:
+- Graceful port conflict resolution
+- Comprehensive logging
+- Maximum startup attempt limit (5 attempts)
 
-- `ValidationError`: Input validation failures
-- `AuthorizationError`: Authentication issues
-- `NetworkError`: Connection problems
-- `NotFoundError`: Resource not found scenarios
+## Performance Considerations
 
-### Error Handling Example
+- Minimal overhead in port selection
+- Systematic port search algorithm
+- Configurable startup timeout
 
-```javascript
-try {
-    await client.createCard('Very long content...'); 
-} catch (error) {
-    if (error instanceof ValidationError) {
-        console.error('Content validation failed:', error.message);
-    }
-}
+## Debugging
+
+Enable verbose logging by setting:
+```bash
+export MCARD_SERVICE_LOG_LEVEL=DEBUG
 ```
 
-## Logging
+## Security
 
-The client supports configurable logging:
+- Avoids hardcoded ports
+- Environment-driven configuration
+- Supports custom host and port settings
 
-```javascript
-const client = new MCardClient({
-    debug: true  // Enables detailed logging
-});
-```
+## Compatibility
 
-## Pagination Design
+- Python 3.8+
+- Node.js 14+
+- FastAPI
+- Uvicorn
 
-### Card Listing with Pagination
+## Migration from `client.js` to `mcard_service_proxy.js`
 
-The `listCards()` method provides flexible pagination with the following key design principles:
+We have completely transitioned from the previous `client.js` implementation to a more robust and feature-rich `mcard_service_proxy.js`. This new implementation offers:
 
-#### Default Pagination
-- Default page is `1`
-- Default page size is `10`
-- Configurable through method options or global constants
+- **Singleton Pattern**: Ensures a single, consistent instance of the MCard service
+- **Enhanced Server Management**: 
+  - Improved server startup and shutdown mechanisms
+  - Dynamic port selection
+  - Comprehensive error handling
+- **Robust Configuration**: 
+  - Validation for API keys, ports, and database paths
+  - Flexible configuration options
 
-#### Pagination Parameters
-- `page`: Specifies the current page number (default: 1)
-- `pageSize`: Determines the number of cards per page (default: 10)
-- Supports custom page sizes between 1 and 100
+## Test Coverage
 
-#### Pagination Metadata
-Each `listCards()` call returns a result object with:
-- `cards`: Array of cards for the current page
-- `totalCards`: Total number of cards
-- `totalPages`: Total number of pages
-- `currentPage`: Current page number
-- `hasNext`: Boolean indicating if more pages exist
-- `hasPrevious`: Boolean indicating if previous pages exist
+We have developed a comprehensive test suite for `mcard_service_proxy.js` that covers:
 
-#### Example Usage
+1. **Content Operations Tests**:
+   - Creating cards with various content types
+     - Plain text
+     - JSON
+     - XML
+     - Binary formats (PDF, SVG, JPG, PNG)
+   - Handling large and edge case content
+   - Base64 encoded content support
 
-```javascript
-// List first page with default 10 cards
-const firstPage = await client.listCards();
+2. **Validation Tests**:
+   - API key validation
+   - Port number validation
+   - Database path validation
+   - Network connectivity checks
 
-// Custom pagination: 5 cards per page, second page
-const customPage = await client.listCards({ 
-    page: 2, 
-    pageSize: 5 
-});
-```
+3. **Persistent Database Tests**:
+   - Database file creation
+   - Persistent card storage across test runs
+   - Database file inspection
 
-#### Error Handling
-- Invalid page numbers throw a `ValidationError`
-- Out-of-range pages return an empty card list
-- Provides graceful fallback mechanisms
+## Potential Improvements
 
-#### Performance Considerations
-- Efficient slice-based pagination
-- Deterministic card selection across pages
-- Minimal overhead for pagination operations
-
-## API Methods
-
-### `createCard(content, options = {})`
-- Creates a new card with given content
-- Validates content length and type
-- Throws `ValidationError` for invalid content
-- Returns card hash
-
-### `getCard(hash)`
-- Retrieves a card by its hash
-- Throws `NotFoundError` if card doesn't exist
-
-### `deleteCard(hash)`
-- Deletes a card by its hash
-- Throws `NotFoundError` if card doesn't exist
-
-### `healthCheck()`
-- Checks server connection status
-- Returns boolean indicating server health
-
-### `listCards(options = {})`
-- Lists cards with pagination support
-- Returns pagination metadata and card list
-- Supports custom page and page size
-- Handles out-of-range page scenarios gracefully
-
-## Error Types
-
-- `ValidationError`: Content validation failures
-- `AuthorizationError`: API key or permission issues
-- `NetworkError`: Connection or request problems
-- `NotFoundError`: Card or resource not found
-
-## Environment Variables
-
-- `MCARD_API_KEY`: Default API key
-- `MCARD_BASE_URL`: Default server base URL
-
-## Recent Changes
-
-### December 9, 2024 - Performance and Pagination Optimization
-
-- **Pagination Limit Adjustment**: 
-  - Reduced `MAX_PAGE_SIZE` from 1,000,000 to 1,000 in both `server.py` and `constants.js`
-  - Improves server performance and prevents potential resource exhaustion
-  - Ensures more controlled and predictable pagination behavior
-  - Maintains existing test coverage and functionality
-
-### Rationale
-
-The previous maximum page size of 1,000,000 was unreasonably large and could potentially lead to:
-- Excessive memory consumption
-- Increased server load
-- Potential performance bottlenecks
-- Risk of unintentional large data retrievals
-
-By setting a more reasonable limit of 1,000 items per page, we:
-- Protect server resources
-- Encourage more efficient data retrieval patterns
-- Provide a sensible default for most use cases
+- [ ] Add more granular port range configuration
+- [ ] Implement advanced port allocation strategies
+- [ ] Create more comprehensive startup failure diagnostics
 
 ## Contributing
 
-Contributions are welcome! Please submit pull requests or open issues on our GitHub repository.
+Please read our [CONTRIBUTING.md](../CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](../LICENSE.md) file for details.

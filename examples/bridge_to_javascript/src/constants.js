@@ -1,4 +1,4 @@
-// Constants derived from server.py and client.js
+// Constants derived from server.py
 
 // Server Configuration Constants
 module.exports = {

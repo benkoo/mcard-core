@@ -186,6 +186,15 @@ class TestEnvironment {
         // Attempt to gracefully terminate the server process
         if (this.serverProcess) {
             try {
+                // Check if the process is still running before attempting to kill
+                try {
+                    process.kill(this.serverProcess.pid, 0);
+                } catch (err) {
+                    console.log('Server process already terminated');
+                    this.serverProcess = null;
+                    return;
+                }
+
                 // Send SIGTERM to allow graceful shutdown
                 process.kill(this.serverProcess.pid, 'SIGTERM');
                 
@@ -193,11 +202,19 @@ class TestEnvironment {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 // If still running, force kill
-                if (this.serverProcess && !this.serverProcess.killed) {
+                try {
                     process.kill(this.serverProcess.pid, 'SIGKILL');
+                } catch (err) {
+                    // Ignore if process is already dead
+                    if (err.code !== 'ESRCH') {
+                        console.error('Error force killing server:', err);
+                    }
                 }
             } catch (error) {
-                console.error('Error stopping server:', error);
+                // Only log if it's not a "No such process" error
+                if (error.code !== 'ESRCH') {
+                    console.error('Error stopping server:', error);
+                }
             }
             
             this.serverProcess = null;

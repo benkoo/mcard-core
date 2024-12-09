@@ -5,7 +5,7 @@ import os
 import time
 import json
 import asyncio
-from typing import Optional, List
+from typing import Optional, List, Union, Dict, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -37,7 +37,9 @@ from mcard.config_constants import (
     ENV_DB_MAX_CONNECTIONS, 
     DEFAULT_POOL_SIZE,
     ENV_DB_TIMEOUT, 
-    DEFAULT_TIMEOUT
+    DEFAULT_TIMEOUT,
+    ENV_SERVER_HOST,
+    ENV_API_KEY
 )
 from mcard.domain.models.card import MCard
 from mcard.domain.dependency.interpreter import ContentTypeInterpreter
@@ -96,9 +98,49 @@ CORS_ORIGINS = [
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
+import socket
+
+def find_free_port(start_port=DEFAULT_API_PORT):
+    """
+    Find a free port starting from the given port number.
+    
+    Args:
+        start_port (int, optional): Starting port to search from. Defaults to DEFAULT_API_PORT.
+    
+    Returns:
+        int: A free port number.
+    """
+    def is_port_in_use(port):
+        """Check if a port is in use."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+
+    # Start searching from the given port
+    current_port = start_port
+    max_attempts = 100  # Prevent infinite loop
+
+    for _ in range(max_attempts):
+        if not is_port_in_use(current_port):
+            return current_port
+        current_port += 1
+
+    # If no port is found, fall back to a random port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+# Use environment variables with sensible defaults
+host = os.getenv(ENV_SERVER_HOST, 'localhost')
+port = int(os.getenv(ENV_API_PORT, '0'))
+if port == 0:
+    port = find_free_port(start_port=DEFAULT_API_PORT)
+api_key = os.getenv(ENV_API_KEY, 'default_key')
+
 # Configuration for MCardSetup
 MCARD_SETUP_CONFIG = {
-    'db_path': os.getenv(ENV_DB_PATH, DEFAULT_DB_PATH),
+    'db_path': os.path.abspath(os.path.join(os.path.dirname(__file__), '..', os.getenv(ENV_DB_PATH, 'data/mcard.db'))),
     'max_connections': int(os.getenv(ENV_DB_MAX_CONNECTIONS, DEFAULT_POOL_SIZE)),
     'timeout': float(os.getenv(ENV_DB_TIMEOUT, DEFAULT_TIMEOUT)),
     'engine_type': EngineType.SQLITE
@@ -379,13 +421,29 @@ async def create_card(content: str, metadata: Optional[dict] = None):
 
 @app.post("/cards", response_model=CardResponse, status_code=201)
 async def create_card_endpoint(
-    card: CardRequest, 
+    card: Union[CardRequest, Dict[str, Any]], 
     api_key: str = Depends(get_api_key)
 ):
     """Create a new card with minimal processing."""
     try:
-        # Create card using MCard facility
-        created_card = await create_card(card.content, card.metadata)
+        # If the input is a dictionary, convert it to the expected format
+        if isinstance(card, dict):
+            # Assume base64 encoded content
+            content = card.get('content')
+            if not content:
+                raise ValueError("Missing 'content' field")
+            
+            # Optional metadata from the dictionary
+            metadata = {
+                'hash': card.get('hash'),
+                'g_time': card.get('g_time')
+            }
+            
+            # Create card using MCard facility
+            created_card = await create_card(content, metadata)
+        else:
+            # Standard CardRequest processing
+            created_card = await create_card(card.content, card.metadata)
         
         # Convert to response model
         return CardResponse.from_mcard(created_card)
@@ -528,15 +586,62 @@ async def shutdown(api_key: str = Depends(get_api_key)):
             detail=f"{ERROR_SERVER_SHUTDOWN}: {str(e)}"
         )
 
-SERVER_STARTUP_BANNER = """
+def main():
+    """
+    Main entry point for the MCard Bridge Server.
+    
+    Handles server configuration, logging, and startup.
+    """
+    # Configure logging
+    logger = configure_logging()
+    
+    try:
+        # Validate environment and configurations
+        validate_environment()
+        
+        # Retrieve port from environment, with fallback to default logic
+        port = int(os.getenv(ENV_API_PORT, '0'))
+        
+        # If port is 0 or not set, start dynamic port selection
+        if port == 0:
+            # Use the default port as the starting point for dynamic selection
+            port = find_free_port(start_port=DEFAULT_API_PORT)
+        
+        # EXPLICITLY set the PORT environment variable
+        os.environ['PORT'] = str(port)
+        os.environ[ENV_API_PORT] = str(port)
+        
+        # Print explicit port information
+        print(f"SERVER_PORT: {port}")
+        
+        # Print startup banner with the actual port
+        startup_banner = f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║                   MCard Bridge Server                        ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ Host:     {host}                                             ║
 ║ Port:     {port}                                             ║
-║ Database: {db_path}                                          ║
+║ Database: {MCARD_SETUP_CONFIG['db_path']}                                          ║
 ╚══════════════════════════════════════════════════════════════╝
 """
+        print(startup_banner)
+        
+        # Log server configuration
+        logger.info(f"Starting MCard Bridge Server on {host}:{port}")
+        logger.info(f"Database Configuration: {MCARD_SETUP_CONFIG}")
+        
+        # Run the server with comprehensive configuration
+        uvicorn.run(
+            "server:app", 
+            host=host, 
+            port=port, 
+            reload=True,  # Auto-reload for development
+            log_level="info",  # Detailed logging
+            workers=1,  # Single worker for development
+        )
+    except Exception as e:
+        logger.error(f"Server startup failed: {e}")
+        raise
 
 def configure_logging():
     """
@@ -592,49 +697,6 @@ def validate_environment():
         import uvicorn
     except ImportError as e:
         raise RuntimeError(f"Missing required dependency: {e}")
-
-def main():
-    """
-    Main entry point for the MCard Bridge Server.
-    
-    Handles server configuration, logging, and startup.
-    """
-    # Configure logging
-    logger = configure_logging()
-    
-    try:
-        # Validate environment and configurations
-        validate_environment()
-        
-        # Retrieve port from environment, with fallback to default
-        port = int(os.getenv(ENV_API_PORT, DEFAULT_API_PORT))
-        
-        # Print startup banner
-        print(SERVER_STARTUP_BANNER.format(
-            host=SERVER_HOST, 
-            port=port, 
-            db_path=MCARD_SETUP_CONFIG['db_path']
-        ))
-        
-        # Log server configuration
-        logger.info(f"Starting MCard Bridge Server on {SERVER_HOST}:{port}")
-        logger.info(f"Database Configuration: {MCARD_SETUP_CONFIG}")
-        
-        # Run the server with comprehensive configuration
-        uvicorn.run(
-            "server:app", 
-            host=SERVER_HOST, 
-            port=port, 
-            reload=True,  # Auto-reload for development
-            log_level="info",  # Detailed logging
-            workers=1,  # Single worker for development
-            proxy_headers=True,  # Support for reverse proxy
-            forwarded_allow_ips="*"  # Allow all IPs (configure carefully in production)
-        )
-    
-    except Exception as e:
-        logger.error(f"Server startup failed: {e}", exc_info=True)
-        sys.exit(1)
 
 if __name__ == "__main__":
     main()

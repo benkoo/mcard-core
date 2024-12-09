@@ -33,12 +33,6 @@ module.exports = {
       functions: 80,
       lines: 80,
       statements: 80
-    },
-    './src/client.js': {
-      branches: 90,
-      functions: 90,
-      lines: 90,
-      statements: 90
     }
   },
 

@@ -15,7 +15,9 @@ from mcard.config_constants import (
     ENV_API_PORT,
     ENV_DB_MAX_CONNECTIONS,
     ENV_DB_TIMEOUT,
-    DEFAULT_API_PORT
+    DEFAULT_API_PORT,
+    DEFAULT_DB_MAX_CONNECTIONS,
+    DEFAULT_DB_TIMEOUT
 )
 import asyncio
 
@@ -27,9 +29,9 @@ async def get_setup_config():
 
     # Initialize MCardSetup with environment variables
     setup = MCardSetup(
-        db_path=os.getenv(ENV_DB_PATH, './data/mcard.db'),
-        max_connections=int(os.getenv(ENV_DB_MAX_CONNECTIONS, '5')),
-        timeout=float(os.getenv(ENV_DB_TIMEOUT, '5.0'))
+        db_path=os.getenv(ENV_DB_PATH, 'data/mcard.db'),
+        max_connections=int(os.getenv(ENV_DB_MAX_CONNECTIONS, str(DEFAULT_DB_MAX_CONNECTIONS))),
+        timeout=float(os.getenv(ENV_DB_TIMEOUT, str(DEFAULT_DB_TIMEOUT)))
     )
 
     # Initialize database
