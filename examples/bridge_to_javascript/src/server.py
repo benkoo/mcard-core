@@ -47,7 +47,7 @@ from mcard.domain.services.hashing import get_hashing_service
 # Constants for server configuration
 SERVER_HOST = "0.0.0.0"
 DEFAULT_PAGE_SIZE = 10
-MAX_PAGE_SIZE = 100
+MAX_PAGE_SIZE = 1000
 MIN_PAGE_SIZE = 1
 
 # Constants for search parameters
@@ -365,6 +365,12 @@ async def create_card(content: str, metadata: Optional[dict] = None):
             metadata=metadata or {}
         )
         
+        # Check if a card with the same hash already exists
+        existing_card = await app.state.setup.storage.get(card.hash)
+        if existing_card:
+            # If the card already exists, return the existing card
+            return existing_card
+        
         # Store the card
         await app.state.setup.storage.save(card)
         return card
@@ -383,8 +389,13 @@ async def create_card_endpoint(
         
         # Convert to response model
         return CardResponse.from_mcard(created_card)
+    except ValueError as ve:
+        # Handle validation errors
+        raise HTTPException(status_code=422, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Card creation failed: {str(e)}")
+        # Log the error for debugging
+        print(f"Unexpected error in card creation: {e}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error during card creation: {str(e)}")
 
 @app.get("/cards", response_model=PaginatedCardsResponse)
 async def list_cards(
@@ -507,9 +518,8 @@ async def shutdown(api_key: str = Depends(get_api_key)):
         # Perform cleanup
         await app.state.setup.cleanup()
         
-        # Attempt graceful shutdown
-        import sys
-        sys.exit(0)
+        # Return a successful shutdown response instead of exiting
+        return {"status": "shutdown_initiated"}
     except Exception as e:
         # Log shutdown errors
         print(f"Shutdown error: {e}")

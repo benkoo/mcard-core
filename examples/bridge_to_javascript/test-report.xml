@@ -1,32 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testExecutions version="1">
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/client.test.js">
-    <testCase name="MCard Client Error Handling should throw ValidationError for empty content" duration="21"/>
-    <testCase name="MCard Client Error Handling should throw ValidationError for extremely long content" duration="5"/>
-    <testCase name="MCard Client Content Validation should validate content length" duration="48"/>
-    <testCase name="MCard Client Content Validation should allow creating card with special characters" duration="7"/>
-    <testCase name="MCard Client Advanced Content Validation should handle object content validation" duration="6"/>
-    <testCase name="MCard Client Logging should log debug information when debug is enabled" duration="1"/>
-    <testCase name="MCard Client Logging should log at different levels" duration="1"/>
-    <testCase name="MCard Client Logging should respect log level" duration="0"/>
-    <testCase name="MCard Client Advanced Error Handling should throw specific error types" duration="37"/>
-    <testCase name="MCard Client Advanced Error Handling should throw NotFoundError when retrieving non-existent card" duration="8"/>
-    <testCase name="MCard Client Advanced Configuration should allow custom base URL and timeout" duration="0"/>
-    <testCase name="MCard Client Advanced Configuration should handle missing or invalid configuration" duration="0"/>
-    <testCase name="MCard Client Advanced Configuration should allow custom logger" duration="1"/>
-    <testCase name="MCard Client Client Configuration should allow custom base URL" duration="0"/>
-    <testCase name="MCard Client Client Configuration should use default configuration when no options provided" duration="1"/>
-    <testCase name="MCard Client Card Operations should create a card successfully" duration="9"/>
-    <testCase name="MCard Client Card Operations should get a card successfully" duration="14"/>
-    <testCase name="MCard Client Card Operations should delete a card successfully" duration="26"/>
-    <testCase name="MCard Client Card Operations should return true when deleting a non-existent card" duration="8"/>
-    <testCase name="MCard Client List and Search Cards should list cards with default parameters" duration="25"/>
-    <testCase name="MCard Client List and Search Cards should search cards by content" duration="18"/>
-    <testCase name="MCard Client List and Search Cards should search cards by hash" duration="21"/>
-    <testCase name="MCard Client List and Search Cards should search cards by time" duration="17"/>
-    <testCase name="MCard Client List and Search Cards should handle pagination" duration="16"/>
-    <testCase name="MCard Client MCard Client Advanced Content Tests should create cards with various binary content types" duration="10"/>
-    <testCase name="MCard Client MCard Client Advanced Content Tests should handle complex nested content" duration="4"/>
-    <testCase name="MCard Client MCard Client Advanced Content Tests should handle large content near size limits" duration="25"/>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/list_cards.test.js">
+    <testCase name="MCard Card Listing and Pagination should list cards with default pagination" duration="41"/>
+    <testCase name="MCard Card Listing and Pagination should support custom pagination" duration="26"/>
+    <testCase name="MCard Card Listing and Pagination should validate list parameters" duration="26"/>
+    <testCase name="MCard Card Listing and Pagination should handle out-of-range page numbers" duration="21"/>
+    <testCase name="MCard Card Listing and Pagination should correctly calculate total pages and cards" duration="100"/>
+    <testCase name="MCard Card Listing and Pagination should support various page sizes" duration="68"/>
+    <testCase name="MCard Card Listing and Pagination should maintain card order across pages" duration="67"/>
+    <testCase name="MCard Card Listing and Pagination should handle maximum page size limit" duration="67"/>
+    <testCase name="MCard Card Listing and Pagination should provide accurate pagination metadata" duration="68"/>
+    <testCase name="MCard Card Listing and Pagination should handle dynamic card count and pagination" duration="22"/>
+    <testCase name="MCard Card Listing and Pagination should handle edge cases in pagination" duration="17"/>
+    <testCase name="MCard Card Listing and Pagination should handle network or server errors gracefully" duration="15"/>
+    <testCase name="MCard Card Listing and Pagination should support debug logging" duration="15"/>
+    <testCase name="MCard Large Scale and Binary Content Handling should handle large number of binary content cards" duration="332"/>
+    <testCase name="MCard Large Scale and Binary Content Handling should handle mixed content types with large files" duration="17"/>
+  </file>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/server_connection.test.js">
+    <testCase name="MCard Server Connection should connect to server health endpoint" duration="4"/>
+    <testCase name="MCard Server Connection should create a simple card" duration="6"/>
+    <testCase name="MCard Server Connection should retrieve a created card" duration="9"/>
+    <testCase name="MCard Server Connection should delete a card" duration="15"/>
+  </file>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/error_handling.test.js">
+    <testCase name="MCard Advanced Error Handling Tests Content Validation Errors should throw ValidationError for extremely long content" duration="14"/>
+    <testCase name="MCard Advanced Error Handling Tests Content Type Validation should detect binary content" duration="4"/>
+    <testCase name="MCard Advanced Error Handling Tests Content Type Validation should handle different content types" duration="1"/>
+    <testCase name="MCard Advanced Error Handling Tests Content Type Validation should handle unicode and special characters" duration="7"/>
+    <testCase name="MCard Advanced Error Handling Tests Network-Related Error Handling should handle network-related issues" duration="11"/>
+    <testCase name="MCard Advanced Error Handling Tests Network-Related Error Handling should throw AuthorizationError for missing API key" duration="1"/>
   </file>
 </testExecutions>

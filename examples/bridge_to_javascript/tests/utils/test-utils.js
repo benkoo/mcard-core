@@ -22,8 +22,14 @@ class TestEnvironment {
     }
 
     async setup() {
+        console.log('🔧 Setting up test environment...');
         await this.createEnvFile();
-        await this.startServer();
+        
+        // Ensure server is stopped first
+        await this.stopServer();
+        
+        // Start server with multiple attempts
+        await this.startServerWithRetry();
     }
 
     async createEnvFile() {
@@ -41,6 +47,57 @@ class TestEnvironment {
         } catch (error) {
             return false;
         }
+    }
+
+    async startServerWithRetry(maxRetries = 3) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`🚀 Server Startup Attempt ${attempt}/${maxRetries}`);
+                await this.startServer();
+                
+                // Verify server is truly running
+                const isRunning = await this.isServerRunning();
+                if (isRunning) {
+                    console.log('✅ Server successfully started and verified');
+                    return;
+                }
+            } catch (error) {
+                console.error(`❌ Server startup attempt ${attempt} failed:`, error.message);
+                
+                // Stop server to clean up resources
+                await this.stopServer();
+                
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+            }
+        }
+        
+        throw new Error(`Failed to start server after ${maxRetries} attempts`);
+    }
+
+    async waitForServer(maxAttempts = 30) {
+        console.log('🕒 Waiting for server to start...');
+        for (let i = 0; i < maxAttempts; i++) {
+            try {
+                console.log(`Attempt ${i + 1}: Checking server health...`);
+                const response = await axios.get('http://localhost:5320/health', {
+                    headers: { 'X-API-Key': 'dev_key_123' },
+                    timeout: 2000
+                });
+                
+                if (response.status === 200) {
+                    console.log('✅ Server is running successfully!');
+                    return true;
+                }
+            } catch (error) {
+                console.log(`Attempt ${i + 1} failed:`, error.message);
+                // Exponential backoff
+                await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+            }
+        }
+        
+        console.error('❌ Server failed to start after maximum attempts');
+        throw new Error('Server did not start within the expected time');
     }
 
     async startServer() {
@@ -125,49 +182,48 @@ class TestEnvironment {
 
     async stopServer() {
         console.log('🛑 Attempting to stop server...');
+        
+        // Attempt to gracefully terminate the server process
         if (this.serverProcess) {
             try {
-                // Try graceful shutdown first
-                await axios.post('http://localhost:5320/shutdown', null, {
-                    headers: { 'X-API-Key': 'dev_key_123' },
-                    timeout: 2000
-                }).catch(() => {});
-
-                // Kill process group
-                process.kill(-this.serverProcess.pid);
+                // Send SIGTERM to allow graceful shutdown
+                process.kill(this.serverProcess.pid, 'SIGTERM');
+                
+                // Wait a short time for graceful shutdown
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // If still running, force kill
+                if (this.serverProcess && !this.serverProcess.killed) {
+                    process.kill(this.serverProcess.pid, 'SIGKILL');
+                }
             } catch (error) {
-                console.warn('Error during server stop:', error);
+                console.error('Error stopping server:', error);
             }
-
+            
             this.serverProcess = null;
-            // Wait for port to be released
-            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+        // Attempt to clear any lingering server ports
+        try {
+            await this.killPortProcess(5320);
+        } catch (error) {
+            console.error('Error killing port process:', error);
         }
     }
 
-    async waitForServer(maxAttempts = 30) {
-        console.log('🕒 Waiting for server to start...');
-        for (let i = 0; i < maxAttempts; i++) {
-            try {
-                console.log(`Attempt ${i + 1}: Checking server health...`);
-                const response = await axios.get('http://localhost:5320/health', {
-                    headers: { 'X-API-Key': 'dev_key_123' },
-                    timeout: 2000
-                });
-                
-                if (response.status === 200) {
-                    console.log('✅ Server is running successfully!');
-                    return true;
+    async killPortProcess(port) {
+        return new Promise((resolve, reject) => {
+            const { exec } = require('child_process');
+            
+            // Find and kill any process using the specified port
+            exec(`lsof -ti:${port} | xargs kill -9`, (error, stdout, stderr) => {
+                if (error && error.code !== 1) {
+                    reject(error);
+                } else {
+                    resolve();
                 }
-            } catch (error) {
-                console.log(`Attempt ${i + 1} failed:`, error.message);
-                // Wait a bit before next attempt
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        }
-        
-        console.error('❌ Server failed to start after maximum attempts');
-        throw new Error('Server did not start within the expected time');
+            });
+        });
     }
 
     async cleanup() {
@@ -200,7 +256,7 @@ class TestEnvironment {
     }
 
     // Add a helper method to execute shell commands
-    execShell(cmd) {
+    async execShell(cmd) {
         return new Promise((resolve, reject) => {
             const { exec } = require('child_process');
             exec(cmd, (error, stdout, stderr) => {
