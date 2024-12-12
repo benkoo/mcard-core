@@ -73,8 +73,8 @@ db.sqlite3
 db.sqlite3-journal
 
 # Logs
-# *.log
-# *.log.*
+*.log
+*.log.*
 
 # Application specific
 examples/mcard_crud_app/data/

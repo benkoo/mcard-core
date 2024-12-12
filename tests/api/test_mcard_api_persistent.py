@@ -9,6 +9,7 @@ from mcard.infrastructure.persistence.schema import SchemaManager
 from mcard.infrastructure.persistence.database_engine_config import EngineType
 from mcard.domain.models.card import MCard, CardCreate
 from mcard.config_constants import TEST_DB_PATH
+from mcard.interfaces.api.api_config_loader import load_config
 import pytest
 import sqlite3
 from datetime import datetime
@@ -18,8 +19,9 @@ import aiosqlite
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Specify the database file path
-DB_PATH = './data/ROOT_mcard_DOT_ENV.db'  # Use the same database path as the API
+# Load configuration
+config = load_config()
+DB_PATH = config.database.db_path
 
 # Ensure the database directory exists
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -44,18 +46,34 @@ async def initialized_api():
         yield api
     finally:
         # Cleanup
-        await api.shutdown()
+        try:
+            await api.shutdown()
+        except Exception as e:
+            logger.error(f"Error during API shutdown: {e}")
 
 @pytest.fixture(autouse=True)
 async def cleanup_event_loop():
     """Cleanup the event loop after each test."""
     yield
-    # Get all tasks
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    # Cancel them
-    [task.cancel() for task in tasks]
-    # Wait until all tasks are cancelled
-    await asyncio.gather(*tasks, return_exceptions=True)
+    try:
+        # Get all tasks except current
+        current_task = asyncio.current_task()
+        tasks = [t for t in asyncio.all_tasks() if t is not current_task]
+        
+        if tasks:
+            # Cancel all tasks
+            for task in tasks:
+                task.cancel()
+            
+            # Wait for all tasks to complete with a timeout
+            await asyncio.wait(tasks, timeout=5)
+            
+            # If any tasks are still pending, log them
+            pending = [t for t in tasks if not t.done()]
+            if pending:
+                logger.warning(f"Some tasks did not complete: {len(pending)} tasks remaining")
+    except Exception as e:
+        logger.error(f"Error during event loop cleanup: {e}")
 
 @pytest.mark.asyncio
 async def test_mcard_api_persistent(initialized_api):
