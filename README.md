@@ -65,6 +65,16 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 - `hash`: A cryptographic hash of the content, using SHA-256 by default (configurable to other algorithms)
 - `g_time`: A timezone-aware timestamp with microsecond precision
 
+### Configuration Features
+- Layered configuration system with domain and infrastructure separation
+- Pydantic-based configuration models with built-in validation
+- Thread-safe singleton pattern for configuration management
+- Environment variable support with validation
+- Comprehensive test coverage for configuration scenarios
+- Clear separation of domain and infrastructure configuration
+- Support for custom configuration overrides
+- Automatic validation of all configuration settings
+
 ### Hash Collision Protection
 - Comprehensive test suite for detecting and handling hash collisions
 - Automated switching to stronger hashing algorithms when potential collisions are detected
@@ -105,16 +115,33 @@ Like HyperCard and HyperTalk before it, MCard aims to be a general-purpose progr
 
 ## Configuration System
 
-The MCard Core project uses a two-tier configuration system:
+The MCard Core project uses a layered configuration system with clear separation of concerns:
 
-### Configuration Constants (`mcard/config_constants.py`)
-This is the central configuration hub that defines:
-- Default configuration values used throughout the project
-- Environment variable names for all configurable settings
-- Standardized constants for database paths and connection settings
-- Hash algorithm specifications and customization options
+### Domain Configuration (`domain_config_models.py`)
+- `DatabaseSettings`: Core database configuration including paths and connection settings
+- `HashingSettings`: Hash algorithm configuration and validation
+These domain models provide the foundational configuration structure with built-in validation.
 
-The constants file serves as the single source of truth for all configuration options, ensuring consistency and making the codebase more maintainable.
+### Infrastructure Configuration
+- `SQLiteConfig`: Specific configuration for SQLite database engine
+- `DataEngineConfig`: High-level configuration management with singleton pattern
+- Environment-based configuration loading with validation
+
+The configuration system ensures:
+- Type safety through Pydantic models
+- Immutable configuration after initialization
+- Thread-safe singleton patterns
+- Comprehensive validation of all settings
+- Clear separation between domain and infrastructure concerns
+
+### Testing Configuration
+The test suite includes extensive coverage of configuration scenarios:
+- Default configuration validation
+- Custom configuration testing
+- Environment variable overrides
+- Invalid configuration handling
+- Thread-safety verification
+- Configuration immutability testing
 
 ### Environment Configuration (`.env.example`)
 The `.env.example` template demonstrates:
@@ -459,41 +486,79 @@ The test suite includes:
 - Hash algorithm transition tests
 - Performance benchmarks
 - Error handling and recovery tests
-- Concurrent operation tests
+- API endpoint testing
+- CLI command testing
 
-### Configuration Examples
+The test suite is built using pytest and includes:
+- Async test support through pytest-asyncio
+- Fixtures for common test scenarios
+- Parameterized tests for edge cases
+- Performance benchmarks
+- Thread safety verification
+- Error handling validation
 
-Example `.env` file:
+To run the tests:
 ```bash
-# Database Settings
-MCARD_DB_PATH=data/db/mcard_demo.db
-MCARD_STORE_MAX_CONNECTIONS=5
-MCARD_STORE_TIMEOUT=30.0
+# Run all tests
+pytest
 
-# Hash Algorithm Settings
-MCARD_HASH_ALGORITHM=sha256
+# Run tests with verbose output
+pytest -v
 
-# Optional Custom Hash Settings
-# MCARD_HASH_CUSTOM_MODULE=myapp.hashing
-# MCARD_HASH_CUSTOM_FUNCTION=custom_hash
-# MCARD_HASH_CUSTOM_LENGTH=64
+# Run specific test files
+pytest tests/domain/models/test_domain_config_models.py
+pytest tests/infrastructure/persistence/test_store.py
 ```
 
-Example Python configuration:
-```python
-from mcard.domain.models.config import AppSettings, HashingSettings
-from mcard.domain.models.repository_config import SQLiteConfig
+## Testing
 
-app_settings = AppSettings(
-    store=SQLiteConfig(
-        db_path="data/db/mcard_demo.db",
-        pool_size=5,
-        timeout=30.0
-    ),
-    hashing=HashingSettings(
-        algorithm="sha256"
-    )
-)
+The MCard Core project maintains a comprehensive test suite that covers all aspects of the system:
+
+### Configuration Testing
+- Validation of default and custom configuration settings
+- Environment variable override testing
+- Configuration immutability verification
+- Thread-safety tests for singleton patterns
+- Invalid configuration handling
+- Configuration reset and cleanup testing
+
+### Storage Testing
+- SQLite engine configuration and initialization
+- Connection pooling and management
+- Transaction handling and rollback scenarios
+- Concurrent operation testing
+- Performance benchmarks for read/write operations
+- Content type handling and validation
+- Batch operation testing
+
+### Core Functionality Testing
+- MCard creation and validation
+- Hash computation and collision detection
+- Time handling and timezone support
+- Content type detection and handling
+- Error handling and recovery
+- API endpoint testing
+- CLI command testing
+
+The test suite is built using pytest and includes:
+- Async test support through pytest-asyncio
+- Fixtures for common test scenarios
+- Parameterized tests for edge cases
+- Performance benchmarks
+- Thread safety verification
+- Error handling validation
+
+To run the tests:
+```bash
+# Run all tests
+pytest
+
+# Run tests with verbose output
+pytest -v
+
+# Run specific test files
+pytest tests/domain/models/test_domain_config_models.py
+pytest tests/infrastructure/persistence/test_store.py
 ```
 
 ## Usage

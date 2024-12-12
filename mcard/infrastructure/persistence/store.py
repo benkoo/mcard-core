@@ -4,15 +4,20 @@ This class follows the Singleton pattern to ensure a single instance is shared a
 """
 
 import os
-from typing import Optional, List, Dict, Any
+import sqlite3
+import logging
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Union
 from threading import Lock
+from contextlib import contextmanager
+
+from mcard.domain.models.domain_config_models import HashingSettings
 from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import StorageError, ConfigurationError
-from mcard.domain.models.config import HashingSettings
-from mcard.infrastructure.persistence.facade import DatabaseFacade, DatabaseConfig
-from mcard.infrastructure.persistence.engine_config import EngineConfig, EngineType, create_engine_config
-from mcard.domain.services.hashing import DefaultHashingService
-from mcard.infrastructure.config import load_config
+from mcard.infrastructure.persistence.database_engine_config import EngineConfig, EngineType, create_engine_config
+from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
+from mcard.infrastructure.infrastructure_config_manager import load_config
 import asyncio
 
 class MCardStore:
@@ -32,7 +37,7 @@ class MCardStore:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, config: Optional[DatabaseConfig] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         Initialize the store with optional configuration.
         
@@ -40,8 +45,8 @@ class MCardStore:
             config: Optional configuration object
         """
         self._config = config or load_config()
-        self._facade: Optional[DatabaseFacade] = None
-        self._hashing_service: Optional[DefaultHashingService] = None
+        self._facade: Optional[SQLiteStore] = None
+        self._hashing_service: Optional[HashingSettings] = None
         self._initialized = False
 
     async def __aenter__(self):
@@ -75,14 +80,25 @@ class MCardStore:
             self.configure()
 
         # Initialize services
-        hashing_settings = HashingSettings(**self._config.hashing)
-        self._hashing_service = DefaultHashingService(hashing_settings)
+        hashing_settings = HashingSettings(algorithm=self._config.hashing['algorithm'])
+        self._hashing_service = hashing_settings
 
-        # Initialize the facade
-        self._facade = DatabaseFacade(self._config)
+        # Initialize the facade with SQLiteConfig
+        if isinstance(self._config, EngineConfig):
+            store_config = self._config
+        else:
+            store_config = create_engine_config(
+                engine_type=EngineType.SQLITE,
+                connection_string=self._config.repository.db_path,
+                max_connections=self._config.repository.max_connections,
+                timeout=self._config.repository.timeout,
+                max_content_size=self._config.max_content_size,
+                engine_options={'check_same_thread': False}
+            )
+        self._facade = SQLiteStore(store_config)
 
-        # Initialize the database schema
-        await self._facade.initialize_schema()
+        # Initialize the database connection and schema
+        await self._facade.initialize()
         self._initialized = True
 
     async def close(self):
@@ -120,16 +136,18 @@ class MCardStore:
 
         # Override configuration if specific parameters are provided
         if engine_type:
-            self._config.engine_config = create_engine_config(
+            # Create new engine config with provided parameters, falling back to existing values
+            engine_config = create_engine_config(
                 engine_type=engine_type,
                 connection_string=connection_string or self._config.engine_config.connection_string,
                 max_connections=max_connections or self._config.engine_config.max_connections,
                 timeout=timeout or self._config.engine_config.timeout
             )
+            self._config.engine_config = engine_config
 
     def compute_hash(self, content: bytes) -> str:
         """Compute hash for given content."""
-        return asyncio.run(self._hashing_service.hash_content(content))
+        return run(self._hashing_service.hash_content(content))
 
     async def save(self, card: MCard) -> None:
         """Save a card to the store."""
@@ -144,8 +162,7 @@ class MCardStore:
 
     def save_sync(self, card: MCard) -> None:
         """Save a card synchronously."""
-        import asyncio
-        asyncio.run(self.save(card))
+        run(self.save(card))
 
     async def get(self, card_id: str) -> Optional[MCard]:
         """Retrieve a card by its ID."""
@@ -157,8 +174,7 @@ class MCardStore:
 
     def get_sync(self, card_id: str) -> Optional[MCard]:
         """Retrieve a card synchronously."""
-        import asyncio
-        return asyncio.run(self.get(card_id))
+        return run(self.get(card_id))
 
     async def delete(self, card_id: str) -> None:
         """Delete a card by its ID."""
@@ -170,8 +186,7 @@ class MCardStore:
 
     def delete_sync(self, card_id: str) -> None:
         """Delete a card synchronously."""
-        import asyncio
-        asyncio.run(self.delete(card_id))
+        run(self.delete(card_id))
 
     async def list(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
         """List cards with optional pagination."""
@@ -181,8 +196,7 @@ class MCardStore:
 
     def list_sync(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
         """List cards synchronously."""
-        import asyncio
-        return asyncio.run(self.list(limit=limit, offset=offset))
+        return run(self.list(limit=limit, offset=offset))
 
     async def search(self, query: str) -> List[MCard]:
         """Search for cards based on a query."""
@@ -194,8 +208,7 @@ class MCardStore:
 
     def search_sync(self, query: str) -> List[MCard]:
         """Search for cards synchronously."""
-        import asyncio
-        return asyncio.run(self.search(query))
+        return run(self.search(query))
 
     async def save_many(self, cards: List[MCard]) -> None:
         """Save multiple cards in a batch."""
@@ -212,8 +225,7 @@ class MCardStore:
 
     def save_many_sync(self, cards: List[MCard]) -> None:
         """Save multiple cards synchronously."""
-        import asyncio
-        asyncio.run(self.save_many(cards))
+        run(self.save_many(cards))
 
     @property
     def is_configured(self) -> bool:
@@ -221,6 +233,6 @@ class MCardStore:
         return self._facade is not None
 
     @property
-    def config(self) -> Optional[DatabaseConfig]:
+    def config(self) -> Optional[Dict[str, Any]]:
         """Get the current database configuration."""
         return self._config

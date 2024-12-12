@@ -1,23 +1,16 @@
-"""Tests for the MCardStore singleton class."""
-
+"""Test store."""
 import os
 import pytest
 import pytest_asyncio
-import tempfile
-import asyncio
 import logging
-import io
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Any
-from PIL import Image
+from typing import List
+from datetime import datetime, timezone
 from mcard.domain.models.card import MCard
-from mcard.domain.models.exceptions import StorageError, ValidationError
+from mcard.domain.models.exceptions import StorageError
 from mcard.infrastructure.persistence.store import MCardStore
-from mcard.infrastructure.persistence.engine_config import EngineType
-from mcard.infrastructure.config import load_config
-import uuid
+from mcard.infrastructure.persistence.database_engine_config import EngineType
+from mcard.infrastructure.infrastructure_config_manager import load_config, DataEngineConfig
 
 # Configure logging
 logging.basicConfig(
@@ -682,47 +675,6 @@ async def test_read_write_isolation(store):
     assert all_exist, "Some cards are missing after concurrent operations"
     assert len(read_results) > 0, "No reads were completed"
     assert all(count >= 5 for count in read_results), "Saw inconsistent state during reads"
-
-@pytest.mark.asyncio
-async def test_transaction_rollback(store):
-    """Test transaction rollback under error conditions."""
-    try:
-        # Create initial card
-        initial_card = MCard(content="Initial content")
-        await store.save(initial_card)
-        initial_hash = initial_card.hash
-        
-        # Try to save a card with the same hash (should fail)
-        duplicate_card = MCard(content="Different content")
-        duplicate_card._hash = initial_hash
-        
-        with pytest.raises(StorageError):
-            await store.save(duplicate_card)
-        
-        # Verify original content was preserved
-        retrieved = await store.get(initial_hash)
-        assert retrieved is not None
-        assert retrieved.content == "Initial content"
-        
-        # Try concurrent duplicate saves
-        cards = []
-        for i in range(3):
-            card = MCard(content=f"Content {i}")
-            card._hash = initial_hash
-            cards.append(card)
-        
-        # Try to save them all at once (should fail)
-        with pytest.raises(StorageError):
-            async with asyncio.timeout(5.0):
-                await asyncio.gather(*[store.save(card) for card in cards])
-        
-        # Verify database state is still consistent
-        retrieved = await store.get(initial_hash)
-        assert retrieved is not None
-        assert retrieved.content == "Initial content"
-    finally:
-        # Ensure connections are cleaned up
-        await asyncio.sleep(0.1)
 
 @pytest.mark.asyncio
 async def test_transaction_rollback(store):
