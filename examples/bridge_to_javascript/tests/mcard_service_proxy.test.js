@@ -5,14 +5,20 @@ const MCardServiceProxy = require('../src/mcard_service_proxy');
 const MCardServiceClinic = require('../src/mcard_service_clinic');
 const axios = require('axios');
 
-jest.mock('axios');
-
 describe('MCard Service Validation', () => {
     let mcardService;
 
-    beforeEach(() => {
+    beforeAll(async () => {
         // Create a new service instance for each test
         mcardService = new MCardServiceProxy();
+        await mcardService.startServer(); // Start the server
+    });
+
+    afterAll(async () => {
+        jest.setTimeout(60000); // Set timeout to 60 seconds for debugging
+        console.log('Stopping the server...');
+        await mcardService.stopServer(); // Stop the server after tests
+        console.log('Server stopped successfully.');
     });
 
     describe('API Key Validation', () => {
@@ -57,9 +63,6 @@ describe('MCard Service Validation', () => {
 
     describe('Network Connectivity', () => {
         it('checks network connectivity', async () => {
-            // Mock successful network connectivity
-            axios.get.mockResolvedValue({ status: 200 });
-            
             const isConnected = await mcardService.checkNetworkConnectivity();
             expect(isConnected).toBe(true);
         });

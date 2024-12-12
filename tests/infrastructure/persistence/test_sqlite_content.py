@@ -2,8 +2,8 @@
 import pytest
 import pytest_asyncio
 import logging
+from mcard.infrastructure.persistence.database_engine_config import SQLiteConfig, EngineConfig, EngineType
 from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
-from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
 from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import StorageError
 import tempfile

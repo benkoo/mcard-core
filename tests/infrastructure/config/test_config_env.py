@@ -1,11 +1,19 @@
-"""Tests for environment variable configuration handling."""
+"""Test configuration environment."""
 import os
 import pytest
+import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
-from mcard.infrastructure.config import (
+from mcard.infrastructure.infrastructure_config_manager import (
+    ConfigurationSource,
+    EnvironmentConfigSource,
     DataEngineConfig,
+    get_project_root,
+    get_default_db_path,
+    get_test_db_path,
     load_config,
+)
+from mcard.config_constants import (
     ENV_DB_PATH,
     ENV_HASH_ALGORITHM,
 )

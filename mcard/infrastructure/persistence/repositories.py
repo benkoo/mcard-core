@@ -6,24 +6,22 @@ from datetime import datetime
 
 from ...domain.models.card import MCard
 from ...domain.models.protocols import CardStore
-from ...domain.models.config import SQLiteConfig
+from mcard.domain.models.repository_config_models import SQLiteConfig
 from .engine.sqlite_engine import SQLiteStore
 
 class SQLiteCardRepo(CardStore):
     """
     SQLite implementation of the CardStore protocol.
     """
-    def __init__(self, db_path: str, pool_size: int = 5):
+    def __init__(self, db_path: str):
         """
         Initialize the SQLite card repository.
         
         Args:
             db_path: Path to the SQLite database
-            pool_size: Connection pool size
         """
         config = SQLiteConfig(
-            db_path=db_path,
-            pool_size=pool_size
+            db_path=db_path
         )
         self._store = SQLiteStore(config)
 

@@ -4,7 +4,7 @@ from datetime import datetime
 from mcard.domain.models.card import MCard
 from mcard.domain.models.protocols import CardStore
 from mcard.infrastructure.persistence.engine.base_engine import BaseStore
-from mcard.infrastructure.persistence.engine_config import EngineConfig
+from mcard.infrastructure.persistence.database_engine_config import EngineConfig
 
 
 class AsyncPersistenceWrapper(CardStore):

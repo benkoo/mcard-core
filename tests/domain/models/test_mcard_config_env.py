@@ -1,16 +1,13 @@
-"""Test configuration loading from environment variables."""
+"""Test MCard config environment."""
 import os
-import asyncio
+import pytest
 import logging
 import tempfile
-import pytest
-import pytest_asyncio
 from pathlib import Path
-import dotenv
+from mcard.domain.models.domain_config_models import AppSettings, DatabaseSettings, HashingSettings
 
-# Import configuration and schema initialization
-from mcard.domain.models.config import AppSettings, DatabaseSettings, HashingSettings
-from mcard.domain.models.repository_config import SQLiteConfig, RepositoryType
+# Import repository configuration and schema initialization
+from mcard.domain.models.repository_config_models import SQLiteConfig, RepositoryType
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)

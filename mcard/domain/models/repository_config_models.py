@@ -1,8 +1,8 @@
 """Repository configuration domain models."""
-from dataclasses import dataclass
-from typing import Optional
 from enum import Enum, auto
-from mcard.infrastructure.persistence.engine_config import EngineConfig, SQLiteConfig
+from typing import Optional
+from dataclasses import dataclass
+from mcard.infrastructure.persistence.database_engine_config import EngineConfig, SQLiteConfig
 from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
 
 class RepositoryType(Enum):

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, Type, Union, Protocol
 from threading import Lock
 from dotenv import load_dotenv
-from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
+from mcard.infrastructure.persistence.database_engine_config import SQLiteConfig, EngineConfig, EngineType
 from mcard.domain.services.hashing import HashingSettings
 from mcard.config_constants import DEFAULT_DB_PATH, TEST_DB_PATH, DEFAULT_POOL_SIZE, DEFAULT_TIMEOUT, DEFAULT_HASH_ALGORITHM, ENV_DB_PATH, ENV_DB_MAX_CONNECTIONS, ENV_DB_TIMEOUT, ENV_HASH_ALGORITHM, ENV_HASH_CUSTOM_MODULE, ENV_HASH_CUSTOM_FUNCTION, ENV_HASH_CUSTOM_LENGTH, ENV_FORCE_DEFAULT_CONFIG
 
@@ -282,6 +282,7 @@ class DataEngineConfig:
             self.pool_size = DEFAULT_POOL_SIZE  # Default pool size
             self.timeout = DEFAULT_TIMEOUT  # Default timeout
             self.engine_options = {'check_same_thread': False}
+            self.max_content_size = 5 * 1024 * 1024  # Default 5MB
             
             # Add hashing configuration
             self.hashing = {
@@ -289,6 +290,17 @@ class DataEngineConfig:
             }
             
             self._initialized = True
+
+    @property
+    def max_content_size(self):
+        """Get max content size."""
+        return self.engine_config.max_content_size if self.engine_config else None
+
+    @max_content_size.setter
+    def max_content_size(self, value):
+        """Set max content size."""
+        if self.engine_config:
+            self.engine_config.max_content_size = value
 
     @classmethod
     def reset(cls):

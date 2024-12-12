@@ -12,8 +12,8 @@ from pathlib import Path
 
 from mcard import MCard, ContentTypeInterpreter
 from mcard.infrastructure.persistence.async_persistence_wrapper import AsyncPersistenceWrapper
+from mcard.infrastructure.persistence.database_engine_config import SQLiteConfig, EngineConfig, EngineType
 from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
-from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType
 from mcard.domain.models.exceptions import StorageError
 
 

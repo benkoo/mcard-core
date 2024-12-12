@@ -1,12 +1,12 @@
 # MCard API
 
-This is a FastAPI application for managing MCard content. It provides endpoints to create, retrieve, and list cards with various filters.
+This is a FastAPI application for managing MCard content. It provides endpoints to create, retrieve, and list cards with various filters. The API is served through [server.py](cci:7://file:///Users/bkoo/Documents/Development/mcard-core/mcard/interfaces/api/server.py:0:0-0:0), which acts as the entry point for the application.
 
 ## Features
 - **Create Card**: Add new cards with content and automatically compute a hash.
 - **Retrieve Card**: Fetch a card using its unique hash.
 - **List Cards**: List all cards with optional filters for time range and pagination.
-- **Remove Card**: Given its hash,remove a card.
+- **Remove Card**: Given its hash, remove a card.
 
 ## Configuration
 - The application loads settings from environment variables, including database paths, hashing algorithms, and the API key.
@@ -30,7 +30,7 @@ This is a FastAPI application for managing MCard content. It provides endpoints 
 1. Ensure all necessary environment variables are set as outlined in the Configuration section.
 2. Run the FastAPI application using the command:
    ```bash
-   uvicorn mcard.interfaces.api.mcard_api:app --reload
+   python -m mcard.interfaces.api.server
    ```
 3. Access the API documentation at `http://localhost:8000/docs`.
 

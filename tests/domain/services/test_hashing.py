@@ -7,7 +7,7 @@ from mcard.domain.services.hashing import (
     get_hashing_service,
     set_hashing_service,
 )
-from mcard.domain.models.config import HashingSettings
+from mcard.domain.models.domain_config_models import HashingSettings
 from mcard.domain.models.exceptions import HashingError
 from mcard.domain.models.card import MCard
 import re

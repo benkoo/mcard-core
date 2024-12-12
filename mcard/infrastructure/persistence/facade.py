@@ -10,8 +10,8 @@ from enum import Enum
 from mcard.domain.models.card import MCard
 from mcard.domain.models.protocols import CardStore
 from mcard.domain.models.exceptions import StorageError
+from mcard.infrastructure.persistence.database_engine_config import EngineConfig, EngineType, SQLiteConfig, DatabaseType
 from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
-from mcard.infrastructure.persistence.engine_config import EngineConfig, EngineType, SQLiteConfig, DatabaseType
 from mcard.infrastructure.persistence.schema import SchemaManager
 
 
@@ -99,11 +99,14 @@ class DatabaseFacade:
         if hasattr(self._store, 'initialize'):
             await self._store.initialize()
 
+        # Ensure tables are defined
+        if not hasattr(self._schema_manager, '_tables') or self._schema_manager._tables is None:
+            self._schema_manager._tables = self._schema_manager._define_tables()
+
         # Now check for connection
         if hasattr(self._store, '_connection') and self._store._connection is not None:
             schema_handler = self._schema_manager.get_schema_handler(self._config.engine_config.engine_type)
-            tables = self._schema_manager._tables  # Get the table definitions
-            await schema_handler.initialize_schema(self._store._connection, tables)
+            await schema_handler.initialize_schema(self._store._connection, self._schema_manager._tables)
         else:
             raise StorageError("Database connection not established")
 

@@ -1,30 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testExecutions version="1">
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/mcard_service_content.test.js">
-    <testCase name="MCard Content Operations Text Content Cards should create a card with plain text" duration="338"/>
-    <testCase name="MCard Content Operations Text Content Cards should create a card with JSON content" duration="5"/>
-    <testCase name="MCard Content Operations Text Content Cards should create a card with XML content" duration="4"/>
-    <testCase name="MCard Content Operations Binary Content Cards should create a card with PDF content" duration="7"/>
-    <testCase name="MCard Content Operations Binary Content Cards should create a card with SVG content" duration="5"/>
-    <testCase name="MCard Content Operations Binary Content Cards should create a card with JPG content" duration="4"/>
-    <testCase name="MCard Content Operations Binary Content Cards should create a card with PNG content" duration="4"/>
-    <testCase name="MCard Content Operations Large and Edge Case Content should handle large text content" duration="22"/>
-    <testCase name="MCard Content Operations Large and Edge Case Content should handle base64 encoded content" duration="6"/>
-    <testCase name="MCard Content Operations Large and Edge Case Content should handle empty content" duration="105"/>
-    <testCase name="MCard Content Operations Card Retrieval and Listing should retrieve a specific card" duration="9"/>
-    <testCase name="MCard Content Operations Card Retrieval and Listing should list cards" duration="62"/>
-    <testCase name="MCard Content Operations Error Handling in Card Operations should handle retrieving non-existent card" duration="5"/>
-  </file>
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/mcard_service_persistent.test.js">
-    <testCase name="MCard Persistent Database Tests Persistent Database Behavior should have a database file created" duration="1"/>
-    <testCase name="MCard Persistent Database Tests Persistent Database Behavior should persist cards across test runs" duration="315"/>
-    <testCase name="MCard Persistent Database Tests Persistent Database Behavior should show previously created cards" duration="11"/>
-    <testCase name="MCard Persistent Database Tests Database File Inspection should provide database file details" duration="1"/>
-  </file>
-  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/mcard_service_proxy.test.js">
-    <testCase name="MCard Service Validation API Key Validation validates API keys correctly" duration="2"/>
-    <testCase name="MCard Service Validation Port Number Validation validates port numbers" duration="0"/>
-    <testCase name="MCard Service Validation Database Path Validation validates database paths" duration="0"/>
-    <testCase name="MCard Service Validation Network Connectivity checks network connectivity" duration="1"/>
+  <file path="/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/env_validation.test.js">
+    <testCase name="Environment Variable Validation Environment variables should be defined and valid after initialization" duration="1">
+      <failure message="Error: Server process is null"><![CDATA[Error: Server process is null
+    at /Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/env_validation.test.js:35:28
+    at new Promise (<anonymous>)
+    at Object.<anonymous> (/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/env_validation.test.js:28:19)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)]]></failure>
+    </testCase>
+    <testCase name="Environment Variable Validation Configuration values should be accessible from the server" duration="1">
+      <failure message="Error: Server process is null"><![CDATA[Error: Server process is null
+    at /Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/env_validation.test.js:35:28
+    at new Promise (<anonymous>)
+    at Object.<anonymous> (/Users/bkoo/Documents/Development/mcard-core/examples/bridge_to_javascript/tests/env_validation.test.js:28:19)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)]]></failure>
+    </testCase>
   </file>
 </testExecutions>

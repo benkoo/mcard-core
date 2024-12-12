@@ -23,7 +23,7 @@ print(f"Loading environment from: {ENV_FILE} (exists: {ENV_FILE.exists()})")
 load_dotenv(ENV_FILE, override=True)
 
 from mcard import SQLiteCardRepo, AppSettings, DatabaseSettings, MCard
-from mcard.domain.models.config import HashingSettings, HashAlgorithm
+from mcard.domain.models.domain_config_models import HashingSettings, HashAlgorithm
 from mcard.domain.services.hashing import DefaultHashingService, set_hashing_service
 
 print(f"MCARD_HASH_ALGORITHM environment variable: {os.environ.get('MCARD_HASH_ALGORITHM')}")

@@ -17,9 +17,9 @@ MAX_CONTENT_SIZE = int(os.getenv('MCARD_MAX_CONTENT_SIZE', '10485760'))
 # Flask configuration
 FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev')  # Change in production
 CSRF_SECRET_KEY = os.getenv('CSRF_SECRET_KEY', 'dev')   # Change in production
-DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-PORT = int(os.getenv('FLASK_PORT', '5050'))
+DEBUG = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
+PORT = int(os.getenv('FLASK_PORT', '5058'))
 
 # Logging configuration
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
 LOG_FILE = str(BASE_DIR / 'app.log')

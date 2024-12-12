@@ -1,7 +1,8 @@
-"""Tests for file-based configuration."""
+"""Test configuration files."""
 import os
+import pytest
 from pathlib import Path
-from mcard.infrastructure.config import get_project_root
+from mcard.infrastructure.infrastructure_config_manager import get_project_root
 
 def test_env_file_exists():
     """Test that .env file exists in the project root."""

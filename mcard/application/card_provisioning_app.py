@@ -10,7 +10,29 @@ import json
 import asyncio
 import logging
 
+# Configure logging
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.propagate = True  # Ensure log propagation is enabled
+
+# Create file handler
+file_handler = logging.FileHandler('mcard_api_test.log')
+file_handler.setLevel(logging.DEBUG)
+
+# Create formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add handler to logger
+logger.addHandler(file_handler)
+
+# Configure root logger as well
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+root_logger.addHandler(file_handler)
+
+print("Logging configuration executed")
+logger.debug('Logging system initialized.')
 
 class CardCreationError(Exception):
     """Base exception for card creation errors."""
@@ -45,6 +67,8 @@ class CardProvisioningApp:
         self.store = store
         self.hashing_service = hashing_service or get_hashing_service()
         self.event_bus = event_bus
+        print('CardProvisioningApp initialized with store and hashing service.')
+        logger.debug('CardProvisioningApp initialized with store and hashing service.')
 
     async def _prepare_content(self, content: Union[str, bytes]) -> bytes:
         """Prepare and validate content for card creation.
@@ -77,27 +101,39 @@ class CardProvisioningApp:
             StorageOperationError: If card cannot be saved
         """
         try:
+            logger.debug(f'Creating new card with hash: {content_hash}')
             card = MCard(content=content)
             card.hash = content_hash
+            logger.debug(f'Attempting to save card with hash: {card.hash}')
             await self._save_with_retry(card, content)
+            logger.debug(f'Successfully saved card with hash: {card.hash}')
             return card
         except Exception as e:
+            logger.error(f'Failed to create new card: {str(e)}')
             raise StorageOperationError(f"Failed to create new card: {str(e)}")
 
-    async def _save_with_retry(self, card: MCard, content: bytes) -> None:
+    async def _save_with_retry(self, card: MCard, content: bytes) -> MCard:
         """Save card with retry logic.
         
         Args:
             card: Card to save
             content: Card content for hash generation
             
+        Returns:
+            MCard: Saved card
+            
         Raises:
             StorageOperationError: If card cannot be saved after max retries
         """
+        existing_card = await self.store.get(card.hash)
+        logger.debug(f'Checking for existing card with hash: {card.hash}, exists: {existing_card is not None}')
+        if existing_card:
+            return existing_card  # Return existing card if it already exists
+
         for attempt in range(self.MAX_RETRIES):
             try:
                 await self.store.save(card)
-                return
+                return card
             except StorageError as e:
                 if "already exists" in str(e) and attempt < self.MAX_RETRIES - 1:
                     card.hash = await self.hashing_service.hash_content(
@@ -181,14 +217,13 @@ class CardProvisioningApp:
     async def create_card(self, content: Union[str, bytes]) -> MCard:
         """Create a new card with the given content.
         
-        If content already exists, creates a reference card instead.
-        If hash collision is detected, transitions to stronger hash.
+        If content already exists, returns the existing card instead.
         
         Args:
             content: The content to create a card with
             
         Returns:
-            MCard: The created card
+            MCard: The created or existing card
             
         Raises:
             ValueError: If content is invalid
@@ -198,23 +233,16 @@ class CardProvisioningApp:
             prepared_content = await self._prepare_content(content)
             content_hash = await self.hashing_service.hash_content(prepared_content)
             
-            if await self.has_hash_for_content(prepared_content):
-                original_card = await self.store.get(content_hash)
-                original_content = await self._prepare_content(original_card.content)
-                
-                if original_content != prepared_content:
-                    # Hash collision - transition to stronger hash
-                    return await self._handle_hash_collision(
-                        prepared_content, content_hash, original_card
-                    )
-                else:
-                    # Duplicate content - create reference card
-                    return await self._handle_duplicate_content(
-                        prepared_content, content_hash, original_card
-                    )
+            # Check if a card with this content already exists
+            existing_card = await self.store.get(content_hash)
+            if existing_card:
+                return existing_card
             
             # Create new card for unique content
-            return await self._create_new_card(prepared_content, content_hash)
+            card = MCard(content=prepared_content.decode('utf-8'))  # Convert bytes back to string for storage
+            card.hash = content_hash
+            await self.store.save(card)
+            return card
             
         except (ValueError, CardCreationError) as e:
             # Re-raise known exceptions
@@ -266,6 +294,19 @@ class CardProvisioningApp:
         # Return True in both cases - collision detection happens in create_card
         return True
 
+    async def list_cards(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
+        """List all provisioned cards with optional pagination.
+        
+        Args:
+            limit: Maximum number of cards to return
+            offset: Number of cards to skip
+            
+        Returns:
+            List of MCard instances
+        """
+        cards, _ = await self.store.list(page_size=limit, page=(offset // limit + 1) if limit and offset else None)
+        return cards
+
     async def list_provisioned_cards(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[MCard]:
         """List all provisioned cards with optional pagination.
         
@@ -301,6 +342,10 @@ class CardProvisioningApp:
             hash_str: Hash string identifying the card to delete
         """
         await self.store.delete(hash_str)
+
+    async def delete_all_cards(self) -> None:
+        """Delete all cards."""
+        await self.store.delete_all()
 
     async def shutdown(self) -> None:
         """Gracefully shutdown the application and its dependencies."""

@@ -1,4 +1,4 @@
-"""Setup script for MCard JavaScript bridge."""
+"""Setup module for bridge to javascript."""
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -9,7 +9,7 @@ load_dotenv(dotenv_path=env_path)
 
 import json
 from mcard.infrastructure.setup import MCardSetup
-from mcard.domain.models.config import AppSettings
+from mcard.domain.models.domain_config_models import AppSettings
 from mcard.config_constants import (
     ENV_DB_PATH,
     ENV_API_PORT,
@@ -29,7 +29,7 @@ async def get_setup_config():
 
     # Initialize MCardSetup with environment variables
     setup = MCardSetup(
-        db_path=os.getenv(ENV_DB_PATH, 'data/mcard.db'),
+        db_path=os.getenv(ENV_DB_PATH, 'data/mcard_in_setup.db'),
         max_connections=int(os.getenv(ENV_DB_MAX_CONNECTIONS, str(DEFAULT_DB_MAX_CONNECTIONS))),
         timeout=float(os.getenv(ENV_DB_TIMEOUT, str(DEFAULT_DB_TIMEOUT)))
     )

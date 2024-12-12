@@ -5,9 +5,9 @@ import pytest
 import pytest_asyncio
 from pathlib import Path
 
-from mcard.infrastructure.config import get_project_root
-from mcard.infrastructure.persistence.engine.sqlite_engine import SQLiteStore
-from mcard.infrastructure.persistence.engine_config import SQLiteConfig
+from mcard.infrastructure.infrastructure_config_manager import get_project_root
+from mcard.infrastructure.persistence.database_engine_config import SQLiteConfig
+from mcard.infrastructure.persistence.store import SQLiteStore
 from mcard.domain.services.hashing import DefaultHashingService, HashingSettings
 
 # Configure asyncio for pytest

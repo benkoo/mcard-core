@@ -6,7 +6,8 @@ import time
 import asyncio
 from datetime import datetime, timezone
 from mcard.infrastructure.persistence.store import MCardStore
-from mcard.infrastructure.persistence.engine_config import EngineType
+from mcard.infrastructure.persistence.database_engine_config import EngineType
+from mcard.infrastructure.infrastructure_config_manager import DataEngineConfig, load_config
 from mcard.domain.models.card import MCard
 import logging
 import pytest_asyncio

@@ -5,10 +5,23 @@ import tempfile
 import subprocess
 import pytest
 from pathlib import Path
-from mcard.infrastructure.config import (
+from mcard.infrastructure.infrastructure_config_manager import (
+    ConfigurationSource,
+    EnvironmentConfigSource,
     DataEngineConfig,
-    load_config,
+    get_project_root,
+    get_default_db_path,
     get_test_db_path,
+    load_config,
+)
+from mcard.config_constants import (
+    ENV_DB_PATH,
+    ENV_DB_MAX_CONNECTIONS,
+    ENV_DB_TIMEOUT,
+    ENV_HASH_ALGORITHM,
+    ENV_HASH_CUSTOM_MODULE,
+    ENV_HASH_CUSTOM_FUNCTION,
+    ENV_HASH_CUSTOM_LENGTH,
 )
 
 @pytest.fixture(autouse=True)
@@ -42,7 +55,15 @@ def test_default_config(setup_test_env):
     script = """
 import os
 from pathlib import Path
-from mcard.infrastructure.config import load_config, get_project_root
+from mcard.infrastructure.infrastructure_config_manager import (
+    ConfigurationSource,
+    EnvironmentConfigSource,
+    DataEngineConfig,
+    get_project_root,
+    get_default_db_path,
+    get_test_db_path,
+    load_config,
+)
 
 # Clear any existing MCARD_ environment variables
 for key in list(os.environ.keys()):

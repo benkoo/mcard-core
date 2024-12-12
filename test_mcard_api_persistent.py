@@ -1,103 +1,127 @@
 import os
 import asyncio
 import logging
-import sqlite3
+from http import HTTPStatus
 from httpx import AsyncClient
-from mcard.interfaces.api.mcard_api import app
-from mcard.infrastructure.persistence.sqlite import SQLiteRepository
-from mcard.domain.models.card import MCard
+from mcard.interfaces.api.mcard_api import app, api
+from mcard.infrastructure.persistence.repositories import SQLiteCardRepo
+from mcard.infrastructure.persistence.schema import SchemaManager
+from mcard.infrastructure.persistence.database_engine_config import EngineType
+from mcard.domain.models.card import MCard, CardCreate
+from mcard.config_constants import TEST_DB_PATH
+import pytest
+import sqlite3
+from datetime import datetime
+import aiosqlite
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Specify the database file path
-DB_PATH = os.path.join(os.path.dirname(__file__), 'MCardManagerStore.db')
+DB_PATH = './data/ROOT_mcard_DOT_ENV.db'  # Use the same database path as the API
 
-async def test_mcard_api_persistent():
-    # Ensure the database file exists and is initialized
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
+# Ensure the database directory exists
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-    # Explicitly initialize the database
+@pytest.fixture(scope="module")
+@pytest.mark.asyncio
+async def initialized_api():
+    """Initialize the API and database."""
+    # Ensure the database directory exists
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)  # Create the directory if it doesn't exist
+    
+    # Initialize the store
+    store = await api.get_store()
+    await store.initialize()  # Make sure schema is initialized
+    
+    # Initialize the schema
+    conn = await aiosqlite.connect(DB_PATH)  # Create a new connection to the database
+    schema_manager = SchemaManager()  # Create an instance of SchemaManager
+    await schema_manager.initialize_schema(EngineType.SQLITE, conn)
+    
+    # Clean up any existing data using direct SQLite connection
+    try:
+        cursor = await conn.cursor()
+        await cursor.execute('DELETE FROM card')
+        await conn.commit()
+    finally:
+        await conn.close()  # Close the connection properly
+    
+    # Also clean through API for good measure
+    await api.delete_all_cards()
+    
+    # Verify database is empty
     conn = sqlite3.connect(DB_PATH)
     try:
-        # Create a cursor
         cursor = conn.cursor()
-        
-        # Create the card table
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS card (
-            hash TEXT PRIMARY KEY,
-            content BLOB NOT NULL,
-            g_time TEXT NOT NULL
-        )
-        """)
-        
-        # Commit the changes
-        conn.commit()
+        cursor.execute('SELECT COUNT(*) FROM card')
+        count = cursor.fetchone()[0]
+        assert count == 0, f"Database not empty after cleanup, found {count} records"
     finally:
-        # Close the connection
         conn.close()
+    
+    # Return the API instance
+    return api
 
-    # Create a persistent repository
-    shared_repo = SQLiteStore(db_path=DB_PATH)
-
+@pytest.mark.asyncio
+async def test_mcard_api_persistent(initialized_api):
+    """Test data persistence in the API."""
+    # Wait for the fixture to complete
+    test_api = await initialized_api
+    
     # Test content
     test_contents = [
-        "Persistent Test Card 1",
-        "Persistent Test Card 2",
-        "Persistent Test Card 3"
+        f"Persistent Test Card {i} - {datetime.now().isoformat()}"
+        for i in range(1, 4)
     ]
+    
+    # Create cards directly using the API instance
+    created_hashes = []
+    for content in test_contents:
+        logger.debug(f"Attempting to create card with content: {content}")
+        card = await test_api.create_card(content)
+        assert card is not None
+        created_hashes.append(card.hash)
+        logger.debug(f"Created card with hash: {card.hash}")
 
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        # Create multiple cards
-        created_hashes = []
-        for content in test_contents:
-            print(f"Creating card with content: {content}")
-            create_response = await client.post("/cards/", 
-                                                json={"content": content}, 
-                                                headers={"x-api-key": "test_api_key"})
-            print("Create Response:", create_response.json())
-            assert create_response.status_code == 200
-            created_hashes.append(create_response.json().get("hash"))
+    # Verify cards were created and can be retrieved
+    for hash_str in created_hashes:
+        card = await test_api.get_card(hash_str)
+        assert card is not None
+        assert card.hash in created_hashes
+        logger.debug(f"Retrieved card with hash: {card.hash}")
 
-        # Verify cards were created in the API
-        list_response = await client.get("/cards/", 
-                                         headers={"x-api-key": "test_api_key"})
-        print("List Response:", list_response.json())
-        assert list_response.status_code == 200
-        
-        # Directly verify database contents
-        def verify_database_contents():
-            # Manually insert the cards into the database
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            
-            # Insert cards directly
-            for card_data in list_response.json():
-                cursor.execute("""
-                INSERT OR REPLACE INTO card (hash, content, g_time)
-                VALUES (?, ?, ?)
-                """, (card_data['hash'], card_data['content'].encode(), card_data['g_time']))
-            
-            conn.commit()
-            
-            # Fetch all cards from the database
-            cursor.execute("SELECT hash, content FROM card")
-            db_cards = cursor.fetchall()
-            
-            print("\nDatabase Contents:")
-            for db_hash, db_content in db_cards:
-                print(f"Hash: {db_hash}, Content: {db_content.decode()}")
-                assert db_content.decode() in test_contents, f"Content {db_content.decode()} not found in expected contents"
-            
-            # Verify the number of cards
-            assert len(db_cards) == len(test_contents), "Not all cards were saved to the database"
-            
-            conn.close()
-        
-        # Run database verification
-        verify_database_contents()
+    # List all cards and verify
+    all_cards = await test_api.list_cards(page=1, page_size=10)
+    assert all_cards is not None
+    assert len(all_cards) == len(test_contents)
+    
+    # Verify content matches
+    card_contents = [card.content for card in all_cards]
+    for content in test_contents:
+        assert content in card_contents
 
-if __name__ == "__main__":
-    asyncio.run(test_mcard_api_persistent())
+    # Directly verify database contents
+    async def verify_database_contents():
+        logger.debug(f"Verifying database contents in {DB_PATH}")
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute("SELECT hash, content FROM card") as cursor:
+                db_cards = await cursor.fetchall()
+                
+                logger.debug("\nDatabase Contents:")
+                for db_hash, db_content in db_cards:
+                    logger.debug(f"Hash: {db_hash}, Content: {db_content}")
+                    assert db_content in test_contents, f"Content {db_content} not found in expected contents"
+                
+                # Verify the number of cards
+                assert len(db_cards) == len(test_contents), f"Expected {len(test_contents)} cards but found {len(db_cards)} in database"
+    
+    # Wait for verification to complete
+    await verify_database_contents()
+
+    # Cleanup after all tests are done
+    await test_api.delete_all_cards()
+    store = await test_api.get_store()
+    await store.close()
+    await test_api.shutdown()

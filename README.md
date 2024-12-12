@@ -811,3 +811,56 @@ We welcome contributions to improve our configuration management system. Please 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Recent Updates
+
+### Database and Testing Improvements (2024-12-13)
+
+#### Fixed Database Persistence Issues
+- Added retry logic to SQLite operations to handle transient failures
+- Improved database connection handling and cleanup in tests
+- Fixed database path consistency between tests and application
+- Added proper cleanup of database connections and resources
+
+#### API Improvements
+- Added `shutdown` method to MCardAPI for proper resource cleanup
+- Enhanced error handling in database operations
+- Improved logging throughout the application
+
+#### Testing Framework Enhancements
+- Fixed async fixture handling in pytest tests
+- Added proper cleanup in test fixtures
+- Improved test reliability and repeatability
+- Added detailed logging for better debugging
+
+## Development
+
+### Prerequisites
+- Python 3.12+
+- pytest
+- aiosqlite
+- FastAPI
+
+### Running Tests
+```bash
+pytest -v test_mcard_api_persistent.py
+```
+
+### Database Configuration
+The application uses SQLite for persistence. The database path can be configured through:
+1. Environment variables (`MCARD_DB_PATH`)
+2. Configuration file
+3. Default fallback path
+
+### Best Practices
+- Always use async/await with database operations
+- Properly close database connections using context managers
+- Handle database errors with retry logic
+- Clean up resources after use
+
+## Contributing
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes with descriptive messages
+4. Push to the branch
+5. Create a Pull Request

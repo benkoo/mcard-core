@@ -1,12 +1,15 @@
-"""Test MCard API with persistent storage."""
+"""Test MCard API persistent storage."""
 import os
 import pytest
 import pytest_asyncio
 import tempfile
+from fastapi.testclient import TestClient
+from pathlib import Path
+from mcard.domain.models.card import MCard
 from mcard.interfaces.api.mcard_api import MCardAPI
+from mcard.infrastructure.persistence.database_engine_config import SQLiteConfig
 from mcard.interfaces.api.async_api_wrapper import AsyncAPIWrapper
 from mcard.infrastructure.persistence.async_persistence_wrapper import AsyncPersistenceWrapper as PersistenceWrapper
-from mcard.infrastructure.persistence.engine_config import SQLiteConfig
 
 @pytest.fixture
 def db_path():

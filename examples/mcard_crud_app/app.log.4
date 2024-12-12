@@ -1,0 +1,40 @@
+2024-12-08 10:45:08,232 - asyncio - DEBUG - Using selector: KqueueSelector
+2024-12-08 10:45:08,233 - aiosqlite - DEBUG - executing functools.partial(<built-in method close of sqlite3.Connection object at 0x107175030>)
+2024-12-08 10:45:08,233 - aiosqlite - DEBUG - operation functools.partial(<built-in method close of sqlite3.Connection object at 0x107175030>) completed
+2024-12-08 10:45:08,233 - werkzeug - INFO - 127.0.0.1 - - [08/Dec/2024 10:45:08] "GET / HTTP/1.1" 200 -
+2024-12-08 10:45:42,663 - asyncio - DEBUG - Using selector: KqueueSelector
+2024-12-08 10:45:42,663 - __main__ - INFO - MCard storage initialized
+2024-12-08 10:45:42,664 - aiosqlite - DEBUG - executing <function connect.<locals>.connector at 0x10717a0c0>
+2024-12-08 10:45:42,664 - aiosqlite - DEBUG - operation <function connect.<locals>.connector at 0x10717a0c0> completed
+2024-12-08 10:45:42,664 - aiosqlite - DEBUG - executing functools.partial(<built-in method execute of sqlite3.Connection object at 0x107175d50>, 'PRAGMA journal_mode=WAL', [])
+2024-12-08 10:45:42,664 - aiosqlite - DEBUG - operation functools.partial(<built-in method execute of sqlite3.Connection object at 0x107175d50>, 'PRAGMA journal_mode=WAL', []) completed
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - executing functools.partial(<built-in method execute of sqlite3.Connection object at 0x107175d50>, 'PRAGMA synchronous=NORMAL', [])
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - operation functools.partial(<built-in method execute of sqlite3.Connection object at 0x107175d50>, 'PRAGMA synchronous=NORMAL', []) completed
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - executing functools.partial(<built-in method execute of sqlite3.Connection object at 0x107175d50>, 'PRAGMA foreign_keys=ON', [])
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - operation functools.partial(<built-in method execute of sqlite3.Connection object at 0x107175d50>, 'PRAGMA foreign_keys=ON', []) completed
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - executing functools.partial(<built-in method execute of sqlite3.Connection object at 0x107175d50>, 'PRAGMA busy_timeout=5.0', [])
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - operation functools.partial(<built-in method execute of sqlite3.Connection object at 0x107175d50>, 'PRAGMA busy_timeout=5.0', []) completed
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - executing functools.partial(<built-in method cursor of sqlite3.Connection object at 0x107175d50>)
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - operation functools.partial(<built-in method cursor of sqlite3.Connection object at 0x107175d50>) completed
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - executing functools.partial(<built-in method execute of sqlite3.Cursor object at 0x107117640>, "SELECT name FROM sqlite_master WHERE type='table' AND name='card'", [])
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - operation functools.partial(<built-in method execute of sqlite3.Cursor object at 0x107117640>, "SELECT name FROM sqlite_master WHERE type='table' AND name='card'", []) completed
+2024-12-08 10:45:42,665 - aiosqlite - DEBUG - executing functools.partial(<built-in method fetchone of sqlite3.Cursor object at 0x107117640>)
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - operation functools.partial(<built-in method fetchone of sqlite3.Cursor object at 0x107117640>) completed
+2024-12-08 10:45:42,666 - mcard.infrastructure.persistence.schema - INFO - Table card already exists, skipping creation
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - executing functools.partial(<built-in method close of sqlite3.Cursor object at 0x107117640>)
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - operation functools.partial(<built-in method close of sqlite3.Cursor object at 0x107117640>) completed
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - executing functools.partial(<built-in method commit of sqlite3.Connection object at 0x107175d50>)
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - operation functools.partial(<built-in method commit of sqlite3.Connection object at 0x107175d50>) completed
+2024-12-08 10:45:42,666 - mcard.infrastructure.persistence.schema - INFO - Successfully initialized schema for tables: card
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - executing functools.partial(<built-in method commit of sqlite3.Connection object at 0x107175d50>)
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - operation functools.partial(<built-in method commit of sqlite3.Connection object at 0x107175d50>) completed
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - executing functools.partial(<built-in method cursor of sqlite3.Connection object at 0x107175d50>)
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - operation functools.partial(<built-in method cursor of sqlite3.Connection object at 0x107175d50>) completed
+2024-12-08 10:45:42,666 - aiosqlite - DEBUG - executing functools.partial(<built-in method execute of sqlite3.Cursor object at 0x107116440>, 'SELECT hash, content, g_time FROM card WHERE 1=1 ORDER BY g_time DESC', [])
+2024-12-08 10:45:42,667 - aiosqlite - DEBUG - operation functools.partial(<built-in method execute of sqlite3.Cursor object at 0x107116440>, 'SELECT hash, content, g_time FROM card WHERE 1=1 ORDER BY g_time DESC', []) completed
+2024-12-08 10:45:42,667 - aiosqlite - DEBUG - executing functools.partial(<built-in method fetchall of sqlite3.Cursor object at 0x107116440>)
+2024-12-08 10:45:42,667 - aiosqlite - DEBUG - operation functools.partial(<built-in method fetchall of sqlite3.Cursor object at 0x107116440>) completed
+2024-12-08 10:45:42,667 - aiosqlite - DEBUG - executing functools.partial(<built-in method close of sqlite3.Cursor object at 0x107116440>)
+2024-12-08 10:45:42,668 - aiosqlite - DEBUG - operation functools.partial(<built-in method close of sqlite3.Cursor object at 0x107116440>) completed
+2024-12-08 10:45:42,668 - __main__ - DEBUG - Retrieved 6 cards
+2024-12-08 10:45:42,668 - __main__ - DEBUG - First card type: <class 'mcard.domain.models.card.MCard'>

@@ -68,14 +68,13 @@ cover/
 *.sqlite3
 
 # Logs
-*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
 # Logs
-*.log
-*.log.*
+# *.log
+# *.log.*
 
 # Application specific
 examples/mcard_crud_app/data/

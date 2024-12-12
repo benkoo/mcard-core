@@ -7,8 +7,8 @@ The schema consists of:
 - A 'card' table with columns:
   - id: INTEGER PRIMARY KEY - Auto-incrementing primary key
   - hash: TEXT - Hash identifier for the card
-  - content: BLOB - Card content
-  - g_time: TEXT - Global timestamp
+  - content: TEXT - Card content
+  - g_time: TEXT - Global timestamp with timezone information
   - metadata: TEXT - JSON-encoded metadata associated with the card
 - An index on g_time for efficient time-based queries
 - An index on hash for efficient hash-based queries
@@ -20,14 +20,15 @@ This single-table design was chosen to:
 4. Optimize for the core use case of storing and retrieving cards
 """
 
-from typing import Optional, Dict, Any, Type, Union, List
+from typing import Optional, Dict, Any, Type, Union, List, Tuple
 from enum import Enum
 import logging
+import sqlite3
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from mcard.domain.models.exceptions import StorageError
-from mcard.infrastructure.persistence.engine_config import EngineType
+from mcard.infrastructure.persistence.database_engine_config import EngineType
 
 logger = logging.getLogger(__name__)
 
@@ -95,11 +96,11 @@ class SchemaManager:
         All card-related data is stored in the 'card' table with the following structure:
         - id: INTEGER PRIMARY KEY - Auto-incrementing primary key
         - hash: TEXT - Hash identifier for the card
-        - content: BLOB - The actual card content in binary format
+        - content: TEXT - Card content
         - g_time: TEXT - Global timestamp with timezone information
         - metadata: TEXT - JSON-encoded metadata associated with the card
         """
-        return {
+        self._tables = {
             "card": TableDefinition(
                 name="card",
                 columns=[
@@ -120,9 +121,9 @@ class SchemaManager:
                     ),
                     ColumnDefinition(
                         name="content",
-                        type=ColumnType.BLOB,
+                        type=ColumnType.TEXT,
                         nullable=False,
-                        comment="Card content stored as binary data"
+                        comment="Card content"
                     ),
                     ColumnDefinition(
                         name="g_time",
@@ -145,6 +146,7 @@ class SchemaManager:
                 comment="Single table storing all card data including content and timestamps"
             )
         }
+        return self._tables
 
     def get_table_definition(self, table_name: str) -> TableDefinition:
         """Get the definition of a specific table."""
@@ -160,12 +162,39 @@ class SchemaManager:
             raise ValueError(f"No schema handler available for {engine_type}")
         return self._schema_handlers[engine_type]
 
-    async def initialize_schema(self, engine_type: EngineType, connection: Any) -> None:
-        """Initialize the schema for a specific database type."""
-        # Force reload tables to get latest schema
-        self._tables = self._define_tables()
-        handler = self.get_schema_handler(engine_type)
-        await handler.initialize_schema(connection, self._tables)
+    async def initialize_schema(self, engine_type: EngineType = EngineType.SQLITE, connection: Optional[Any] = None) -> bool:
+        """
+        Initialize the database schema for the specified engine type.
+        
+        Args:
+            engine_type (EngineType): The type of database engine to initialize.
+            connection (Optional[Any]): Optional database connection. If not provided, 
+                                        a new connection will be created.
+        
+        Returns:
+            bool: True if schema initialization was successful, False otherwise.
+        """
+        try:
+            # Ensure tables are defined
+            if self._tables is None:
+                self._define_tables()
+            
+            # Get the appropriate schema handler
+            schema_handler = self.get_schema_handler(engine_type)
+            
+            # If no connection is provided, raise an error
+            if connection is None:
+                raise ValueError("Database connection is required for schema initialization")
+            
+            # Initialize schema using the schema handler
+            await schema_handler.initialize_schema(connection, self._tables)
+            
+            return True
+        except Exception as e:
+            logger.error(f"Schema initialization failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
 
 class BaseSchemaHandler(ABC):
@@ -187,89 +216,119 @@ class BaseSchemaHandler(ABC):
         pass
 
     @abstractmethod
-    def _generate_table_sql(self, table: TableDefinition) -> tuple[str, list[str]]:
+    def _generate_table_sql(self, table: TableDefinition) -> tuple[str, Dict[str, str]]:
         """Generate SQL statements for table creation and indexes.
         
         Args:
             table: Table definition containing columns and indexes
             
         Returns:
-            Tuple of (create table SQL, list of create index SQLs)
+            Tuple of (create table SQL, dictionary of index names to index SQL)
         """
         pass
 
 
 class SQLiteSchemaHandler(BaseSchemaHandler):
-    """Schema handler for SQLite database."""
-
+    """SQLite-specific schema handler."""
+    
     def get_column_type(self, column_type: ColumnType) -> str:
-        """Map generic column types to SQLite types."""
-        type_map = {
+        """Map column types to SQLite types."""
+        type_mapping = {
             ColumnType.TEXT: "TEXT",
             ColumnType.BLOB: "BLOB",
             ColumnType.INTEGER: "INTEGER",
             ColumnType.FLOAT: "REAL",
-            ColumnType.BOOLEAN: "INTEGER",  # SQLite doesn't have a boolean type
-            ColumnType.TIMESTAMP: "TEXT",  # Store timestamps as ISO format strings
-            ColumnType.JSON: "TEXT"  # Store JSON as text
+            ColumnType.BOOLEAN: "INTEGER",  # SQLite uses 0/1 for boolean
+            ColumnType.TIMESTAMP: "TEXT",  # SQLite stores timestamps as text
+            ColumnType.JSON: "TEXT"  # JSON stored as text
         }
-        return type_map[column_type]
+        return type_mapping.get(column_type, "TEXT")
 
     def _build_column_definition(self, column: ColumnDefinition) -> str:
-        """Build SQLite column definition string."""
-        parts = [
-            column.name,
-            self.get_column_type(column.type),
-            "PRIMARY KEY AUTOINCREMENT" if column.primary_key and column.type == ColumnType.INTEGER else "",
-            "NOT NULL" if not column.nullable else "",
-            "UNIQUE" if column.unique and not column.primary_key else "",  # Don't add UNIQUE if it's already a primary key
-            f"DEFAULT {column.default}" if column.default is not None else "",
-            f"/* {column.comment} */" if column.comment else ""
-        ]
-        return " ".join(part for part in parts if part)
+        """Build SQLite column definition."""
+        parts = [column.name, self.get_column_type(column.type)]
+        
+        if column.primary_key:
+            parts.append("PRIMARY KEY AUTOINCREMENT")
+        
+        if not column.nullable:
+            parts.append("NOT NULL")
+        
+        if column.unique:
+            parts.append("UNIQUE")
+        
+        if column.default is not None:
+            parts.append(f"DEFAULT {column.default}")
+        
+        return " ".join(parts)
 
-    def _generate_table_sql(self, table: TableDefinition) -> tuple[str, list[str]]:
-        """Generate SQL statements for table creation and indexes.
+    def _generate_table_sql(self, table: TableDefinition) -> tuple[str, Dict[str, str]]:
+        """
+        Generate SQL statements for table creation and indexes.
         
         Args:
             table: Table definition containing columns and indexes
             
         Returns:
-            Tuple of (create table SQL, list of create index SQLs)
+            Tuple of (create table SQL, dictionary of index names to index SQL)
         """
-        columns = [self._build_column_definition(col) for col in table.columns]
-        create_table_sql = f"""
-            CREATE TABLE IF NOT EXISTS {table.name} (
-                {', '.join(columns)}
-            ) /* {table.comment or ''} */
-        """
+        # Build column definitions
+        column_defs = [self._build_column_definition(col) for col in table.columns]
         
-        create_index_sqls = []
+        # Construct table creation SQL
+        table_sql = f"CREATE TABLE IF NOT EXISTS {table.name} (\n"
+        table_sql += ",\n".join(column_defs)
+        table_sql += "\n)"
+        
+        # Generate index SQLs
+        index_sqls = {}
         if table.indexes:
-            for idx_name, idx_columns in table.indexes.items():
-                create_index_sql = f"""
-                    CREATE INDEX IF NOT EXISTS {idx_name}
-                    ON {table.name} ({', '.join(idx_columns)})
-                """
-                create_index_sqls.append(create_index_sql)
-                
-        return create_table_sql, create_index_sqls
+            for index_name, index_columns in table.indexes.items():
+                # Construct index SQL
+                index_cols_str = ", ".join(index_columns)
+                index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table.name} ({index_cols_str})"
+                index_sqls[index_name] = index_sql
+        
+        return table_sql, index_sqls
 
     async def initialize_schema(self, connection: Any, tables: Dict[str, TableDefinition]) -> None:
-        """Initialize schema for the database connection."""
-        async with connection.cursor() as cursor:
-            for table in tables.values():
-                # Check if table exists
-                await cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table.name}'")
-                if not await cursor.fetchone():
-                    # Table doesn't exist, create it
-                    create_table_sql, create_index_sqls = self._generate_table_sql(table)
-                    await cursor.execute(create_table_sql)
-                    for create_index_sql in create_index_sqls:
-                        await cursor.execute(create_index_sql)
-                    logger.info(f"Created table: {table.name}")
-                else:
-                    logger.info(f"Table {table.name} already exists, skipping creation")
-
-        await connection.commit()
-        logger.info(f"Successfully initialized schema for tables: {', '.join(tables.keys())}")
+        """Initialize the SQLite schema."""
+        try:
+            # Log the start of schema initialization
+            logger.debug(f"Starting SQLite schema initialization for tables: {list(tables.keys())}")
+            
+            # Ensure the connection is an aiosqlite connection
+            if not hasattr(connection, 'execute'):
+                logger.error(f"Invalid connection type: {type(connection)}")
+                raise ValueError("Connection must be an aiosqlite connection")
+            
+            # Process each table definition
+            for table_name, table_def in tables.items():
+                logger.debug(f"Processing table: {table_name}")
+                
+                # Generate table creation SQL
+                table_sql, index_sqls = self._generate_table_sql(table_def)
+                logger.debug(f"Table creation SQL: {table_sql}")
+                
+                try:
+                    # Create table
+                    await connection.execute(table_sql)
+                    logger.info(f"Initialized table {table_name} in SQLite database")
+                    
+                    # Create indexes
+                    for index_name, index_sql in index_sqls.items():
+                        logger.debug(f"Index SQL: {index_sql}")
+                        await connection.execute(index_sql)
+                        logger.debug(f"Created index {index_name}")
+                
+                except sqlite3.OperationalError as e:
+                    logger.error(f"Error initializing table {table_name}: {e}")
+                    # Don't raise here to continue with other tables
+            
+            # Commit the transaction
+            await connection.commit()
+            logger.info("SQLite schema initialization completed successfully")
+        
+        except Exception as e:
+            logger.error(f"Comprehensive schema initialization error: {e}", exc_info=True)
+            raise

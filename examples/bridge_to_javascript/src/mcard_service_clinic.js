@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const dotenv = require('dotenv');
 
 class MCardServiceClinic {
     /**
@@ -14,14 +15,14 @@ class MCardServiceClinic {
             return false;
         }
 
-        // In test environment, allow specific test keys
+        // In test environment, check if the API key matches the one in .env
         if (process.env.NODE_ENV === 'test') {
-            const testKeys = [
-                'valid_test_key', 
-                'default_key', 
-                process.env.MCARD_API_KEY
-            ].filter(Boolean);
-            return testKeys.includes(apiKey);
+            const dotenvConfig = dotenv.config();
+            if (dotenvConfig.error) {
+                throw dotenvConfig.error;
+            }
+            const envApiKey = dotenvConfig.parsed.MCARD_API_KEY;
+            return apiKey === envApiKey;
         }
 
         // Production validation: check key length and complexity

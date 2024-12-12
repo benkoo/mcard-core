@@ -12,7 +12,7 @@ import aiosqlite
 
 from mcard.domain.models.card import MCard
 from mcard.domain.models.exceptions import ValidationError, StorageError
-from mcard.infrastructure.persistence.engine_config import SQLiteConfig, EngineConfig, EngineType, DatabaseType
+from mcard.infrastructure.persistence.database_engine_config import SQLiteConfig, EngineConfig, EngineType, DatabaseType
 from mcard.infrastructure.persistence.schema import SchemaManager
 from mcard.infrastructure.persistence.engine.base_engine import BaseStore
 
@@ -41,9 +41,15 @@ class SQLiteStore(BaseStore):
     async def initialize(self):
         """Initialize the database connection."""
         if not self._initialized:
+            logger.debug(f'Initializing SQLite database at {self._config.db_path}')  # Log initialization
             # Ensure the database directory exists
             db_path = Path(self._config.db_path)
             db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create the database file if it does not exist
+            if not db_path.exists():
+                logger.debug(f'Creating database file at {db_path}')  # Log file creation
+                open(db_path, 'a').close()  # Create an empty file if it doesn't exist
 
             # Open connection
             self._connection = await aiosqlite.connect(
@@ -95,6 +101,7 @@ class SQLiteStore(BaseStore):
             try:
                 now = datetime.now(timezone.utc).isoformat()
                 card = MCard(content=content, g_time=now)
+                # Store content as string
                 await cursor.execute(
                     'INSERT INTO card (hash, content, g_time) VALUES (?, ?, ?)',
                     (card.hash, content, now)
@@ -146,7 +153,8 @@ class SQLiteStore(BaseStore):
                 await cursor.execute('SELECT content, g_time FROM card WHERE hash = ?', (hash_str,))
                 row = await cursor.fetchone()
                 if row:
-                    return MCard(content=row[0], hash=hash_str, g_time=row[1])
+                    content = row[0].decode() if isinstance(row[0], bytes) else row[0]
+                    return MCard(content=content, hash=hash_str, g_time=row[1])
                 return None
             finally:
                 await cursor.close()
@@ -268,7 +276,9 @@ class SQLiteStore(BaseStore):
 
                 await cursor.execute(' '.join(query), params)
                 rows = await cursor.fetchall()
-                cards = [MCard(content=row[1], hash=row[0], g_time=row[2]) for row in rows]
+                cards = [MCard(content=row[1], 
+                             hash=row[0], 
+                             g_time=row[2]) for row in rows]
 
                 # Get pagination info if needed
                 pagination_info = None
@@ -368,7 +378,9 @@ class SQLiteStore(BaseStore):
 
                 await cursor.execute(sql, params)
                 rows = await cursor.fetchall()
-                cards = [MCard(content=row[1], hash=row[0], g_time=row[2]) for row in rows]
+                cards = [MCard(content=row[1], 
+                             hash=row[0], 
+                             g_time=row[2]) for row in rows]
 
                 # Get pagination info if needed
                 pagination_info = None
@@ -399,7 +411,7 @@ class SQLiteStore(BaseStore):
         return await self._execute_with_retry(_search)
 
     async def save(self, card: MCard) -> None:
-        """Save a card to the store."""
+        """Save a card to the database."""
         if not self._initialized:
             await self.initialize()
 
@@ -410,29 +422,20 @@ class SQLiteStore(BaseStore):
             raise ValidationError(f"Content size exceeds maximum allowed size of {self.max_content_size} bytes")
 
         async def _save():
-            cursor = await self._connection.cursor()
-            try:
-                # Check if hash already exists
-                await cursor.execute('SELECT 1 FROM card WHERE hash = ?', (card.hash,))
-                if await cursor.fetchone():
-                    raise StorageError(f"Card with hash {card.hash} already exists")
-                    
-                # Insert new card
-                now = datetime.now(timezone.utc).isoformat()
-                try:
-                    await cursor.execute(
-                        'INSERT INTO card (content, hash, g_time) VALUES (?, ?, ?)',
-                        (card.content, card.hash, now)
-                    )
-                    await self._connection.commit()
-                except sqlite3.IntegrityError as e:
-                    if "UNIQUE constraint failed" in str(e):
-                        raise StorageError(f"Card with hash {card.hash} already exists")
-                    raise StorageError(f"Failed to save card: {str(e)}")
-            finally:
-                await cursor.close()
+            logger.debug(f'Attempting to save card with hash: {card.hash} to database')
+            async with self._connection.cursor() as cursor:
+                await cursor.execute(
+                    "INSERT INTO card (hash, content, g_time) VALUES (?, ?, ?)",
+                    (card.hash, card.content, card.g_time)
+                )
+                await self._connection.commit()
+                logger.debug(f'Successfully saved card with hash: {card.hash} to database')
 
-        await self._execute_with_retry(_save)
+        try:
+            await self._execute_with_retry(_save)
+        except Exception as e:
+            logger.error(f'Failed to save card with hash: {card.hash}, error: {str(e)}')
+            raise StorageError(f"Failed to save card: {str(e)}")
 
     async def remove(self, hash_str: str) -> None:
         """Remove a card by its hash."""

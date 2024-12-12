@@ -7,11 +7,17 @@ import os
 import pytest
 from pathlib import Path
 from dotenv import load_dotenv
-from mcard.infrastructure.config import (
-    DataEngineConfig, 
-    load_config, 
+from mcard.infrastructure.infrastructure_config_manager import (
+    ConfigurationSource,
+    EnvironmentConfigSource,
+    DataEngineConfig,
+    TestConfigSource,
+    get_project_root,
     get_default_db_path,
     get_test_db_path,
+    load_config,
+)
+from mcard.config_constants import (
     ENV_DB_PATH,
     ENV_DB_MAX_CONNECTIONS,
     ENV_DB_TIMEOUT,
@@ -19,8 +25,6 @@ from mcard.infrastructure.config import (
     ENV_HASH_CUSTOM_MODULE,
     ENV_HASH_CUSTOM_FUNCTION,
     ENV_HASH_CUSTOM_LENGTH,
-    EnvironmentConfigSource,
-    TestConfigSource,
 )
 from mcard.domain.dependency.hashing import HashingSettings
 from pytest_mock import mocker
@@ -112,7 +116,7 @@ def test_default_config(clean_env):
     script = """
 import os
 from pathlib import Path
-from mcard.infrastructure.config import load_config, get_project_root
+from mcard.infrastructure.infrastructure_config_manager import load_config, get_project_root
 
 config = load_config()
 assert config.repository.db_path == "data/mcard.db", f"Expected data/mcard.db, got {config.repository.db_path}"
@@ -214,7 +218,7 @@ def test_custom_hash_validation(clean_env):
 
 def test_path_creation(mocker):
     """Test that database paths are created if they don't exist."""
-    from mcard.infrastructure.config import get_project_root
+    from mcard.infrastructure.infrastructure_config_manager import get_project_root
     
     # Get the project's data directory
     data_dir = get_project_root() / "data"

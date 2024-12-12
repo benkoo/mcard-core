@@ -1,34 +1,38 @@
 """MCard model definition."""
 import hashlib
 from datetime import datetime, timezone
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Dict, Any, List
+from pydantic import BaseModel
 
 from ..models.exceptions import ValidationError
 from ..services.card_hashing import compute_hash
 
+class CardCreate(BaseModel):
+    """Request model for creating a new card."""
+    content: str
+
 class MCard:
-    """MCard model."""
+    """MCard domain model."""
 
     def __init__(self, content: Union[str, bytes], hash: Optional[str] = None, g_time: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
         """Initialize MCard."""
         if content is None:
             raise ValidationError("Card content cannot be None")
 
-        # Convert content to bytes if it's a string
-        if isinstance(content, str):
-            self._content = content.encode('utf-8')
-        elif isinstance(content, bytes):
-            self._content = content
+        # Convert content to string if it's bytes
+        if isinstance(content, bytes):
+            self._content = content.decode('utf-8')
         else:
-            self._content = str(content).encode('utf-8')
+            self._content = str(content)
 
         # Compute hash if not provided
-        self._hash = hash or compute_hash(self._content)
+        content_bytes = self._content.encode('utf-8')
+        self._hash = hash or compute_hash(content_bytes)
         self._g_time = self._parse_time(g_time) if g_time else datetime.now(timezone.utc)
         self._metadata = metadata or {}
 
     @property
-    def content(self) -> Union[str, bytes]:
+    def content(self) -> str:
         """Get card content."""
         return self._content
 
@@ -71,13 +75,33 @@ class MCard:
         except (ValueError, TypeError) as e:
             raise ValidationError(f"Invalid time format: {str(e)}")
 
+    def to_api_response(self) -> 'CardResponse':
+        """Convert to API response model."""
+        return CardResponse(
+            hash=self.hash,
+            content=self.content,
+            g_time=self.g_time,
+            metadata=self.metadata
+        )
+
     def __str__(self) -> str:
         """String representation of MCard."""
-        try:
-            content_preview = self._content.decode('utf-8')[:50]
-        except UnicodeDecodeError:
-            content_preview = str(self._content)[:50]
+        content_preview = self._content[:50]
 
-        if len(content_preview) < len(str(self._content)):
+        if len(content_preview) < len(self._content):
             content_preview += "..."
         return f"MCard(hash={self.hash}, g_time={self.g_time}, content={content_preview}, metadata={self.metadata})"
+
+class CardResponse(BaseModel):
+    """API response model for card data."""
+    hash: str
+    content: str
+    g_time: str
+    metadata: Dict = {}
+
+class PaginatedCardsResponse(BaseModel):
+    """Response model for paginated card listings."""
+    items: List[CardResponse]
+    total: int
+    page: int
+    page_size: int

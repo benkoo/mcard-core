@@ -73,6 +73,8 @@ async def init_mcard():
     global storage, mcard_setup
     try:
         if mcard_setup is None:
+            logger.info(f"Using database path: {DB_PATH}")
+            logger.info(f"Database path: {DB_PATH}")
             logger.info(f"Initializing MCard with database at: {DB_PATH}")
             mcard_setup = MCardSetup(
                 db_path=DB_PATH,

@@ -203,7 +203,7 @@ async function stopServer() {
         }
 
         console.log('Stopping server...');
-        
+
         const cleanup = () => {
             serverProcess = null;
             console.log('Server stopped successfully');
@@ -214,18 +214,18 @@ async function stopServer() {
             // Try graceful shutdown first
             process.kill(-serverProcess.pid);
             serverProcess.on('close', cleanup);
-            
+
             // Force kill after timeout
             setTimeout(() => {
                 if (serverProcess) {
                     try {
                         process.kill(-serverProcess.pid, 'SIGKILL');
                     } catch (error) {
-                        // Process might already be gone
+                        console.error('Error forcing kill:', error);
                     }
                     cleanup();
                 }
-            }, 5000);
+            }, 10000); // Increased timeout to 10 seconds
         } catch (error) {
             console.error('Error stopping server:', error);
             cleanup();

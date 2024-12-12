@@ -6,11 +6,11 @@ from datetime import datetime
 from typing import Optional
 import click
 from ...domain.models.card import MCard
-from mcard.interfaces.api.mcard_api import get_store
+from mcard.interfaces.api.mcard_api import api
 
 def get_repository():
     """Alias for get_store to maintain compatibility."""
-    return get_store()
+    return api.get_store()
 
 @click.group()
 def cli():

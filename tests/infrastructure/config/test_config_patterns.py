@@ -1,9 +1,16 @@
-"""Tests for configuration design patterns and architecture."""
+"""Test configuration patterns."""
 import os
 import pytest
-from mcard.infrastructure.config import (
-    DataEngineConfig,
+from pathlib import Path
+from mcard.infrastructure.infrastructure_config_manager import (
+    get_project_root,
+    get_default_db_path,
+    get_test_db_path,
+    load_config,
+    resolve_db_path,
+    ConfigurationSource,
     EnvironmentConfigSource,
+    DataEngineConfig,
     TestConfigSource,
 )
 

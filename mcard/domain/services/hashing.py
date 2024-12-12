@@ -9,8 +9,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from ..models.config import HashingSettings
-from ..models.hashing_protocol import HashingService as HashingServiceProtocol
+from mcard.domain.models.domain_config_models import HashingSettings
+from mcard.domain.models.hashing_protocol import HashingService as HashingServiceProtocol
 
 class HashingError(Exception):
     """Raised when hashing operations fail."""

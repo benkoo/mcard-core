@@ -73,10 +73,50 @@ The application uses the `g_time` attribute from MCard to track content creation
 - Binary Files with download option
 - Dynamically detected content types
 
-## Development Setup
-1. Clone the repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Run the application: `python app.py`
+## Running the Application
+
+### Prerequisites
+- Python 3.12 or higher
+- Virtual environment (recommended)
+
+### Setup Instructions
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourusername/mcard-core.git
+   cd mcard-core/examples/mcard_crud_app
+   ```
+
+2. **Create a virtual environment**:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure environment variables**:
+   Copy [.env.example](cci:7://file:///Users/bkoo/Documents/Development/mcard-core/.env.example:0:0-0:0) to [.env](cci:7://file:///Users/bkoo/Documents/Development/mcard-core/.env:0:0-0:0) and adjust settings as needed.
+
+5. **Run the application**:
+   ```bash
+   python app.py
+   ```
+
+### Troubleshooting
+- If you encounter issues, check the [app.log](cci:7://file:///Users/bkoo/Documents/Development/mcard-core/examples/mcard_crud_app/app.log:0:0-0:0) for error messages.
+- Ensure that all dependencies are installed correctly.
+
+### Logging
+- The application logs are stored in [app.log](cci:7://file:///Users/bkoo/Documents/Development/mcard-core/examples/mcard_crud_app/app.log:0:0-0:0). Review this file for detailed error messages and application behavior.
+
+### Testing
+To run tests for the CRUD application:
+```bash
+pytest
+```
 
 ## Key Technologies
 - Python 3.12

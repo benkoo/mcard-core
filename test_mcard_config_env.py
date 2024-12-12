@@ -1,15 +1,17 @@
+"""Test configuration environment."""
 import os
+import pytest
+from pathlib import Path
+from mcard.domain.models.domain_config_models import AppSettings, DatabaseSettings
 import asyncio
 import logging
 import tempfile
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 import sqlite3
 import dotenv
 
-# Import configuration and schema initialization
-from mcard.domain.models.config import AppSettings, DatabaseSettings
+# Import schema initialization
 from mcard.infrastructure.persistence.schema import SQLiteSchemaHandler
 from mcard.infrastructure.repository import SQLiteRepository
 

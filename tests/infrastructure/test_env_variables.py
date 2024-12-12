@@ -1,7 +1,15 @@
+"""Test environment variables."""
 import os
 import pytest
-from dotenv import load_dotenv
 from pathlib import Path
+from mcard.infrastructure.infrastructure_config_manager import (
+    get_project_root,
+    get_default_db_path,
+    get_test_db_path,
+    load_config,
+    resolve_db_path
+)
+from dotenv import load_dotenv
 
 # Load test-specific environment variables
 test_env_path = Path(__file__).parent.parent / '.env.test'
@@ -34,7 +42,6 @@ def test_MCARD_STORE_PATH():
     assert actual_db_path == expected_db_path, f"Expected MCARD_STORE_PATH to be '{expected_db_path}', but got '{actual_db_path}'"
 
     # Verify the path exists and is relative to project root
-    from mcard.infrastructure.config import get_project_root
     db_path = get_project_root() / expected_db_path
     assert db_path.parent.exists(), f"Database directory {db_path.parent} does not exist"
     assert db_path.parent.is_dir(), f"{db_path.parent} is not a directory"
@@ -42,8 +49,6 @@ def test_MCARD_STORE_PATH():
 
 def test_data_directory_creation():
     """Test that the data directory is created if it doesn't exist."""
-    from mcard.infrastructure.config import get_project_root, get_default_db_path, get_test_db_path
-    
     # Get data directory path
     data_dir = get_project_root() / "data"
     
@@ -71,7 +76,6 @@ def test_data_directory_creation():
 def test_test_mode_configuration():
     """Test that test-specific configuration is used in test mode."""
     import os
-    from mcard.infrastructure.config import load_config, get_test_db_path
     from mcard.infrastructure.persistence.store import MCardStore
     
     # Set test mode
@@ -104,7 +108,7 @@ def test_test_mode_configuration():
 def test_env_overrides_in_test_mode():
     """Test that environment variables can override test defaults."""
     import os
-    from mcard.infrastructure.config import load_config, ENV_DB_PATH, ENV_DB_MAX_CONNECTIONS, ENV_DB_TIMEOUT
+    from mcard.infrastructure.infrastructure_config_manager import ENV_DB_PATH, ENV_DB_MAX_CONNECTIONS, ENV_DB_TIMEOUT
     
     # Set test mode
     os.environ['PYTEST_CURRENT_TEST'] = 'test_env_overrides_in_test_mode'
