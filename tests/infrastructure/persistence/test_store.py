@@ -31,13 +31,13 @@ async def cleanup_store():
     # Force close any remaining connections
     await asyncio.sleep(0.1)  # Allow any pending operations to complete
     
-    # Clean up the test database
-    try:
-        import os
-        if os.path.exists("test.db"):
-            os.remove("test.db")
-    except Exception as e:
-        logger.warning(f"Failed to cleanup test database: {e}")
+    # Temporarily comment out database cleanup to inspect it
+    # try:
+    #     import os
+    #     if os.path.exists("test.db"):
+    #         os.remove("test.db")
+    # except Exception as e:
+    #     logger.warning(f"Failed to cleanup test database: {e}")
 
 @pytest_asyncio.fixture
 async def store():

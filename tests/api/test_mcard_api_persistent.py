@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Load configuration
 config = load_config()
-DB_PATH = config.database.db_path
+DB_PATH = "./tests/data/test_mcard.db"  # Hardcoded path for testing
 
 # Ensure the database directory exists
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)

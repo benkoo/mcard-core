@@ -98,7 +98,6 @@ class SchemaManager:
         - hash: TEXT - Hash identifier for the card
         - content: TEXT - Card content
         - g_time: TEXT - Global timestamp with timezone information
-        - metadata: TEXT - JSON-encoded metadata associated with the card
         """
         self._tables = {
             "card": TableDefinition(
@@ -131,12 +130,6 @@ class SchemaManager:
                         nullable=False,
                         index=True,
                         comment="Global timestamp in ISO 8601 format with timezone and microsecond precision (e.g., '2023-12-25T13:45:30.123456+00:00')"
-                    ),
-                    ColumnDefinition(
-                        name="metadata",
-                        type=ColumnType.TEXT,
-                        nullable=True,
-                        comment="JSON-encoded metadata associated with the card"
                     )
                 ],
                 indexes={
